@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { syncRecentlyUpdatedAnime } from "./anilist/animeTitlesAndRelations/keepUpdatedSync.task";
+import { syncRecentlyUpdatedAnime } from "./anilist/animeTitlesAndRelations/keepUpdated.task";
 
 const app = new Hono();
 
