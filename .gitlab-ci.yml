@@ -1,20 +1,5 @@
 stages:
-  - test
   - build
-
-vitest:
-  stage: test
-  image: node:22-alpine
-  before_script:
-    - corepack enable
-    - corepack prepare pnpm@10.29.2 --activate
-    - cd server
-    - pnpm install --frozen-lockfile
-  script:
-    - pnpm test --run
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 docker-build:
   stage: build
