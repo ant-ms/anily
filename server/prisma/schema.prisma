@@ -1,0 +1,40 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [pg_trgm]
+}
+
+model BaseAnime {
+  anilistId   Int    @id
+  malId       Int?
+  lastUpdated BigInt
+
+  titleEnglish String?
+  titleNative  String?
+  titleRomanji String?
+  synonyms     AnimeSynonym[]
+
+  relatedAnime BaseAnime[] @relation("BaseAnimeRelations")
+  relatedToBy  BaseAnime[] @relation("BaseAnimeRelations")
+
+  @@index([titleEnglish(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([titleRomanji(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([titleNative(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model AnimeSynonym {
+  id      Int    @id @default(autoincrement())
+  animeId Int
+  text    String
+
+  anime BaseAnime @relation(fields: [animeId], references: [anilistId])
+
+  @@unique([animeId, text])
+  @@index([text(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([animeId])
+}

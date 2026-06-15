@@ -1,0 +1,33 @@
+stages:
+  - test
+  - build
+
+vitest:
+  stage: test
+  image: node:22-alpine
+  before_script:
+    - corepack enable
+    - corepack prepare pnpm@10.29.2 --activate
+    - cd server
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm test --run
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+docker-build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.0-debug
+    entrypoint: [""]
+  script:
+    - /kaniko/executor
+      --context "$CI_PROJECT_DIR/server"
+      --dockerfile "$CI_PROJECT_DIR/server/Dockerfile"
+      --destination "$CI_REGISTRY_IMAGE/server:$CI_COMMIT_SHORT_SHA"
+  before_script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" | base64)\"}}}" > /kaniko/.docker/config.json
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
