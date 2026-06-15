@@ -4,17 +4,18 @@ export const GET_ANIME_TITLES_QUERY = graphql(`
   query Query(
     $page: Int
     $sort: [MediaSort]
-    $type: MediaType
     $startDateGreater: FuzzyDateInt
     $startDateLesser: FuzzyDateInt
+    $endDateGreater: FuzzyDateInt
     $perPage: Int
   ) {
     Page(page: $page, perPage: $perPage) {
       media(
         sort: $sort
-        type: $type
+        type: ANIME
         startDate_greater: $startDateGreater
         startDate_lesser: $startDateLesser
+        endDate_greater: $endDateGreater
       ) {
         id
         idMal

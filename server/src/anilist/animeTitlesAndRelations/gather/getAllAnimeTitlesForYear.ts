@@ -6,7 +6,6 @@ export async function getAllAnimeTitlesForYear(year: number) {
 
   const getPagesRecursively = async (page: number = 0) => {
     const result = await fetchGraphQL(GET_ANIME_TITLES_QUERY, {
-      type: "ANIME",
       perPage,
       page,
       startDateGreater: `${year}0101`,
