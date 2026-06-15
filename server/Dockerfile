@@ -8,6 +8,8 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+RUN pnpm prisma generate
+RUN pnpm codegen
 RUN pnpm build
 
 FROM node:22-alpine AS runtime
