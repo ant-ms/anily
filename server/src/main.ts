@@ -8,6 +8,7 @@ import {
 } from "@hono/oidc-auth";
 import { syncRecentlyUpdatedAnime } from "./anilist/animeTitlesAndRelations/keepUpdated.task";
 import packageJson from "../package.json";
+import { searchForAnime } from "./functions/searchForAnime";
 
 const app = new Hono();
 
@@ -43,8 +44,27 @@ app.get("/info", (c) => {
 });
 
 // authenticated routes
-app.get("api/login", (c) => c.redirect("http://localhost:5173")); // TODO
+app.get("/api/login", (c) => c.redirect("http://localhost:5173")); // TODO
 app.get("/api/me", async (c) => c.json(await getAuth(c)));
+app.get("/api/search", async (c) => {
+  const query = c.req.query("q");
+  if (!query) return c.json({ error: "No query provided" });
+
+  try {
+    const results = await searchForAnime(query);
+    const filteredResults = results.map((result) => {
+      return {
+        anilistId: result.anilistId,
+        titleEnglish: result.titleEnglish,
+        titleRomanji: result.titleRomanji,
+        titleNative: result.titleNative,
+      };
+    });
+    return c.json(filteredResults);
+  } catch (error) {
+    return c.json({ error: "Failed to search", reason: error });
+  }
+});
 
 serve(
   {

@@ -2,14 +2,14 @@
     import SidebarTabs from "./SidebarTabs.svelte";
     import SidebarUser from "./SidebarUser.svelte";
     import type { Tab } from "../tab-switcher/tab-switcher-types";
-    import type LoginData from "../../types/LoginData";
+    import type ProfileData from "../../types/ProfileData";
 
     let {
         activeTab = $bindable(),
         profileData,
     }: {
         activeTab?: Tab;
-        profileData: LoginData;
+        profileData: ProfileData;
     } = $props();
 </script>
 

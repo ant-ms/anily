@@ -2,12 +2,13 @@
     import Button from "../lib/Button.svelte";
     import SignInIcon from "phosphor-svelte/lib/SignInIcon";
     import { PersistedState } from "runed";
-    import type LoginData from "../types/LoginData";
+    import type ProfileData from "../types/ProfileData";
+    import { apiBaseUrl } from "../lib/context";
 
     let {
-        profileData = $bindable(),
+        profileData: profileData = $bindable(),
     }: {
-        profileData?: LoginData;
+        profileData?: ProfileData;
     } = $props();
 
     const enteredUrl = new PersistedState("backendUrl", "https://");
@@ -50,8 +51,8 @@
 
                 enteredUrlAuthenticated = true;
                 const content = await response.json();
+                apiBaseUrl.set(new URL(enteredUrl.current));
                 profileData = {
-                    apiBaseUrl: `${enteredUrl.current}/api`,
                     name: content.name.split(" ")[0],
                     pictureUrl: content.picture,
                 };

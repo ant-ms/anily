@@ -19,8 +19,10 @@ model BaseAnime {
   titleRomanji String?
   synonyms     AnimeSynonym[]
 
-  relatedAnime BaseAnime[] @relation("BaseAnimeRelations")
-  relatedToBy  BaseAnime[] @relation("BaseAnimeRelations")
+  relatedAnime  BaseAnime[]         @relation("BaseAnimeRelations")
+  relatedToBy   BaseAnime[]         @relation("BaseAnimeRelations")
+  detailedAnime DetailedAnime?
+  groupingItems AnimeGroupingItem[]
 
   @@index([titleEnglish(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([titleRomanji(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -37,4 +39,53 @@ model AnimeSynonym {
   @@unique([animeId, text])
   @@index([text(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([animeId])
+}
+
+enum Rating {
+  LIKE
+  NEUTRAL
+  DISLIKE
+}
+
+model Episode {
+  id Int @id @default(autoincrement())
+
+  titleEnglish String?
+  titleNative  String?
+  titleRomanji String?
+
+  thumbnailUrl String?
+
+  watched Boolean @default(false)
+}
+
+model AnimeGrouping {
+  id    Int             @id @default(autoincrement())
+  items DetailedAnime[]
+}
+
+model DetailedAnime {
+  id                 Int       @id @default(autoincrement())
+  baseAnime          BaseAnime @relation(fields: [baseAnimeAnilistId], references: [anilistId])
+  baseAnimeAnilistId Int       @unique
+
+  groupingOrder Int?
+  groupingId    Int?
+  grouping      AnimeGrouping? @relation(fields: [groupingId], references: [id], onDelete: Cascade)
+
+  thumbnailUrl String?
+  description  String?
+
+  rating         Rating
+  markedForLater Boolean
+
+  @@unique([groupingId, groupingOrder])
+  @@index([groupingId])
+}
+
+model AnimeGroupingItem {
+  id          Int       @id @default(autoincrement())
+  order       Int
+  baseAnimeId Int
+  baseAnime   BaseAnime @relation(fields: [baseAnimeId], references: [anilistId], onDelete: Cascade)
 }

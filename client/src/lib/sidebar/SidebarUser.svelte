@@ -4,14 +4,15 @@
     import GearIcon from "phosphor-svelte/lib/GearIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
     import type { Tab } from "../tab-switcher/tab-switcher-types";
-    import type LoginData from "../../types/LoginData";
+    import type ProfileData from "../../types/ProfileData";
+    import { apiBaseUrl } from "../context";
 
     let {
         activeTab = $bindable(),
         profileData,
     }: {
         activeTab?: Tab;
-        profileData: LoginData;
+        profileData: ProfileData;
     } = $props();
 </script>
 
@@ -39,7 +40,7 @@
     <Button
         Icon={SignOutIcon}
         onclick={() => {
-            window.location.href = `${profileData.apiBaseUrl.replace(/\/api$/, "")}/logout`;
+            window.location.href = `${apiBaseUrl.get()}/logout`;
         }}
     />
 </div>

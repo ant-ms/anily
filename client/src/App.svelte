@@ -6,9 +6,9 @@
     import LogsPage from "./pages/LogsPage.svelte";
     import SettingsPage from "./pages/SettingsPage.svelte";
     import HomePage from "./pages/HomePage.svelte";
-    import type LoginData from "./types/LoginData";
+    import type ProfileData from "./types/ProfileData";
 
-    let profileData: LoginData | undefined = $state(undefined);
+    let profileData: ProfileData | undefined = $state(undefined);
 
     let activeTab: Tab | undefined = $state();
 </script>
