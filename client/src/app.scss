@@ -1,0 +1,21 @@
+:root {
+    --color-accent: hsl(48, 100%, 58%);
+}
+
+html {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+    margin: 0;
+    background: #13100e;
+    color: #ffffff;
+}
+
+input {
+    font-size: unset;
+    background: unset;
+    border: unset;
+    color: unset;
+    outline: none;
+}
