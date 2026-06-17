@@ -1,6 +1,9 @@
-import { prisma } from "../../prisma";
-import { getRecentlyUpdatedAnime } from "./gather/getRecentlyUpdatedAnime";
-import upsertAnimeTitlesAndRelations from "./upsertAnimeTitlesAndRelations";
+import { prisma } from "../prisma";
+import { updateAnimeDetailsIfNeeded } from "./animeDetails/keepUpdated.task";
+import { getRecentlyUpdatedAnime } from "./animeTitlesAndRelations/gather/getRecentlyUpdatedAnime";
+import upsertAnimeTitlesAndRelations from "./animeTitlesAndRelations/upsertAnimeTitlesAndRelations";
+
+// TODO: Is there any way to determine what was updated?
 
 export async function syncRecentlyUpdatedAnime() {
   console.log("[animeTitles.keepUpdatedSync] fetching recently updated anime");
@@ -18,7 +21,7 @@ export async function syncRecentlyUpdatedAnime() {
     );
 
     let page = 1;
-    let totalUpserted = 0;
+    let totalUpdated = 0;
     let reachedCutoff = false;
 
     while (!reachedCutoff) {
@@ -33,8 +36,13 @@ export async function syncRecentlyUpdatedAnime() {
           break;
         }
 
+        // First update the titles and relations
         await upsertAnimeTitlesAndRelations(anime);
-        totalUpserted++;
+
+        // Then update the details (thubnail and description)
+        await updateAnimeDetailsIfNeeded(anime.id);
+
+        totalUpdated++;
       }
 
       if (!reachedCutoff && pageInfo.hasNextPage) {
@@ -45,7 +53,7 @@ export async function syncRecentlyUpdatedAnime() {
     }
 
     console.log(
-      `[animeTitles.keepUpdatedSync] sync complete — upserted ${totalUpserted} anime`,
+      `[animeTitles.keepUpdatedSync] sync complete — updated ${totalUpdated} anime`,
     );
   } catch (error) {
     console.error("[animeTitles.keepUpdatedSync] sync failed:", error);

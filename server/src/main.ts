@@ -6,7 +6,7 @@ import {
   revokeSession,
   processOAuthCallback,
 } from "@hono/oidc-auth";
-import { syncRecentlyUpdatedAnime } from "./anilist/animeTitlesAndRelations/keepUpdated.task";
+import { syncRecentlyUpdatedAnime } from "./anilist/keepUpdated.task";
 import packageJson from "../package.json";
 import { searchForAnime } from "./functions/searchForAnime";
 

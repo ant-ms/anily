@@ -1,2 +1,13 @@
-// TODO: Update once a night for anime that broadcasted within -6 months,
-//       otherwise once every 31 days (in batches of size n / 31)
+import { prisma } from "../../prisma";
+import { getAnimeDetailsFromApiAndUpsert } from "./getAnimeDetailsFromApiAndUpsert";
+
+export const updateAnimeDetailsIfNeeded = async (anilistId: number) => {
+  const existsInDB = await prisma.animeDetails.findUnique({
+    where: { baseAnimeAnilistId: anilistId },
+  });
+
+  // We skip updating any details if the anime is not in the database
+  if (!existsInDB) return;
+
+  await getAnimeDetailsFromApiAndUpsert(anilistId);
+};

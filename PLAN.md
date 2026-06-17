@@ -1,5 +1,5 @@
 - [x] Search (Basic database updates for titles and relations)
-- [ ] OICD Authentication
+- [x] OICD Authentication
 - [ ] Anime details (thumbnail and description, and set rating and marked)
 - [ ] Episodes (details from TMDB and dates from Jikan)
 - [ ] AnimeGrouping (show in sidebar, top switcher to move within franchise, built during add/update)
