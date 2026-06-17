@@ -2,11 +2,14 @@
     import SidebarTabs from "./SidebarTabs.svelte";
     import SidebarUser from "./SidebarUser.svelte";
     import type { Tab } from "../tab-switcher/tab-switcher-types";
+    import type LoginData from "../../types/LoginData";
 
     let {
         activeTab = $bindable(),
+        profileData,
     }: {
         activeTab?: Tab;
+        profileData: LoginData;
     } = $props();
 </script>
 
@@ -27,11 +30,11 @@
             <div>TODO settings</div>
         {:else}
             <div>
-                TODO watching anime with new unwatched episodes ("like news")
+                TODO watching anime with new <br /> unwatched episodes ("like news")
             </div>
         {/if}
     </div>
-    <SidebarUser bind:activeTab />
+    <SidebarUser bind:activeTab {profileData} />
 </div>
 
 <style lang="scss">

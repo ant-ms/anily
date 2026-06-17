@@ -4,20 +4,20 @@
     import GearIcon from "phosphor-svelte/lib/GearIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
     import type { Tab } from "../tab-switcher/tab-switcher-types";
+    import type LoginData from "../../types/LoginData";
 
     let {
         activeTab = $bindable(),
+        profileData,
     }: {
         activeTab?: Tab;
+        profileData: LoginData;
     } = $props();
 </script>
 
 <div id="sidebar-user">
-    <img
-        src="https://gitlab.com/uploads/-/system/user/avatar/3555890/avatar.png"
-        alt=""
-    />
-    <span>Yanik</span>
+    <img src={profileData.pictureUrl} alt="" />
+    <span>{profileData.name}</span>
     <Button
         Icon={LogIcon}
         active={activeTab?.id === "logs"}
@@ -36,7 +36,12 @@
             };
         }}
     />
-    <Button Icon={SignOutIcon} />
+    <Button
+        Icon={SignOutIcon}
+        onclick={() => {
+            window.location.href = `${profileData.apiBaseUrl.replace(/\/api$/, "")}/logout`;
+        }}
+    />
 </div>
 
 <style lang="scss">

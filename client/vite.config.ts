@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       $lib: path.resolve(__dirname, "./src/lib"),
       $pages: path.resolve(__dirname, "./src/pages"),
+      $types: path.resolve(__dirname, "./src/types"),
     },
   },
 });

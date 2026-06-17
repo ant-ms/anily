@@ -1,21 +1,21 @@
 <script lang="ts">
     import Sidebar from "$lib/sidebar/Sidebar.svelte";
-    import Searchbar from "$lib/searchbar/Searchbar.svelte";
     import "./app.scss";
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import LoginPage from "./pages/LoginPage.svelte";
     import LogsPage from "./pages/LogsPage.svelte";
     import SettingsPage from "./pages/SettingsPage.svelte";
+    import HomePage from "./pages/HomePage.svelte";
+    import type LoginData from "./types/LoginData";
 
-    // TODO
-    let loggedIn = $state(true);
+    let profileData: LoginData | undefined = $state(undefined);
 
     let activeTab: Tab | undefined = $state();
 </script>
 
-{#if loggedIn}
+{#if profileData}
     <main>
-        <Sidebar bind:activeTab />
+        <Sidebar bind:activeTab {profileData} />
         <div id="content">
             {#if activeTab?.id === "watching"}
 
@@ -28,13 +28,12 @@
             {:else if activeTab?.id === "settings"}
                 <SettingsPage />
             {:else}
-                <Searchbar />
-                <div>TODO calendar</div>
+                <HomePage />
             {/if}
         </div>
     </main>
 {:else}
-    <LoginPage />
+    <LoginPage bind:profileData />
 {/if}
 
 <style style="scss">

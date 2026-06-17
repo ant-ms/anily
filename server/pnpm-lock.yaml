@@ -11,6 +11,9 @@ importers:
       '@hono/node-server':
         specifier: ^2.0.4
         version: 2.0.4(hono@4.12.25)
+      '@hono/oidc-auth':
+        specifier: ^1.8.3
+        version: 1.8.3(hono@4.12.25)
       '@prisma/adapter-pg':
         specifier: ^7.8.0
         version: 7.8.0
@@ -742,6 +745,12 @@ packages:
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
+
+  '@hono/oidc-auth@1.8.3':
+    resolution: {integrity: sha512-mirx3dUNLChkk8IyiWNlv5J6lGQyQ3I0jazV1F9CD8vNjNfknhjT7Hbk+z5JPBJtJXTvRVt3i0LP8J/hMLV1Dg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      hono: '>=3.0.0'
 
   '@inquirer/ansi@2.0.7':
     resolution: {integrity: sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q==}
@@ -2112,6 +2121,9 @@ packages:
     resolution: {integrity: sha512-3pKJwH184Xo/lnH6oyP1q2pMd7HcypqqmRs91/6/i2CGtWwIKGCkOOMTm/zXbgTEWHw1uNpNi/igc3ePOYHb6w==}
     engines: {node: '>=0.10.0'}
 
+  oauth4webapi@3.8.6:
+    resolution: {integrity: sha512-iwemM91xz8nryHti2yTmg5fhyEMVOkOXwHNqbvcATjyajb5oQxCQzrNOA6uElRHuMhQQTKUyFKV9y/CNyg25BQ==}
+
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
     engines: {node: '>=0.10.0'}
@@ -3447,6 +3459,11 @@ snapshots:
     dependencies:
       hono: 4.12.25
 
+  '@hono/oidc-auth@1.8.3(hono@4.12.25)':
+    dependencies:
+      hono: 4.12.25
+      oauth4webapi: 3.8.6
+
   '@inquirer/ansi@2.0.7': {}
 
   '@inquirer/checkbox@5.2.1(@types/node@25.9.3)':
@@ -4654,6 +4671,8 @@ snapshots:
   normalize-path@2.1.1:
     dependencies:
       remove-trailing-separator: 1.1.0
+
+  oauth4webapi@3.8.6: {}
 
   object-assign@4.1.1: {}
 

@@ -8,28 +8,28 @@
         onclick = undefined,
         style = "normal",
         active = false,
+        disabled = false,
     }: {
         children?: Snippet;
         Icon?: Component<IconComponentProps, {}, "">;
         style?: "normal" | "ghost";
         active?: boolean;
         onclick?: () => void;
+        disabled?: boolean;
     } = $props();
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="button" {onclick} class:active>
+<button {onclick} class:active {disabled}>
     {#if Icon}
         <Icon size="1.25rem" />
     {/if}
     {#if children}
         {@render children()}
     {/if}
-</div>
+</button>
 
 <style lang="scss">
-    .button {
+    button {
         display: flex;
         align-items: center;
         gap: 4px;
