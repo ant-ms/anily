@@ -7,6 +7,8 @@
     import SettingsPage from "./pages/SettingsPage.svelte";
     import HomePage from "./pages/HomePage.svelte";
     import type ProfileData from "./types/ProfileData";
+    import { selectedAnimeAnilistId } from "./lib/context.svelte";
+    import AnimeDetailsPage from "./pages/AnimeDetailsPage.svelte";
 
     let profileData: ProfileData | undefined = $state(undefined);
 
@@ -17,12 +19,8 @@
     <main>
         <Sidebar bind:activeTab {profileData} />
         <div id="content">
-            {#if activeTab?.id === "watching"}
-
-            {:else if activeTab?.id === "bookmarked"}
-
-            {:else if activeTab?.id === "done"}
-
+            {#if selectedAnimeAnilistId.current}
+                <AnimeDetailsPage />
             {:else if activeTab?.id === "logs"}
                 <LogsPage />
             {:else if activeTab?.id === "settings"}
@@ -41,9 +39,5 @@
         display: grid;
         grid-template-columns: auto 1fr;
         grid-template-rows: 100vh;
-
-        #content {
-            padding: 12px;
-        }
     }
 </style>

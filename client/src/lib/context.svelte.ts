@@ -1,11 +1,12 @@
 class Context<T> {
-  private _value: T | undefined;
+  private _value: T | undefined = $state();
   public set(value: T | undefined) {
     this._value = value;
   }
-  public get(): T | undefined {
+  public get current(): T | undefined {
     return this._value;
   }
 }
 
 export const apiBaseUrl = new Context<URL>();
+export const selectedAnimeAnilistId = new Context<number>();

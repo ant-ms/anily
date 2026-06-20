@@ -10,5 +10,6 @@
 
 <style lang="scss">
     #home-page {
+        padding: 12px;
     }
 </style>

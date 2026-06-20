@@ -1,6 +1,6 @@
 <script lang="ts">
     import MagnifyingGlassIcon from "phosphor-svelte/lib/MagnifyingGlassIcon";
-    import { apiBaseUrl } from "../context";
+    import { apiBaseUrl, selectedAnimeAnilistId } from "../context.svelte";
     import { Debounced } from "runed";
 
     type SearchResult = {
@@ -23,14 +23,14 @@
             return;
         }
 
-        if (!apiBaseUrl.get()) {
+        if (!apiBaseUrl.current) {
             console.warn("[Searchbar] apiBaseUrl not set but tried to search");
             return;
         }
 
         const url = new URL(
             `/api/search?q=${encodeURIComponent(query)}`,
-            apiBaseUrl.get(),
+            apiBaseUrl.current,
         );
 
         fetch(url.toString(), { credentials: "include" })
@@ -50,12 +50,11 @@
     let inputElement: HTMLElement | undefined;
     let autocompleteElement: HTMLElement | undefined;
     const autocompleteTopPadding = 8;
-    const autocompleteWidthOffset = -24;
     $effect(() => {
         if (autocompleteElement && inputElement) {
             autocompleteElement.style.top = `${inputElement.getBoundingClientRect().bottom + autocompleteTopPadding}px`;
             autocompleteElement.style.left = `${inputElement.getBoundingClientRect().left}px`;
-            autocompleteElement.style.width = `${inputElement.getBoundingClientRect().width + autocompleteWidthOffset}px`;
+            autocompleteElement.style.width = `${inputElement.getBoundingClientRect().width}px`;
         }
     });
 </script>
@@ -76,7 +75,13 @@
     bind:this={autocompleteElement}
 >
     {#each searchResults as result}
-        <div>{result.titleEnglish}</div>
+        <button
+            onclick={() => {
+                selectedAnimeAnilistId.set(result.anilistId);
+            }}
+        >
+            {result.titleEnglish || result.titleRomanji || result.titleNative}
+        </button>
     {/each}
 </div>
 
@@ -95,11 +100,21 @@
         position: absolute;
         background: #1d1a17;
         border-radius: 0.5rem;
-        padding: 0.75rem;
+        overflow: hidden;
+
         display: none;
+        flex-direction: column;
+
+        button {
+            cursor: pointer;
+            padding: 0.5rem;
+            &:hover {
+                background: #2a2622;
+            }
+        }
 
         &.active {
-            display: block;
+            display: flex;
         }
     }
 </style>

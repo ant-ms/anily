@@ -3,7 +3,7 @@
     import SignInIcon from "phosphor-svelte/lib/SignInIcon";
     import { PersistedState } from "runed";
     import type ProfileData from "../types/ProfileData";
-    import { apiBaseUrl } from "../lib/context";
+    import { apiBaseUrl } from "../lib/context.svelte";
 
     let {
         profileData: profileData = $bindable(),
@@ -52,8 +52,11 @@
                 enteredUrlAuthenticated = true;
                 const content = await response.json();
                 apiBaseUrl.set(new URL(enteredUrl.current));
+                if (!content.name) {
+                    console.error("no name", content);
+                }
                 profileData = {
-                    name: content.name.split(" ")[0],
+                    name: content.name?.split(" ")[0],
                     pictureUrl: content.picture,
                 };
             })
