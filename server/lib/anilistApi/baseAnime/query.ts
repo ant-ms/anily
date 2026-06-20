@@ -16,6 +16,7 @@ export const GET_ANIME_TITLES_QUERY = graphql(`
         startDate_greater: $startDateGreater
         startDate_lesser: $startDateLesser
         endDate_greater: $endDateGreater
+        format_in: [MOVIE, ONA, ONE_SHOT, OVA, SPECIAL, TV, TV_SHORT]
       ) {
         id
         idMal
@@ -25,11 +26,17 @@ export const GET_ANIME_TITLES_QUERY = graphql(`
           romaji
         }
         relations {
-          nodes {
+          edges {
             id
-            type
+            relationType
+            node {
+              id
+              type
+              format
+            }
           }
         }
+        format
         synonyms
         updatedAt
       }

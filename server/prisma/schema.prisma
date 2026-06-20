@@ -9,23 +9,64 @@ datasource db {
   extensions = [pg_trgm]
 }
 
+enum AnimeFormat {
+  MOVIE
+  ONA
+  ONE_SHOT
+  OVA
+  SPECIAL
+  TV
+  TV_SHORT
+}
+
 model BaseAnime {
-  anilistId   Int    @id
+  anilistId   Int         @id
   malId       Int?
   lastUpdated BigInt
+  format      AnimeFormat
 
   titleEnglish String?
   titleNative  String?
   titleRomanji String?
   synonyms     AnimeSynonym[]
 
-  relatedAnime BaseAnime[]   @relation("BaseAnimeRelations")
-  relatedToBy  BaseAnime[]   @relation("BaseAnimeRelations")
+  relationsOut AnimeRelation[] @relation("RelationFrom")
+  relationsIn  AnimeRelation[] @relation("RelationTo")
   animeDetails AnimeDetails?
 
   @@index([titleEnglish(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([titleRomanji(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([titleNative(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+enum AnimeRelationType {
+  ADAPTATION
+  PREQUEL
+  SEQUEL
+  PARENT
+  SIDE_STORY
+  CHARACTER
+  SUMMARY
+  ALTERNATIVE
+  SPIN_OFF
+  OTHER
+  SOURCE
+  COMPILATION
+  CONTAINS
+}
+
+model AnimeRelation {
+  id           Int               @id @default(autoincrement())
+  relationType AnimeRelationType
+
+  fromAnime   BaseAnime @relation("RelationFrom", fields: [fromAnimeId], references: [anilistId])
+  fromAnimeId Int
+  toAnime     BaseAnime @relation("RelationTo", fields: [toAnimeId], references: [anilistId])
+  toAnimeId   Int
+
+  @@unique([fromAnimeId, toAnimeId, relationType])
+  @@index([fromAnimeId])
+  @@index([toAnimeId])
 }
 
 model AnimeSynonym {
