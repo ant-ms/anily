@@ -1,5 +1,5 @@
-import { prisma } from "../../prisma";
-import { getAllAnimeTitlesForYear } from "./gather/getAllAnimeTitlesForYear";
+import { prisma } from "../../src/prisma";
+import { getAllAnimeTitlesForYear } from "$lib/anilistApi/baseAnime/getAllAnimeTitlesForYear";
 
 export default async (
   baseAnime: Awaited<ReturnType<typeof getAllAnimeTitlesForYear>>[number],

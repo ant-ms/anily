@@ -1,4 +1,4 @@
-import { graphql } from "../../../gql";
+import { graphql } from "../../../src/gql";
 
 export const GET_ANIME_TITLES_QUERY = graphql(`
   query Query(

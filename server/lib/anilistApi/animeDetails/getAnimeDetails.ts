@@ -1,4 +1,4 @@
-import { fetchGraphQL } from "../../genericAnilistCall";
+import { fetchGraphQL } from "../genericAnilistCall";
 import { GET_ANIME_DETAILS_QUERY } from "./query";
 
 export const getAnimeDetailsFromAPI = async (anilistId: number) => {

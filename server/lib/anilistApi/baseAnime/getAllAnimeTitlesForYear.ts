@@ -1,4 +1,4 @@
-import { fetchGraphQL } from "../../genericAnilistCall";
+import { fetchGraphQL } from "../genericAnilistCall";
 import { GET_ANIME_TITLES_QUERY } from "./query";
 
 export async function getAllAnimeTitlesForYear(year: number) {

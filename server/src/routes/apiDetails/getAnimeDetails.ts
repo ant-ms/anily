@@ -1,5 +1,5 @@
-import { getAnimeDetailsFromApiAndUpsert } from "../anilist/animeDetails/getAnimeDetailsFromApiAndUpsert";
-import { prisma } from "../prisma";
+import { getAnimeDetailsFromApiAndUpsert } from "$lib/anilistApi/getAnimeDetailsFromApiAndUpsert";
+import { prisma } from "../../prisma";
 
 const getAnimeDetailsFromDb = async (anilistId: number) =>
   await prisma.animeDetails.findUnique({

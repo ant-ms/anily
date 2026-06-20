@@ -1,5 +1,5 @@
-import { prisma } from "../../prisma";
-import { getAnimeDetailsFromAPI } from "./gather/getAnimeDetails";
+import { prisma } from "../../src/prisma";
+import { getAnimeDetailsFromAPI } from "$lib/anilistApi/animeDetails/getAnimeDetails";
 
 export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
   const animeDetails = await getAnimeDetailsFromAPI(anilistId);

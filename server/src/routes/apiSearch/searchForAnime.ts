@@ -1,4 +1,4 @@
-import { prisma } from "../prisma";
+import { prisma } from "../../prisma";
 
 export const searchForAnime = async (q: string) =>
   await prisma.baseAnime.findMany({

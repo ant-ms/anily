@@ -1,5 +1,5 @@
-import { getAllAnimeTitlesForYear } from "./gather/getAllAnimeTitlesForYear";
-import upsertAnimeTitlesAndRelations from "./upsertAnimeTitlesAndRelations";
+import { getAllAnimeTitlesForYear } from "$lib/anilistApi/baseAnime/getAllAnimeTitlesForYear";
+import upsertAnimeTitlesAndRelations from "$lib/anilistApi/upsertAnimeTitlesAndRelations";
 
 const startYear = 1984;
 const endYear = 2026;
