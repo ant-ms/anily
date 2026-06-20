@@ -7,6 +7,7 @@ import { logger, setupLoggerMiddleware } from "./logger";
 import { setupApiSearch } from "./routes/apiSearch";
 import { setupApiDetails } from "./routes/apiDetails";
 import { keepAnilistDataUpdated } from "./syncs/keepAnilistDataUpdated";
+import { setupApiGrouping } from "./routes/apiGrouping";
 
 const app = new Hono();
 
@@ -28,6 +29,7 @@ app.get("/info", (c) => {
 
 setupApiSearch(app);
 setupApiDetails(app);
+setupApiGrouping(app);
 
 // authenticated routes
 app.get("/api/login", (c) => c.redirect("http://localhost:5173")); // TODO

@@ -14,6 +14,17 @@ export const logger = pino({
           },
         }
       : undefined,
+  serializers: {
+    req: (req) => ({
+      method: req.method,
+      url: req.url,
+      // Explicitly omit headers by not passing req.headers
+    }),
+    res: (res: Response) => ({
+      statusCode: res.status,
+      // Explicitly omit response headers
+    }),
+  },
 });
 
 export const setupLoggerMiddleware = (app: Hono) => {

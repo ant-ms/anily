@@ -5,12 +5,18 @@ import upsertAnimeTitlesAndRelations from "$lib/anilistApi/upsertAnimeTitlesAndR
 import { logger } from "$src/logger";
 import { Logger } from "pino";
 
-const gatherAnimeUntil = async (lastUpdatedInDb: bigint, page = 1) => {
+type RecentlyUpdatedAnime = Awaited<
+  ReturnType<typeof getRecentlyUpdatedAnime>
+>["media"];
+
+const gatherAnimeUntil = async (
+  lastUpdatedInDb: bigint,
+  page = 1,
+): Promise<RecentlyUpdatedAnime> => {
   const { media, pageInfo } = await getRecentlyUpdatedAnime(page);
 
-  let animeToKeep = [];
+  const animeToKeep = [];
 
-  // If this page reaches the cutoff, return the collected anime
   for (const anime of media) {
     if (anime.updatedAt != null && BigInt(anime.updatedAt) < lastUpdatedInDb) {
       return animeToKeep;
@@ -18,12 +24,13 @@ const gatherAnimeUntil = async (lastUpdatedInDb: bigint, page = 1) => {
     animeToKeep.push(anime);
   }
 
-  // Otherwise, continue to the next page
   if (pageInfo.hasNextPage) {
-    return gatherAnimeUntil(lastUpdatedInDb, page + 1);
+    return [
+      ...animeToKeep,
+      ...(await gatherAnimeUntil(lastUpdatedInDb, page + 1)),
+    ];
   }
 
-  // If no more pages, return the collected anime
   return animeToKeep;
 };
 
