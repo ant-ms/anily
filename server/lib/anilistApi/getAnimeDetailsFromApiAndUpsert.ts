@@ -26,10 +26,14 @@ export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
         animeDetails.coverImage?.extraLarge ||
         animeDetails.coverImage?.large ||
         animeDetails.coverImage?.medium,
-      markedForLater: false,
     },
     include: {
-      baseAnime: true,
+      // TODO: Remove duplication
+      baseAnime: {
+        include: {
+          groupings: true,
+        },
+      },
     },
   });
 };

@@ -1,6 +1,6 @@
 <script lang="ts">
     import NewspaperIcon from "phosphor-svelte/lib/NewspaperIcon";
-    import BookmarkIcon from "phosphor-svelte/lib/BookmarkIcon";
+    import HourglassIcon from "phosphor-svelte/lib/HourglassIcon";
     import CheckFatIcon from "phosphor-svelte/lib/CheckFatIcon";
     import PlayIcon from "phosphor-svelte/lib/PlayIcon";
     import TabSwitcher from "../tab-switcher/TabSwitcher.svelte";
@@ -13,28 +13,36 @@
     } = $props();
 </script>
 
-<TabSwitcher
-    bind:activeTab
-    tabs={[
-        {
-            id: "home",
-            Icon: NewspaperIcon,
-            default: true,
-        },
-        {
-            id: "watching",
-            name: "In Progress",
-            Icon: PlayIcon,
-        },
-        {
-            id: "bookmarked",
-            name: "Bookmarked",
-            Icon: BookmarkIcon,
-        },
-        {
-            id: "done",
-            name: "Done",
-            Icon: CheckFatIcon,
-        },
-    ]}
-/>
+<div class="tabs">
+    <TabSwitcher
+        bind:activeTab
+        tabs={[
+            {
+                id: "inbox",
+                Icon: NewspaperIcon,
+                default: true,
+            },
+            {
+                id: "waiting",
+                name: "Caught Up",
+                Icon: PlayIcon,
+            },
+            {
+                id: "upcoming",
+                name: "Upcoming",
+                Icon: HourglassIcon,
+            },
+            {
+                id: "completed",
+                name: "Completed",
+                Icon: CheckFatIcon,
+            },
+        ]}
+    />
+</div>
+
+<style lang="scss">
+    .tabs {
+        border-bottom: 1px solid #2e2c29;
+    }
+</style>

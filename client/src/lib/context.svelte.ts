@@ -10,3 +10,5 @@ class Context<T> {
 
 export const apiBaseUrl = new Context<URL>();
 export const selectedAnimeAnilistId = new Context<number>();
+
+export const sidebarDataRefreshSeed = new Context<number>();

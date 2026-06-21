@@ -8,6 +8,8 @@ import { setupApiSearch } from "./routes/apiSearch";
 import { setupApiDetails } from "./routes/apiDetails";
 import { keepAnilistDataUpdated } from "./syncs/keepAnilistDataUpdated";
 import { setupApiGrouping } from "./routes/apiGrouping";
+import "dotenv/config";
+import { setupApiSidebarInbox } from "./routes/apiSidebar/inbox";
 
 const app = new Hono();
 
@@ -30,6 +32,7 @@ app.get("/info", (c) => {
 setupApiSearch(app);
 setupApiDetails(app);
 setupApiGrouping(app);
+setupApiSidebarInbox(app);
 
 // authenticated routes
 app.get("/api/login", (c) => c.redirect("http://localhost:5173")); // TODO
@@ -43,6 +46,8 @@ serve(
   (info) => {
     logger.info(`Server is running on http://localhost:${info.port}`);
 
-    setInterval(keepAnilistDataUpdated, 5 * 60 * 1000);
+    if (process.env.ANILY_DISABLE_SCHEDULES !== "true") {
+      setInterval(keepAnilistDataUpdated, 5 * 60 * 1000);
+    }
   },
 );

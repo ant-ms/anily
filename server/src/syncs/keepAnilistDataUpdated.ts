@@ -4,6 +4,7 @@ import { getAnimeDetailsFromApiAndUpsert } from "$lib/anilistApi/getAnimeDetails
 import upsertAnimeTitlesAndRelations from "$lib/anilistApi/upsertAnimeTitlesAndRelations";
 import { logger } from "$src/logger";
 import { Logger } from "pino";
+import { updateAnimeGroupingIfNeeded } from "$src/routes/apiGrouping/updateAnimeGroupingIfNeeded";
 
 type RecentlyUpdatedAnime = Awaited<
   ReturnType<typeof getRecentlyUpdatedAnime>
@@ -70,6 +71,9 @@ export const keepAnilistDataUpdated = async () => {
 
     // Then update the details (thubnail and description)
     await updateAnimeDetailsIfNeeded(anime.id);
+
+    // If the anime is part of a grouping, update the grouping to include it
+    await updateAnimeGroupingIfNeeded(anime.id);
   }
 
   log.info(`sync complete`);

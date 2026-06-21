@@ -7,7 +7,11 @@ const getAnimeDetailsFromDb = async (anilistId: number) =>
       baseAnimeAnilistId: anilistId,
     },
     include: {
-      baseAnime: true,
+      baseAnime: {
+        include: {
+          groupings: true,
+        },
+      },
     },
   });
 

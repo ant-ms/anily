@@ -3,19 +3,7 @@
 import { AnimeRelationType } from "../../../generated/prisma/enums";
 import { prisma } from "$src/prisma";
 import { getAnimeDetailsFromApiAndUpsert } from "$lib/anilistApi/getAnimeDetailsFromApiAndUpsert";
-
-// Relation types whose edges stay inside a single franchise. CHARACTER / OTHER /
-// ADAPTATION / SOURCE are excluded so cameos and crossovers don't merge
-// unrelated franchises into one grouping.
-const GROUPING_RELATION_TYPES = new Set<AnimeRelationType>([
-  AnimeRelationType.PREQUEL,
-  AnimeRelationType.SEQUEL,
-  AnimeRelationType.PARENT,
-  AnimeRelationType.SIDE_STORY,
-  AnimeRelationType.SPIN_OFF,
-  AnimeRelationType.ALTERNATIVE,
-  AnimeRelationType.CONTAINS,
-]);
+import { collectGroupingMemberIds } from "./collectGroupingMemberIds";
 
 type ChainableAnime = {
   anilistId: number;
@@ -32,33 +20,6 @@ export type ChainNode<T extends ChainableAnime> = {
 export type AnimeGrouping<T extends ChainableAnime> = {
   chains: ChainNode<T>[];
   notInChain: T[];
-};
-
-const isGroupingRelation = (relation: { relationType: AnimeRelationType }) =>
-  GROUPING_RELATION_TYPES.has(relation.relationType);
-
-const collectGroupingMemberIds = async (rootAnilistId: number) => {
-  const memberIds = new Set<number>();
-
-  const visit = async (anilistId: number) => {
-    if (memberIds.has(anilistId)) return;
-    memberIds.add(anilistId);
-
-    const anime = await prisma.baseAnime.findUniqueOrThrow({
-      where: { anilistId },
-      include: { relationsIn: true, relationsOut: true },
-    });
-
-    const neighbourIds = [
-      ...anime.relationsIn.filter(isGroupingRelation).map((r) => r.fromAnimeId),
-      ...anime.relationsOut.filter(isGroupingRelation).map((r) => r.toAnimeId),
-    ];
-
-    for (const neighbourId of neighbourIds) await visit(neighbourId);
-  };
-
-  await visit(rootAnilistId);
-  return [...memberIds];
 };
 
 const buildChains = <T extends ChainableAnime>(
@@ -116,9 +77,7 @@ export const buildAnimeGroupingIds = async (rootAnilistId: number) => {
   return buildChains(members);
 };
 
-export const buildAnimeGroupingDetails = async (rootAnilistId: number) => {
-  const memberIds = await collectGroupingMemberIds(rootAnilistId);
-
+export const fillAnimeGroupingDetails = async (memberIds: number[]) => {
   const existingDetails = await prisma.animeDetails.findMany({
     where: { baseAnimeAnilistId: { in: memberIds } },
   });
@@ -131,6 +90,17 @@ export const buildAnimeGroupingDetails = async (rootAnilistId: number) => {
   for (const anilistId of memberIdsWithoutFetchedDetails) {
     await getAnimeDetailsFromApiAndUpsert(anilistId);
   }
+
+  return [
+    ...existingDetails.map((detail) => detail.baseAnimeAnilistId),
+    ...memberIdsWithoutFetchedDetails,
+  ];
+};
+
+export const buildAnimeGroupingDetails = async (rootAnilistId: number) => {
+  const memberIds = await collectGroupingMemberIds(rootAnilistId);
+
+  await fillAnimeGroupingDetails(memberIds);
 
   const members = await prisma.baseAnime.findMany({
     where: { anilistId: { in: memberIds } },

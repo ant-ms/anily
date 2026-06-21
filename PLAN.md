@@ -2,7 +2,7 @@
 - [x] OICD Authentication
 - [x] Anime details (thumbnail and description, and set rating and marked)
 - [ ] Episodes (details from TMDB and dates from Jikan)
-- [ ] AnimeGrouping (show in sidebar, top switcher to move within franchise, built during add/update)
+- [x] AnimeGrouping (show in sidebar, top switcher to move within franchise, built during add/update)
 - [ ] Automatic and manual update triggers for episode releases and anime updates
 - [ ] More robust and integrated job system (with dashboard, cron schedules, etc)
 - [ ] Downloads through transmission (migrate ani-ant, maybe with Anitomy for parsing torrent names)

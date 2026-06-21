@@ -30,9 +30,11 @@ model BaseAnime {
   titleRomanji String?
   synonyms     AnimeSynonym[]
 
-  relationsOut AnimeRelation[] @relation("RelationFrom")
-  relationsIn  AnimeRelation[] @relation("RelationTo")
-  animeDetails AnimeDetails?
+  relationsOut        AnimeRelation[] @relation("RelationFrom")
+  relationsIn         AnimeRelation[] @relation("RelationTo")
+  animeDetails        AnimeDetails?
+  groupings           AnimeGrouping[] @relation("GroupingItems")
+  displayForGroupings AnimeGrouping[] @relation("GroupingDisplayAnime")
 
   @@index([titleEnglish(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([titleRomanji(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -89,8 +91,13 @@ model AnimeDetails {
   thumbnailUrl String?
   description  String?
 
-  markedForLater Boolean
-
   @@unique([groupingId, groupingOrder])
   @@index([groupingId])
+}
+
+model AnimeGrouping {
+  id             Int         @id @default(autoincrement())
+  items          BaseAnime[] @relation("GroupingItems")
+  displayAnime   BaseAnime   @relation("GroupingDisplayAnime", fields: [displayAnimeId], references: [anilistId])
+  displayAnimeId Int
 }

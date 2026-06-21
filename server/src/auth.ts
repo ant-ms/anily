@@ -4,8 +4,10 @@ import {
   revokeSession,
   processOAuthCallback,
 } from "@hono/oidc-auth";
+import { cors } from "hono/cors";
 
 export const setupAuthHandlers = (app: Hono) => {
+  app.use("*", cors());
   app.use("*", async (c, next) => {
     c.set("oidcClaimsHook", async (orig, claims) => ({
       ...orig,

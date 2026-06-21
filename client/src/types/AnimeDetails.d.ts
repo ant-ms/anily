@@ -7,5 +7,5 @@ export default interface AnimeDetailsData {
   titleNative: string;
   description: string;
   thumbnailUrl: string;
-  markedForLater: boolean;
+  groupingId: number | null;
 }

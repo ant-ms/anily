@@ -1,20 +1,25 @@
 <script lang="ts">
     import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
-    import HandGrabbingIcon from "phosphor-svelte/lib/HandGrabbingIcon";
+    import BookmarkIcon from "phosphor-svelte/lib/BookmarkIcon";
+    import PencilIcon from "phosphor-svelte/lib/PencilIcon";
 
     import { watch } from "runed";
-    import { apiBaseUrl, selectedAnimeAnilistId } from "../lib/context.svelte";
+    import {
+        apiBaseUrl,
+        selectedAnimeAnilistId,
+        sidebarDataRefreshSeed,
+    } from "../lib/context.svelte";
     import type AnimeDetailsData from "../types/AnimeDetails";
-    import TabSwitcher from "../lib/tab-switcher/TabSwitcher.svelte";
     import Button from "../lib/Button.svelte";
 
     let animeDetails: AnimeDetailsData | undefined = $state();
+    let updateSeed = $state(Math.random());
 
     watch(
-        () => selectedAnimeAnilistId.current,
+        () => [selectedAnimeAnilistId.current, updateSeed],
         () => {
             const url = new URL(
-                `/api/details?anilistId=${selectedAnimeAnilistId.current}`,
+                `/api/details/${selectedAnimeAnilistId.current}`,
                 apiBaseUrl.current,
             );
             fetch(url.toString(), { credentials: "include" })
@@ -60,8 +65,42 @@
         </div>
 
         <div class="actions">
+            <Button
+                Icon={BookmarkIcon}
+                active={animeDetails?.groupingId !== null}
+                onclick={() => {
+                    if (!animeDetails) return;
+
+                    const url = new URL(
+                        `/api/details/${selectedAnimeAnilistId.current}/grouping`,
+                        apiBaseUrl.current,
+                    );
+
+                    // Remove the grouping if it exists
+                    if (animeDetails.groupingId !== null) {
+                        fetch(url.toString(), {
+                            method: "DELETE",
+                            credentials: "include",
+                        }).then((_) => {
+                            updateSeed = Math.random();
+                        });
+                    }
+
+                    // or add it if it doesn't
+                    if (animeDetails.groupingId === null) {
+                        fetch(url.toString(), {
+                            method: "POST",
+                            credentials: "include",
+                        }).then((_) => {
+                            updateSeed = Math.random();
+                            sidebarDataRefreshSeed.set(Math.random());
+                        });
+                    }
+                }}
+            />
+            <div class="spacer"></div>
+            <Button Icon={PencilIcon} />
             <Button Icon={ArrowsClockwiseIcon} />
-            <Button Icon={HandGrabbingIcon} />
         </div>
     </div>
 
@@ -141,6 +180,10 @@
                 flex-direction: column;
                 gap: 0.5rem;
                 align-items: flex-end;
+
+                .spacer {
+                    flex-grow: 1;
+                }
             }
         }
 

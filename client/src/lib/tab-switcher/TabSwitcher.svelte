@@ -49,6 +49,9 @@
             padding: 10px;
             cursor: pointer;
             border-bottom: 3px solid transparent;
+            transition:
+                background 0.2s,
+                border-bottom 0.2s;
 
             &:hover {
                 background: hsl(36, 7%, 14%);
