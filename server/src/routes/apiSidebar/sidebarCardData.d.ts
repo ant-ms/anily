@@ -1,5 +1,7 @@
 export interface SidebarCardData {
-  anilistId: number;
+  displayAnilistId: number;
+  allAnilistIds: number[];
+
   titleEnglish: string | null;
   titleRomanji: string | null;
   titleNative: string | null;

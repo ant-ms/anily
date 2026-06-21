@@ -6,6 +6,11 @@ const getInboxAnimesFromDB = async (): Promise<SidebarCardData[]> => {
   const animeGroupings = await prisma.animeGrouping.findMany({
     where: {},
     include: {
+      items: {
+        select: {
+          anilistId: true,
+        },
+      },
       displayAnime: {
         include: {
           animeDetails: true,
@@ -15,7 +20,8 @@ const getInboxAnimesFromDB = async (): Promise<SidebarCardData[]> => {
   });
 
   return animeGroupings.map((a) => ({
-    anilistId: a.displayAnime.anilistId,
+    displayAnilistId: a.displayAnime.anilistId,
+    allAnilistIds: a.items.map((i) => i.anilistId),
     titleEnglish: a.displayAnime.titleEnglish,
     titleRomanji: a.displayAnime.titleRomanji,
     titleNative: a.displayAnime.titleNative,

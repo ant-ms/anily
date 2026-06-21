@@ -11,16 +11,21 @@ type ChainEntry = Awaited<
 >["chains"][number];
 
 type FilteredChainNode = {
+  anilistId: number;
+  titleEnglish: string | null;
   titleRomanji: string | null;
+  titleNative: string | null;
+  thumbnailUrl: string | null;
   children: FilteredChainNode[];
 };
 
 const filterAnimeDetails = (a: NonChainEntry | ChainEntry["anime"]) => {
   return {
+    anilistId: a.anilistId,
     titleEnglish: a.titleEnglish,
     titleRomanji: a.titleRomanji,
     titleNative: a.titleNative,
-    thumbnailUrl: a.animeDetails?.thumbnailUrl,
+    thumbnailUrl: a.animeDetails?.thumbnailUrl || null,
   };
 };
 

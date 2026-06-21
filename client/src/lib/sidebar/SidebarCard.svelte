@@ -15,19 +15,23 @@
     ]);
 </script>
 
+<!-- TODO: Stay highlighted -->
+
 <!-- svelte-ignore a11y_missing_attribute -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <a
     onclick={() => {
-        if (selectedAnimeAnilistId.current !== data.anilistId) {
-            selectedAnimeAnilistId.set(data.anilistId);
-        } else {
+        if (data.allAnilistIds.includes(selectedAnimeAnilistId.current ?? 0)) {
             selectedAnimeAnilistId.set(undefined);
+        } else {
+            selectedAnimeAnilistId.set(data.displayAnilistId);
         }
     }}
     class="sidebar-card"
-    class:active={selectedAnimeAnilistId.current === data.anilistId}
+    class:active={data.allAnilistIds.includes(
+        selectedAnimeAnilistId.current ?? 0,
+    )}
 >
     <img src={data.thumbnailUrl} alt="" />
     <div class="right">

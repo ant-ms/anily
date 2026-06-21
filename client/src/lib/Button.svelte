@@ -41,9 +41,14 @@
             background 0.2s,
             border 0.2s;
 
-        &:hover {
+        &:hover:not(:disabled) {
             cursor: pointer;
             background: hsl(20, 17.6%, 14%);
+        }
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
         }
 
         &.active {

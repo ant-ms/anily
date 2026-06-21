@@ -8,7 +8,7 @@
     import HomePage from "./pages/HomePage.svelte";
     import type ProfileData from "./types/ProfileData";
     import { selectedAnimeAnilistId } from "./lib/context.svelte";
-    import AnimeDetailsPage from "./pages/AnimeDetailsPage.svelte";
+    import AnimeDetailsPage from "./pages/AnimeDetailsPage/AnimeDetailsPage.svelte";
 
     let profileData: ProfileData | undefined = $state(undefined);
 

@@ -1,0 +1,197 @@
+<script lang="ts">
+    import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
+    import BookmarkIcon from "phosphor-svelte/lib/BookmarkIcon";
+    import PencilIcon from "phosphor-svelte/lib/PencilIcon";
+    import CaretLeftIcon from "phosphor-svelte/lib/CaretLeftIcon";
+    import CaretRightIcon from "phosphor-svelte/lib/CaretRightIcon";
+
+    import {
+        apiBaseUrl,
+        selectedAnimeAnilistId,
+        sidebarDataRefreshSeed,
+    } from "../../lib/context.svelte";
+    import type AnimeDetailsData from "../../types/AnimeDetails";
+    import Button from "../../lib/Button.svelte";
+    import type AnimeGroupingsData from "../../types/AnimeGroupings";
+    import type { ChainNode } from "../../types/AnimeGroupings";
+    import { watch } from "runed";
+    import ChainTree from "./chains/ChainTree.svelte";
+    import NotInChain from "./chains/NotInChain.svelte";
+
+    let {
+        animeDetails,
+        updateSeed = $bindable(),
+    }: {
+        animeDetails: AnimeDetailsData;
+        updateSeed: number;
+    } = $props();
+
+    let animeGroupings: AnimeGroupingsData | undefined = $state();
+
+    watch(
+        () => [selectedAnimeAnilistId.current, updateSeed],
+        ([anilistId, seed], previous) => {
+            // A bookmark toggle (updateSeed change) always forces a refresh.
+            const seedChanged = !previous || previous[1] !== seed;
+
+            // Navigating to an anime that's already part of the loaded grouping
+            // just switches the visible page — no need to refetch.
+            if (!seedChanged && animeGroupings) {
+                const page = findPageForAnime(animeGroupings, anilistId);
+                if (page !== null) {
+                    currentPage = page;
+                    return;
+                }
+            }
+
+            const url = new URL(
+                `/api/grouping?baseAnilistId=${selectedAnimeAnilistId.current}`,
+                apiBaseUrl.current,
+            );
+            fetch(url.toString(), { credentials: "include" })
+                .then((results) => results.json())
+                .then((data: AnimeGroupingsData) => {
+                    animeGroupings = data;
+                    // Open the page containing the anime that's being viewed
+                    // instead of resetting back to the first chain.
+                    currentPage =
+                        findPageForAnime(
+                            data,
+                            selectedAnimeAnilistId.current,
+                        ) ?? 0;
+                });
+        },
+    );
+
+    const findPageForAnime = (
+        data: AnimeGroupingsData,
+        anilistId: number | undefined,
+    ): number | null => {
+        if (anilistId === undefined) return null;
+
+        const inTree = (node: ChainNode): boolean =>
+            node.anilistId === anilistId || node.children.some(inTree);
+
+        const chainIndex = data.chains.findIndex(inTree);
+        if (chainIndex !== -1) return chainIndex;
+
+        if (data.notInChain.some((a) => a.anilistId === anilistId)) {
+            return data.chains.length;
+        }
+
+        return null;
+    };
+
+    // The chevrons page through each chain plus a final "not in a chain" page.
+    let currentPage = $state(0);
+    let hasNotInChain = $derived((animeGroupings?.notInChain.length ?? 0) > 0);
+    let pageCount = $derived(
+        (animeGroupings?.chains.length ?? 0) + (hasNotInChain ? 1 : 0),
+    );
+
+    const navigate = (direction: -1 | 1) => {
+        if (pageCount === 0) return;
+        currentPage = Math.max(
+            0,
+            Math.min(pageCount - 1, currentPage + direction),
+        );
+    };
+
+    const toggleGrouping = () => {
+        if (!animeDetails) return;
+
+        const url = new URL(
+            `/api/details/${selectedAnimeAnilistId.current}/grouping`,
+            apiBaseUrl.current,
+        );
+
+        // Remove the grouping if it exists
+        if (animeDetails.groupingId !== null) {
+            fetch(url.toString(), {
+                method: "DELETE",
+                credentials: "include",
+            }).then((_) => {
+                updateSeed = Math.random();
+            });
+        }
+
+        // or add it if it doesn't
+        if (animeDetails.groupingId === null) {
+            fetch(url.toString(), {
+                method: "POST",
+                credentials: "include",
+            }).then((_) => {
+                updateSeed = Math.random();
+                sidebarDataRefreshSeed.set(Math.random());
+            });
+        }
+    };
+</script>
+
+<div class="chains">
+    <div class="actions">
+        <Button
+            Icon={BookmarkIcon}
+            active={animeDetails?.groupingId !== null}
+            onclick={toggleGrouping}
+        />
+        <Button Icon={PencilIcon} />
+        <Button Icon={ArrowsClockwiseIcon} />
+        <div class="spacer"></div>
+        <Button
+            Icon={CaretLeftIcon}
+            disabled={currentPage <= 0}
+            onclick={() => navigate(-1)}
+        />
+        <Button
+            Icon={CaretRightIcon}
+            disabled={currentPage >= pageCount - 1}
+            onclick={() => navigate(1)}
+        />
+    </div>
+
+    <div class="tree">
+        {#if animeGroupings}
+            {#if currentPage < animeGroupings.chains.length}
+                <ChainTree root={animeGroupings.chains[currentPage]} />
+            {:else if hasNotInChain}
+                <NotInChain animes={animeGroupings.notInChain} />
+            {/if}
+        {/if}
+    </div>
+</div>
+
+<style lang="scss">
+    .chains {
+        display: grid;
+        height: 100vh;
+        grid-template-rows: auto 1fr;
+        grid-template-columns: minmax(250px, auto);
+        border-left: 1px solid #2e2c29;
+        background: #1d1a17;
+        min-height: 0;
+
+        .actions {
+            flex-grow: 1;
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-end;
+            margin: 0.5rem;
+
+            .spacer {
+                flex-grow: 1;
+            }
+        }
+
+        .tree {
+            display: flex;
+            align-items: flex-start;
+            justify-self: center;
+            gap: 2rem;
+            padding: 4px;
+            width: max-content;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+    }
+</style>

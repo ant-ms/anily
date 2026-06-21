@@ -4,7 +4,7 @@
     import type { Tab } from "../tab-switcher/tab-switcher-types";
     import type ProfileData from "../../types/ProfileData";
     import { watch } from "runed";
-    import type SidebarCardData from "../../types/sidebarCardData";
+    import type SidebarCardData from "../../types/SidebarCardData";
     import { apiBaseUrl, sidebarDataRefreshSeed } from "../context.svelte";
     import SidebarCard from "./SidebarCard.svelte";
 
