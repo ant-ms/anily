@@ -1,17 +1,16 @@
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
 import { getAuth } from "@hono/oidc-auth";
 import packageJson from "../package.json";
 import { setupAuthHandlers } from "./auth";
 import { logger, setupLoggerMiddleware } from "./logger";
-import { setupApiSearch } from "./routes/apiSearch";
-import { setupApiDetails } from "./routes/apiDetails";
 import { keepAnilistDataUpdated } from "./syncs/keepAnilistDataUpdated";
-import { setupApiGrouping } from "./routes/apiGrouping";
 import "dotenv/config";
-import { setupApiSidebarInbox } from "./routes/apiSidebar/inbox";
+import { app } from "./app";
 
-const app = new Hono();
+import "$src/routes/apiDetails";
+import "$src/routes/apiGrouping";
+import "$src/routes/apiSearch";
+import "$src/routes/apiSidebar/inbox";
 
 setupAuthHandlers(app);
 setupLoggerMiddleware(app);
@@ -28,11 +27,6 @@ app.get("/info", (c) => {
     version: packageJson.version,
   });
 });
-
-setupApiSearch(app);
-setupApiDetails(app);
-setupApiGrouping(app);
-setupApiSidebarInbox(app);
 
 // authenticated routes
 app.get("/api/login", (c) => c.redirect("http://localhost:5173")); // TODO

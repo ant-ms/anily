@@ -1,27 +1,19 @@
-import { Hono } from "hono";
 import { getAnimeDetails } from "./getAnimeDetails";
 import { getNumberOfAnimeGroupings } from "../apiGrouping/updateAnimeGroupingIfNeeded";
 import { prisma } from "$src/prisma";
 import { fillAnimeGroupingDetails } from "../apiGrouping/buildAnimeGroupings";
 import { collectGroupingMemberIds } from "../apiGrouping/collectGroupingMemberIds";
+import { anilistParamValidator } from "$src/validators/anilistId";
+import { app } from "$src/app";
 
-export const setupApiDetails = (app: Hono) => {
-  app.get("/api/details/:anilistId", async (c) => {
-    const anilistId = c.req.param("anilistId");
-    if (!anilistId) return c.json({ error: "No anilistId provided" });
-
-    let anilistIdInt: number;
-    try {
-      anilistIdInt = parseInt(anilistId);
-    } catch (error) {
-      return c.json({
-        error: "Invalid anilistId",
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
+export const apiDetailsAnilistIdGetRoute = app.get(
+  "/api/details/:anilistId",
+  anilistParamValidator,
+  async (c) => {
+    const params = c.req.valid("param");
 
     try {
-      const details = await getAnimeDetails(anilistIdInt);
+      const details = await getAnimeDetails(params.anilistId);
       const filteredDetails = {
         anilistId: details.baseAnime.anilistId,
         titleEnglish: details.baseAnime.titleEnglish,
@@ -38,25 +30,18 @@ export const setupApiDetails = (app: Hono) => {
         reason: error instanceof Error ? error.message : String(error),
       });
     }
-  });
+  },
+);
 
-  app.post("/api/details/:anilistId/grouping", async (c) => {
-    const anilistId = c.req.param("anilistId");
-    if (!anilistId) return c.json({ error: "No anilistId provided" });
+export const apiDetailsAnilistIdGroupingPostRoute = app.post(
+  "/api/details/:anilistId/grouping",
+  anilistParamValidator,
+  async (c) => {
+    const params = c.req.valid("param");
 
-    // TODO: Reduce duplication
-    let anilistIdInt: number;
-    try {
-      anilistIdInt = parseInt(anilistId);
-    } catch (error) {
-      return c.json({
-        error: "Invalid anilistId",
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    const numberOfAnimeGroupings =
-      await getNumberOfAnimeGroupings(anilistIdInt);
+    const numberOfAnimeGroupings = await getNumberOfAnimeGroupings(
+      params.anilistId,
+    );
 
     // If the anime is already grouped, return a 200 status with a message
     if (numberOfAnimeGroupings.length > 0) {
@@ -64,7 +49,7 @@ export const setupApiDetails = (app: Hono) => {
     }
 
     // Make sure all members have details
-    const groupingMemberIds = await collectGroupingMemberIds(anilistIdInt);
+    const groupingMemberIds = await collectGroupingMemberIds(params.anilistId);
     await fillAnimeGroupingDetails(groupingMemberIds);
 
     await prisma.animeGrouping.create({
@@ -74,37 +59,30 @@ export const setupApiDetails = (app: Hono) => {
         },
         displayAnime: {
           connect: {
-            anilistId: anilistIdInt,
+            anilistId: params.anilistId,
           },
         },
       },
     });
 
     return c.body(null, 200);
-  });
+  },
+);
 
-  app.delete("/api/details/:anilistId/grouping", async (c) => {
-    const anilistId = c.req.param("anilistId");
-    if (!anilistId) return c.json({ error: "No anilistId provided" });
-
-    let anilistIdInt: number;
-    try {
-      anilistIdInt = parseInt(anilistId);
-    } catch (error) {
-      return c.json({
-        error: "Invalid anilistId",
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
+export const apiDetailsAnilistIdGroupingDeleteRoute = app.delete(
+  "/api/details/:anilistId/grouping",
+  anilistParamValidator,
+  async (c) => {
+    const params = c.req.valid("param");
 
     await prisma.animeGrouping.deleteMany({
       where: {
         displayAnime: {
-          anilistId: anilistIdInt,
+          anilistId: params.anilistId,
         },
       },
     });
 
     return c.body(null, 200);
-  });
-};
+  },
+);

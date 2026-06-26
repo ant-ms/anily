@@ -1,5 +1,7 @@
-import { Hono } from "hono";
 import { buildAnimeGroupingDetails } from "./buildAnimeGroupings";
+import { app } from "$src/app";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 
 // TODO: This grouping should actually be stored in the database
 
@@ -34,23 +36,19 @@ const recursivelyFilterChainEntry = (node: ChainEntry): FilteredChainNode => ({
   children: node.children.map(recursivelyFilterChainEntry),
 });
 
-export const setupApiGrouping = (app: Hono) => {
-  app.get("/api/grouping", async (c) => {
-    const baseAnilistId = c.req.query("baseAnilistId");
-    if (!baseAnilistId) return c.json({ error: "No baseAnilistId provided" });
-
-    let baseAnilistIdInt: number;
-    try {
-      baseAnilistIdInt = parseInt(baseAnilistId);
-    } catch (error) {
-      return c.json({
-        error: "Invalid baseAnilistId",
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
+export const apiGroupingGetRoute = app.get(
+  "/api/grouping",
+  zValidator(
+    "query",
+    z.object({
+      baseAnilistId: z.int(),
+    }),
+  ),
+  async (c) => {
+    const query = c.req.valid("query");
 
     try {
-      const chains = await buildAnimeGroupingDetails(baseAnilistIdInt);
+      const chains = await buildAnimeGroupingDetails(query.baseAnilistId);
 
       const output = {
         chains: chains.chains.map(recursivelyFilterChainEntry),
@@ -64,5 +62,5 @@ export const setupApiGrouping = (app: Hono) => {
         reason: error instanceof Error ? error.message : String(error),
       });
     }
-  });
-};
+  },
+);

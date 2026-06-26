@@ -1,5 +1,5 @@
+import { app } from "$src/app";
 import { prisma } from "$src/prisma";
-import { Hono } from "hono";
 import { SidebarCardData } from "./sidebarCardData";
 
 const getInboxAnimesFromDB = async (): Promise<SidebarCardData[]> => {
@@ -30,9 +30,10 @@ const getInboxAnimesFromDB = async (): Promise<SidebarCardData[]> => {
   }));
 };
 
-export const setupApiSidebarInbox = (app: Hono) => {
-  app.get("/api/sidebar/inbox", async (c) => {
+export const apiSidebarInboxGetRoute = app.get(
+  "/api/sidebar/inbox",
+  async (c) => {
     const data = await getInboxAnimesFromDB();
     return c.json(data);
-  });
-};
+  },
+);
