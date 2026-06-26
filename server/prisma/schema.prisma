@@ -99,6 +99,7 @@ model AnimeDetails {
 
   thumbnailUrl String?
   description  String?
+  episodes     Int?
 
   @@unique([groupingId, groupingOrder])
   @@index([groupingId])

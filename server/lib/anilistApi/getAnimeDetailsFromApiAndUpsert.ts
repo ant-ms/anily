@@ -18,6 +18,7 @@ export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
         animeDetails.coverImage?.extraLarge ||
         animeDetails.coverImage?.large ||
         animeDetails.coverImage?.medium,
+      episodes: animeDetails.episodes,
     },
     create: {
       baseAnimeAnilistId: anilistId,
@@ -26,6 +27,7 @@ export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
         animeDetails.coverImage?.extraLarge ||
         animeDetails.coverImage?.large ||
         animeDetails.coverImage?.medium,
+      episodes: animeDetails.episodes,
     },
     include: {
       // TODO: Remove duplication
