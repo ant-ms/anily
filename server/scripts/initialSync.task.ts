@@ -1,8 +1,8 @@
 import { getAllAnimeTitlesForYear } from "$lib/anilistApi/baseAnime/getAllAnimeTitlesForYear";
 import upsertAnimeTitlesAndRelations from "$lib/anilistApi/upsertAnimeTitlesAndRelations";
 
-const startYear = 1984;
-const endYear = 2026;
+const startYear = 1905;
+const endYear = 2030;
 const yearsToProcess = Array.from(
   { length: endYear - startYear + 1 },
   (_, index) => startYear + index,

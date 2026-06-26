@@ -8,8 +8,6 @@ export const GET_ANIME_DETAILS_QUERY = graphql(`
         english
       }
       episodes
-      season
-      seasonYear
       coverImage {
         extraLarge
         large

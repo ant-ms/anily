@@ -19,6 +19,13 @@ enum AnimeFormat {
   TV_SHORT
 }
 
+enum AnimeSeason {
+  WINTER
+  SPRING
+  SUMMER
+  FALL
+}
+
 model BaseAnime {
   anilistId   Int         @id
   malId       Int?
@@ -29,6 +36,8 @@ model BaseAnime {
   titleNative  String?
   titleRomanji String?
   synonyms     AnimeSynonym[]
+  season       AnimeSeason?
+  seasonYear   Int?
 
   relationsOut        AnimeRelation[] @relation("RelationFrom")
   relationsIn         AnimeRelation[] @relation("RelationTo")

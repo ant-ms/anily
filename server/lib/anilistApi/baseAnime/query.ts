@@ -38,6 +38,8 @@ export const GET_ANIME_TITLES_QUERY = graphql(`
         }
         format
         synonyms
+        season
+        seasonYear
         updatedAt
       }
       pageInfo {

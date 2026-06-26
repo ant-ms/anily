@@ -1,6 +1,7 @@
 import { prisma } from "../../src/prisma";
 import { AnimeFormat, AnimeRelationType } from "../../generated/prisma/client";
 import { getAllAnimeTitlesForYear } from "$lib/anilistApi/baseAnime/getAllAnimeTitlesForYear";
+import { BaseAnimeUpdateInput } from "generated/prisma/models";
 
 type AnilistAnime = Awaited<
   ReturnType<typeof getAllAnimeTitlesForYear>
@@ -80,7 +81,9 @@ export default async (anime: AnilistAnime) => {
         skipDuplicates: true,
       },
     },
-  };
+    season: anime?.season || null,
+    seasonYear: anime?.seasonYear || null,
+  } satisfies BaseAnimeUpdateInput;
 
   await prisma.$transaction([
     // 1. Ensure every related anime exists before we reference it.
