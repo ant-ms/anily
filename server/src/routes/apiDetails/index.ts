@@ -22,6 +22,7 @@ export const apiDetailsAnilistIdGetRoute = app.get(
         description: details.description,
         thumbnailUrl: details.thumbnailUrl,
         groupingId: details.baseAnime.groupings?.[0]?.id || null,
+        episodes: details.episodes,
       };
       return c.json(filteredDetails);
     } catch (error) {

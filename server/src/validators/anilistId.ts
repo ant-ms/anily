@@ -4,6 +4,6 @@ import { z } from "zod";
 export const anilistParamValidator = zValidator(
   "param",
   z.object({
-    anilistId: z.int(),
+    anilistId: z.coerce.number().int(),
   }),
 );

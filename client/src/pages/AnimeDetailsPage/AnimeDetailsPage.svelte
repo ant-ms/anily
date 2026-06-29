@@ -7,6 +7,7 @@
     import type AnimeDetailsData from "../../types/AnimeDetails";
     import Hero from "./Hero.svelte";
     import Chains from "./Chains.svelte";
+    import Episodes from "./Episodes.svelte";
 
     let animeDetails: AnimeDetailsData | undefined = $state();
     let updateSeed = $state(Math.random());
@@ -32,16 +33,7 @@
         <div class="left">
             <Hero {animeDetails} />
 
-            <div class="episodes">
-                <p>bla</p>
-                <p>bla</p>
-                <p>bla</p>
-                <p>bla</p>
-                <p>bla</p>
-                <p>bla</p>
-                <p>bla</p>
-                <p>bla</p>
-            </div>
+            <Episodes {animeDetails} />
         </div>
         <div class="right">
             <Chains {animeDetails} {updateSeed} />
@@ -53,13 +45,12 @@
     #anime-details-page {
         display: grid;
         grid-template-columns: 1fr auto;
-        /* display: grid;
-        grid-template-rows: auto 1fr;
-        gap: 2rem;
-        height: 100vh;
 
-        .episodes {
-            overflow-y: auto;
-        } */
+        .left {
+            display: grid;
+            grid-template-rows: auto 1fr;
+
+            height: 100vh;
+        }
     }
 </style>

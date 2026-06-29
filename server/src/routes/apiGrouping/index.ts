@@ -41,7 +41,7 @@ export const apiGroupingGetRoute = app.get(
   zValidator(
     "query",
     z.object({
-      baseAnilistId: z.int(),
+      baseAnilistId: z.coerce.number().int(),
     }),
   ),
   async (c) => {
