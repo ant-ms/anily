@@ -99,7 +99,7 @@ model AnimeDetails {
 
   thumbnailUrl String?
   description  String?
-  episodes     Int?
+  episodes     Episode[]
 
   @@unique([groupingId, groupingOrder])
   @@index([groupingId])
@@ -110,4 +110,24 @@ model AnimeGrouping {
   items          BaseAnime[] @relation("GroupingItems")
   displayAnime   BaseAnime   @relation("GroupingDisplayAnime", fields: [displayAnimeId], references: [anilistId])
   displayAnimeId Int
+}
+
+model Episode {
+  id             Int          @id @default(autoincrement())
+  animeDetails   AnimeDetails @relation(fields: [animeDetailsId], references: [id], onDelete: Cascade)
+  animeDetailsId Int
+
+  number   Int
+  airingAt DateTime?
+
+  titleEnglish String?
+  titleNative  String?
+  titleRomanji String?
+
+  thumbnailUrl String?
+
+  watched Boolean @default(false)
+
+  @@unique([animeDetailsId, number])
+  @@index([animeDetailsId])
 }

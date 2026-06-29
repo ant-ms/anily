@@ -8,26 +8,23 @@ export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
     throw new Error("Failed to fetch anime details");
   }
 
+  const thumbnailUrl =
+    animeDetails.coverImage?.extraLarge ||
+    animeDetails.coverImage?.large ||
+    animeDetails.coverImage?.medium;
+
   return await prisma.animeDetails.upsert({
     where: {
       baseAnimeAnilistId: anilistId,
     },
     update: {
       description: animeDetails.description,
-      thumbnailUrl:
-        animeDetails.coverImage?.extraLarge ||
-        animeDetails.coverImage?.large ||
-        animeDetails.coverImage?.medium,
-      episodes: animeDetails.episodes,
+      thumbnailUrl,
     },
     create: {
       baseAnimeAnilistId: anilistId,
       description: animeDetails.description,
-      thumbnailUrl:
-        animeDetails.coverImage?.extraLarge ||
-        animeDetails.coverImage?.large ||
-        animeDetails.coverImage?.medium,
-      episodes: animeDetails.episodes,
+      thumbnailUrl,
     },
     include: {
       // TODO: Remove duplication
@@ -35,6 +32,9 @@ export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
         include: {
           groupings: true,
         },
+      },
+      episodes: {
+        orderBy: { number: "asc" },
       },
     },
   });
