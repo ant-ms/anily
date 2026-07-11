@@ -1,4 +1,5 @@
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { getAuth } from "@hono/oidc-auth";
 import packageJson from "../package.json";
 import { setupAuthHandlers } from "./auth";
@@ -16,11 +17,6 @@ import "$src/routes/apiSidebar/inbox";
 setupAuthHandlers(app);
 setupLoggerMiddleware(app);
 
-// application basics
-app.get("/", (c) => {
-  // TODO: Serve a static HTML pages (frontend)
-  return c.text("Hello Hono!");
-});
 app.get("/info", (c) => {
   return c.json({
     project: "anily",
@@ -30,8 +26,12 @@ app.get("/info", (c) => {
 });
 
 // authenticated routes
-app.get("/api/login", (c) => c.redirect("http://localhost:5173")); // TODO
+app.get("/api/login", (c) => c.redirect("/"));
 app.get("/api/me", async (c) => c.json(await getAuth(c)));
+
+// frontend
+app.use("/*", serveStatic({ root: "./public" }));
+app.get("*", serveStatic({ path: "./public/index.html" }));
 
 serve(
   {

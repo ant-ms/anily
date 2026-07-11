@@ -8,7 +8,7 @@ docker-build:
     entrypoint: [""]
   script:
     - /kaniko/executor
-      --context "$CI_PROJECT_DIR/server"
+      --context "$CI_PROJECT_DIR"
       --dockerfile "$CI_PROJECT_DIR/server/Dockerfile"
       --destination "$CI_REGISTRY_IMAGE/server:$CI_COMMIT_SHORT_SHA"
       --destination "$CI_REGISTRY_IMAGE/server:latest"
