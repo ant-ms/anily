@@ -8,6 +8,7 @@ import "dotenv/config";
 import { app } from "./app";
 
 import "$src/routes/apiDetails";
+import "$src/routes/apiEpisodes";
 import "$src/routes/apiGrouping";
 import "$src/routes/apiSearch";
 import "$src/routes/apiSidebar/inbox";

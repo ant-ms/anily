@@ -6,6 +6,7 @@
     } from "../../lib/context.svelte";
     import type AnimeDetailsData from "../../types/AnimeDetails";
     import Hero from "./Hero.svelte";
+    import HeroSkeleton from "./HeroSkeleton.svelte";
     import Chains from "./Chains.svelte";
     import Episodes from "./Episodes.svelte";
 
@@ -13,33 +14,43 @@
     let updateSeed = $state(Math.random());
 
     watch(
-        () => `${selectedAnimeAnilistId.current}${updateSeed}`,
-        () => {
+        () => [selectedAnimeAnilistId.current, updateSeed],
+        ([anilistId], previous) => {
+            if (anilistId === undefined) return;
+
+            const animeChanged = !previous || previous[0] !== anilistId;
+            if (animeChanged) animeDetails = undefined;
+
             const url = new URL(
-                `/api/details/${selectedAnimeAnilistId.current}`,
+                `/api/details/${anilistId}`,
                 apiBaseUrl.current,
             );
             fetch(url.toString(), { credentials: "include" })
                 .then((results) => results.json())
                 .then((data) => {
+                    if (selectedAnimeAnilistId.current !== anilistId) return;
                     animeDetails = data;
                 });
         },
     );
 </script>
 
-{#if animeDetails}
-    <div id="anime-details-page">
-        <div class="left">
+<div id="anime-details-page">
+    <div class="left">
+        {#if animeDetails}
             <Hero {animeDetails} />
+        {:else}
+            <HeroSkeleton />
+        {/if}
 
-            <Episodes {animeDetails} />
-        </div>
-        <div class="right">
-            <Chains {animeDetails} {updateSeed} />
-        </div>
+        <Episodes {updateSeed} />
     </div>
-{/if}
+    <div class="right">
+        {#if animeDetails}
+            <Chains {animeDetails} bind:updateSeed />
+        {/if}
+    </div>
+</div>
 
 <style lang="scss">
     #anime-details-page {

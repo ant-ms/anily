@@ -1,4 +1,5 @@
 import { getAnimeDetails } from "./getAnimeDetails";
+import { getAnimeDetailsFromApiAndUpsert } from "$lib/anilistApi/getAnimeDetailsFromApiAndUpsert";
 import { getNumberOfAnimeGroupings } from "../apiGrouping/updateAnimeGroupingIfNeeded";
 import { prisma } from "$src/prisma";
 import { fillAnimeGroupingDetails } from "../apiGrouping/buildAnimeGroupings";
@@ -22,7 +23,6 @@ export const apiDetailsAnilistIdGetRoute = app.get(
         description: details.description,
         thumbnailUrl: details.thumbnailUrl,
         groupingId: details.baseAnime.groupings?.[0]?.id || null,
-        episodes: details.episodes,
       };
       return c.json(filteredDetails);
     } catch (error) {
@@ -30,6 +30,28 @@ export const apiDetailsAnilistIdGetRoute = app.get(
         error: "Failed to get details",
         reason: error instanceof Error ? error.message : String(error),
       });
+    }
+  },
+);
+
+export const apiDetailsAnilistIdRefreshPostRoute = app.post(
+  "/api/details/:anilistId/refresh",
+  anilistParamValidator,
+  async (c) => {
+    const params = c.req.valid("param");
+
+    try {
+      // Force a fresh fetch from AniList and upsert into the database.
+      await getAnimeDetailsFromApiAndUpsert(params.anilistId);
+      return c.body(null, 200);
+    } catch (error) {
+      return c.json(
+        {
+          error: "Failed to refresh details",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
     }
   },
 );

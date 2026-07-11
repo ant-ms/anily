@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type SidebarCardData from "../../types/sidebarCardData";
+    import type SidebarCardData from "../../types/SidebarCardData";
     import { selectedAnimeAnilistId } from "../context.svelte";
 
     let {

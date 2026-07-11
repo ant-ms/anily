@@ -15,9 +15,6 @@ const getAnimeDetailsFromDb = async (anilistId: number) =>
     },
   });
 
-export const getAnimeDetails = async (anilistId: number) => {
-  const anime = await getAnimeDetailsFromDb(anilistId);
-  if (anime) return anime;
-
-  return getAnimeDetailsFromApiAndUpsert(anilistId);
-};
+export const getAnimeDetails = async (anilistId: number) =>
+  (await getAnimeDetailsFromDb(anilistId)) ??
+  (await getAnimeDetailsFromApiAndUpsert(anilistId));

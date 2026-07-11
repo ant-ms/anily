@@ -5,6 +5,7 @@ import upsertAnimeTitlesAndRelations from "$lib/anilistApi/upsertAnimeTitlesAndR
 import { logger } from "$src/logger";
 import { Logger } from "pino";
 import { updateAnimeGroupingIfNeeded } from "$src/routes/apiGrouping/updateAnimeGroupingIfNeeded";
+import { upsertEpisodesForAnime } from "$lib/thetvdb/upsertEpisodesForAnime";
 
 type RecentlyUpdatedAnime = Awaited<
   ReturnType<typeof getRecentlyUpdatedAnime>
@@ -71,6 +72,12 @@ export const keepAnilistDataUpdated = async () => {
 
     // Then update the details (thubnail and description)
     await updateAnimeDetailsIfNeeded(anime.id);
+
+    try {
+      await upsertEpisodesForAnime(anime.id);
+    } catch (error) {
+      log.warn({ anilistId: anime.id, error }, "failed to update episodes");
+    }
 
     // If the anime is part of a grouping, update the grouping to include it
     await updateAnimeGroupingIfNeeded(anime.id);

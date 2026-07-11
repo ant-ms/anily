@@ -8,5 +8,4 @@ export default interface AnimeDetailsData {
   description: string;
   thumbnailUrl: string;
   groupingId: number | null;
-  episodes: number;
 }

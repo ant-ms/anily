@@ -33,9 +33,6 @@ export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
           groupings: true,
         },
       },
-      episodes: {
-        orderBy: { number: "asc" },
-      },
     },
   });
 };

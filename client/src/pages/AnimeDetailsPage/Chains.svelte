@@ -126,6 +126,39 @@
             });
         }
     };
+    let refreshing = $state(false);
+
+    const refreshDetails = () => {
+        if (refreshing) return;
+        refreshing = true;
+
+        const detailsUrl = new URL(
+            `/api/details/${selectedAnimeAnilistId.current}/refresh`,
+            apiBaseUrl.current,
+        );
+        const episodesUrl = new URL(
+            `/api/episodes/${selectedAnimeAnilistId.current}/refresh`,
+            apiBaseUrl.current,
+        );
+
+        Promise.all([
+            fetch(detailsUrl.toString(), {
+                method: "POST",
+                credentials: "include",
+            }),
+            fetch(episodesUrl.toString(), {
+                method: "POST",
+                credentials: "include",
+            }),
+        ])
+            .then(() => {
+                updateSeed = Math.random();
+                sidebarDataRefreshSeed.set(Math.random());
+            })
+            .finally(() => {
+                refreshing = false;
+            });
+    };
 </script>
 
 <div class="chains">
@@ -136,7 +169,11 @@
             onclick={toggleGrouping}
         />
         <Button Icon={PencilIcon} />
-        <Button Icon={ArrowsClockwiseIcon} />
+        <Button
+            Icon={ArrowsClockwiseIcon}
+            disabled={refreshing}
+            onclick={refreshDetails}
+        />
         <div class="spacer"></div>
         <Button
             Icon={CaretLeftIcon}
