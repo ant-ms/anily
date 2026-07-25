@@ -20,8 +20,11 @@
 
     watch(
         () => [activeTab, sidebarDataRefreshSeed.current],
-        () => {
-            visibleCardData = [];
+        ([tab, seed], previous) => {
+            const tabChanged = !previous || previous[0] !== tab;
+            if (tabChanged) {
+                visibleCardData = [];
+            }
 
             const url = new URL(
                 `/api/sidebar/${activeTab?.id || "inbox"}`,
@@ -39,23 +42,11 @@
 <div id="sidebar">
     <SidebarTabs bind:activeTab />
     <div class="sidebar-content">
-        {#if activeTab?.id === "waiting"}
-            <div>
-                TODO waiting anime (at least 1 episode watched but not all)
-            </div>
-        {:else if activeTab?.id === "upcoming"}
-            <div>TODO want to watch animes (no episodes watched)</div>
-        {:else if activeTab?.id === "completed"}
-            <div>TODO finished animes (all episodes watched)</div>
-        {:else if activeTab?.id === "logs"}
+        {#if activeTab?.id === "logs"}
             <div>TODO logs</div>
         {:else if activeTab?.id === "settings"}
             <div>TODO settings</div>
         {:else}
-            <!-- <div>
-                TODO watching anime with new <br /> unwatched episodes ("like news")
-            </div> -->
-
             <div class="cards">
                 {#each visibleCardData as data}
                     <SidebarCard {data} />

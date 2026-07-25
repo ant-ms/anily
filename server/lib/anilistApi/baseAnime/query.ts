@@ -41,6 +41,12 @@ export const GET_ANIME_TITLES_QUERY = graphql(`
         season
         seasonYear
         updatedAt
+        episodes
+        startDate {
+          year
+          month
+          day
+        }
       }
       pageInfo {
         currentPage

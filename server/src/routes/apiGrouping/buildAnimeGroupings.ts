@@ -22,7 +22,7 @@ export type AnimeGrouping<T extends ChainableAnime> = {
   notInChain: T[];
 };
 
-const buildChains = <T extends ChainableAnime>(
+export const buildChains = <T extends ChainableAnime>(
   animes: T[],
 ): AnimeGrouping<T> => {
   const pool = new Map(animes.map((anime) => [anime.anilistId, anime]));
@@ -110,7 +110,8 @@ export const buildAnimeGroupingDetails = async (rootAnilistId: number) => {
         include: {
           episodes: {
             select: {
-              watched: true
+              watched: true,
+              airingAt: true
             }
           }
         }

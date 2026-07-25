@@ -2,12 +2,12 @@
 - [x] OICD Authentication
 - [x] Anime details (thumbnail and description, and set rating and marked)
 - [x] AnimeGrouping (show in sidebar, top switcher to move within franchise, built during add/update)
-- [~] Episodes (details from TMDB and dates from Jikan)
+- [x] Episodes (details from TMDB and dates from Jikan)
   - [x] Fetching
   - [x] Displaying
-  - [ ] Allow marking as watched
+  - [x] Allow marking as watched
 - [x] Loading screen for when anime details are fetching
-- [ ] Deployment of UI
+- [x] Deployment of UI
 - [ ] Quick Switch like seach instead of homescreen search
 - [ ] Automatic and manual update triggers for episode releases and anime updates
 - [ ] More robust and integrated job system (with dashboard, cron schedules, etc)

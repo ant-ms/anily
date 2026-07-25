@@ -13,6 +13,12 @@ export const GET_ANIME_DETAILS_QUERY = graphql(`
         medium
         color
       }
+      episodes
+      startDate {
+        year
+        month
+        day
+      }
       description(asHtml: true)
     }
   }

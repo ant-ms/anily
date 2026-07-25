@@ -40,15 +40,15 @@
     });
 
     watch(
-        () => [selectedAnimeAnilistId.current, updateSeed],
-        ([anilistId, seed], previous) => {
+        () => [selectedAnimeAnilistId.current, updateSeed, sidebarDataRefreshSeed.current],
+        ([anilistId, seed, sidebarSeed], previous) => {
             // A bookmark toggle (updateSeed change) always forces a refresh.
-            const seedChanged = !previous || previous[1] !== seed;
+            const seedChanged = !previous || previous[1] !== seed || previous[2] !== sidebarSeed;
 
             // Navigating to an anime that's already part of the loaded grouping
             // just switches the visible page — no need to refetch.
             if (!seedChanged && animeGroupings) {
-                const page = findPageForAnime(animeGroupings, anilistId);
+                const page = findPageForAnime(animeGroupings, anilistId as number | undefined);
                 if (page !== null) {
                     currentPage = page;
                     return;

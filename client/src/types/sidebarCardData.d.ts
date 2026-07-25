@@ -2,12 +2,13 @@ export interface AnimeProgress {
   anilistId: number;
   watched: number;
   total: number;
+  released: number;
 }
 
 export default interface SidebarCardData {
   displayAnilistId: number;
   allAnilistIds: number[];
-  progress: AnimeProgress[];
+  progress: AnimeProgress[][];
 
   titleEnglish: string | null;
   titleRomanji: string | null;

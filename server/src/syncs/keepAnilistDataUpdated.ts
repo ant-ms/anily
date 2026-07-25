@@ -73,8 +73,12 @@ export const keepAnilistDataUpdated = async () => {
     // Then update the details (thubnail and description)
     await updateAnimeDetailsIfNeeded(anime.id);
 
+    const startDate = anime.startDate?.year && anime.startDate?.month && anime.startDate?.day
+      ? new Date(anime.startDate.year, anime.startDate.month - 1, anime.startDate.day)
+      : null;
+
     try {
-      await upsertEpisodesForAnime(anime.id);
+      await upsertEpisodesForAnime(anime.id, anime.episodes, startDate);
     } catch (error) {
       log.warn({ anilistId: anime.id, error }, "failed to update episodes");
     }

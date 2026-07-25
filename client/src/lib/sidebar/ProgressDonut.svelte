@@ -22,32 +22,33 @@
     <!-- Solid background for overlaying on images -->
     <circle cx="12" cy="12" r="10" fill="#1d1a17" />
 
-    <!-- Background track: increased opacity for better contrast -->
-    <circle
-        cx="12"
-        cy="12"
-        r="9"
-        stroke="rgba(255, 255, 255, 0.25)"
-        stroke-width="3"
-        fill="none"
-    />
-    {#if prog.watched > 0}
-        <!-- Progress track -->
+    {#if prog.released === 0}
+        <!-- Small grey dot for announced/future anime with no released episodes -->
+        <circle cx="12" cy="12" r="3" fill="rgba(255, 255, 255, 0.25)" />
+    {:else}
+        <!-- Background track: increased opacity for better contrast -->
         <circle
             cx="12"
             cy="12"
             r="9"
-            stroke="#ffd52c"
+            stroke="rgba(255, 255, 255, 0.25)"
             stroke-width="3"
             fill="none"
-            stroke-dasharray="56.548"
-            stroke-dashoffset={56.548 - (percent / 100) * 56.548}
-            transform="rotate(-90 12 12)"
-            stroke-linecap="round"
         />
-        {#if prog.watched === prog.total && prog.total > 0}
-            <!-- Checkmark for 100% -->
-            <path d="M 8 12.5 L 11 15.5 L 16 9.5" fill="none" stroke="#ffd52c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+        {#if prog.watched > 0}
+            <!-- Progress track -->
+            <circle
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="#ffd52c"
+                stroke-width="3"
+                fill={prog.watched === prog.total && prog.total > 0 ? "#ffd52c" : "none"}
+                stroke-dasharray="56.548"
+                stroke-dashoffset={56.548 - (percent / 100) * 56.548}
+                transform="rotate(-90 12 12)"
+                stroke-linecap="round"
+            />
         {/if}
     {/if}
 </svg>

@@ -6,6 +6,7 @@
     import {
         apiBaseUrl,
         selectedAnimeAnilistId,
+        sidebarDataRefreshSeed,
     } from "../../lib/context.svelte";
     import type EpisodeData from "../../types/Episode";
     import PlayIcon from "phosphor-svelte/lib/PlayIcon";
@@ -82,6 +83,7 @@
             if (!response.ok) {
                 throw new Error("Failed to update watch status");
             }
+            sidebarDataRefreshSeed.set((sidebarDataRefreshSeed.current ?? 0) + 1);
         } catch (error) {
             console.error(error);
             episode.watched = !newStatus;
@@ -115,6 +117,7 @@
             if (!response.ok) {
                 throw new Error("Failed to update all episodes watch status");
             }
+            sidebarDataRefreshSeed.set((sidebarDataRefreshSeed.current ?? 0) + 1);
         } catch (error) {
             console.error(error);
             episodes.forEach((e, i) => (e.watched = previousStatuses[i]));

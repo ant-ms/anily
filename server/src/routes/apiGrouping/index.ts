@@ -22,6 +22,7 @@ type FilteredChainNode = {
     anilistId: number;
     watched: number;
     total: number;
+    released: number;
   };
   children: FilteredChainNode[];
 };
@@ -37,6 +38,7 @@ const filterAnimeDetails = (a: NonChainEntry | ChainEntry["anime"]) => {
       anilistId: a.anilistId,
       watched: a.animeDetails?.episodes.filter((e) => e.watched).length || 0,
       total: a.animeDetails?.episodes.length || 0,
+      released: a.animeDetails?.episodes.filter((e: any) => e.airingAt && e.airingAt <= new Date()).length || 0,
     }
   };
 };

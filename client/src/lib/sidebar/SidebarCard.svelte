@@ -40,9 +40,13 @@
         <span>{titles[1]}</span>
 
         {#if data.progress && data.progress.length > 0}
-            <div class="progress-donuts">
-                {#each data.progress as prog}
-                    <ProgressDonut {prog} />
+            <div class="progress-chains">
+                {#each data.progress as chain}
+                    <div class="progress-chain">
+                        {#each chain as prog}
+                            <ProgressDonut {prog} />
+                        {/each}
+                    </div>
                 {/each}
             </div>
         {/if}
@@ -85,11 +89,21 @@
                 }
             }
 
-            .progress-donuts {
+            .progress-chains {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                margin-top: 6px;
+            }
+
+            .progress-chain {
                 display: flex;
                 gap: 4px;
-                margin-top: 6px;
-                flex-wrap: wrap;
+                padding: 4px 6px;
+                border-radius: 100px;
+                border-top: 1px solid #2e2c29;
+                border-bottom: 1px solid #2e2c29;
+                background: rgba(255, 255, 255, 0.02);
             }
         }
 

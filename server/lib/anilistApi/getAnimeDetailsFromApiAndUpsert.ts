@@ -13,7 +13,7 @@ export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
     animeDetails.coverImage?.large ||
     animeDetails.coverImage?.medium;
 
-  return await prisma.animeDetails.upsert({
+  const upserted = await prisma.animeDetails.upsert({
     where: {
       baseAnimeAnilistId: anilistId,
     },
@@ -35,4 +35,19 @@ export const getAnimeDetailsFromApiAndUpsert = async (anilistId: number) => {
       },
     },
   });
+
+  let startDate: Date | null = null;
+  if (animeDetails.startDate?.year && animeDetails.startDate?.month && animeDetails.startDate?.day) {
+    startDate = new Date(
+      animeDetails.startDate.year,
+      animeDetails.startDate.month - 1,
+      animeDetails.startDate.day
+    );
+  }
+
+  // Also fetch and upsert episodes using the correct episode count cap from Anilist.
+  const { upsertEpisodesForAnime } = await import("../thetvdb/upsertEpisodesForAnime");
+  await upsertEpisodesForAnime(anilistId, animeDetails.episodes, startDate);
+
+  return upserted;
 };
