@@ -1,6 +1,13 @@
+export interface AnimeProgress {
+  anilistId: number;
+  watched: number;
+  total: number;
+}
+
 export interface SidebarCardData {
   displayAnilistId: number;
   allAnilistIds: number[];
+  progress: AnimeProgress[];
 
   titleEnglish: string | null;
   titleRomanji: string | null;
@@ -8,5 +15,4 @@ export interface SidebarCardData {
   thumbnailUrl: string | null;
 
   nextEpisodeDate?: Date;
-  // TODO: If in past, show season e.g. "Winter 2025"
 }

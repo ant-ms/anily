@@ -9,6 +9,15 @@ const getInboxAnimesFromDB = async (): Promise<SidebarCardData[]> => {
       items: {
         select: {
           anilistId: true,
+          animeDetails: {
+            select: {
+              episodes: {
+                select: {
+                  watched: true,
+                },
+              },
+            },
+          },
         },
       },
       displayAnime: {
@@ -22,6 +31,11 @@ const getInboxAnimesFromDB = async (): Promise<SidebarCardData[]> => {
   return animeGroupings.map((a) => ({
     displayAnilistId: a.displayAnime.anilistId,
     allAnilistIds: a.items.map((i) => i.anilistId),
+    progress: a.items.map((i) => ({
+      anilistId: i.anilistId,
+      watched: i.animeDetails?.episodes.filter((e) => e.watched).length || 0,
+      total: i.animeDetails?.episodes.length || 0,
+    })),
     titleEnglish: a.displayAnime.titleEnglish,
     titleRomanji: a.displayAnime.titleRomanji,
     titleNative: a.displayAnime.titleNative,

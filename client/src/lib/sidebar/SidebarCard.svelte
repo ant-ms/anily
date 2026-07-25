@@ -1,6 +1,7 @@
 <script lang="ts">
     import type SidebarCardData from "../../types/SidebarCardData";
     import { selectedAnimeAnilistId } from "../context.svelte";
+    import ProgressDonut from "./ProgressDonut.svelte";
 
     let {
         data,
@@ -37,6 +38,14 @@
     <div class="right">
         <span>{titles[0]}</span>
         <span>{titles[1]}</span>
+
+        {#if data.progress && data.progress.length > 0}
+            <div class="progress-donuts">
+                {#each data.progress as prog}
+                    <ProgressDonut {prog} />
+                {/each}
+            </div>
+        {/if}
     </div>
 </a>
 
@@ -74,6 +83,13 @@
                 &:nth-child(2) {
                     opacity: 0.6;
                 }
+            }
+
+            .progress-donuts {
+                display: flex;
+                gap: 4px;
+                margin-top: 6px;
+                flex-wrap: wrap;
             }
         }
 

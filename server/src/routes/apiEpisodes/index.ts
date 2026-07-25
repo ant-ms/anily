@@ -3,6 +3,7 @@ import { upsertEpisodesForAnime } from "$lib/thetvdb/upsertEpisodesForAnime";
 import { anilistParamValidator } from "$src/validators/anilistId";
 import { app } from "$src/app";
 import { updateEpisodeWatchStatus } from "./updateEpisodeWatchStatus";
+import { updateAllEpisodesWatchStatus } from "./updateAllEpisodesWatchStatus";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
@@ -80,6 +81,34 @@ export const apiEpisodesWatchPutRoute = app.put(
       return c.json(
         {
           error: "Failed to update episode watch status",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
+    }
+  },
+);
+
+export const apiEpisodesWatchAllPutRoute = app.put(
+  "/api/episodes/:anilistId/watch-all",
+  anilistParamValidator,
+  zValidator(
+    "json",
+    z.object({
+      watched: z.boolean(),
+    }),
+  ),
+  async (c) => {
+    const params = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    try {
+      await updateAllEpisodesWatchStatus(params.anilistId, body.watched);
+      return c.body(null, 200);
+    } catch (error) {
+      return c.json(
+        {
+          error: "Failed to update all episodes watch status",
           reason: error instanceof Error ? error.message : String(error),
         },
         500,

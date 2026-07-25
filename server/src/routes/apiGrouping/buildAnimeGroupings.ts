@@ -104,7 +104,18 @@ export const buildAnimeGroupingDetails = async (rootAnilistId: number) => {
 
   const members = await prisma.baseAnime.findMany({
     where: { anilistId: { in: memberIds } },
-    include: { relationsOut: true, animeDetails: true },
+    include: { 
+      relationsOut: true, 
+      animeDetails: {
+        include: {
+          episodes: {
+            select: {
+              watched: true
+            }
+          }
+        }
+      } 
+    },
     orderBy: { anilistId: "asc" },
   });
   return buildChains(members);

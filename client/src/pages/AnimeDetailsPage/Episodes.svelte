@@ -21,6 +21,10 @@
     } = $props();
 
     let episodes: EpisodeData[] = $state([]);
+    let releasedEpisodes = $derived(episodes.filter((e) => !isFuture(e.airingAt)));
+    let allReleasedWatched = $derived(
+        releasedEpisodes.length > 0 && releasedEpisodes.every((e) => e.watched),
+    );
     let loading = $state(true);
 
     watch(
@@ -54,10 +58,10 @@
         });
     };
 
-    const isFuture = (airingAt: string | null) => {
+    function isFuture(airingAt: string | null) {
         if (!airingAt) return true;
         return new Date(airingAt).getTime() > Date.now();
-    };
+    }
 
 
     const toggleWatch = async (episode: EpisodeData) => {
@@ -83,6 +87,39 @@
             episode.watched = !newStatus;
         }
     };
+
+    const toggleAllWatch = async () => {
+        const anilistId = selectedAnimeAnilistId.current;
+        if (anilistId === undefined) return;
+
+        const newStatus = !allReleasedWatched;
+
+        const previousStatuses = episodes.map((e) => e.watched);
+        episodes.forEach((e) => {
+            if (!isFuture(e.airingAt)) {
+                e.watched = newStatus;
+            }
+        });
+
+        try {
+            const url = new URL(
+                `/api/episodes/${anilistId}/watch-all`,
+                apiBaseUrl.current,
+            );
+            const response = await fetch(url.toString(), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ watched: newStatus }),
+                credentials: "include",
+            });
+            if (!response.ok) {
+                throw new Error("Failed to update all episodes watch status");
+            }
+        } catch (error) {
+            console.error(error);
+            episodes.forEach((e, i) => (e.watched = previousStatuses[i]));
+        }
+    };
 </script>
 
 <div class="episodes">
@@ -101,6 +138,18 @@
             </div>
         {/each}
     {:else}
+        {#if episodes.length > 0}
+            <div class="toolbar" transition:fade={{ duration: 200 }}>
+                <div class="spacer"></div>
+                <Button Icon={DownloadIcon} style="ghost" disabled={true} />
+                <Button
+                    Icon={allReleasedWatched ? CheckIcon : EyeIcon}
+                    active={allReleasedWatched}
+                    style="ghost"
+                    onclick={toggleAllWatch}
+                />
+            </div>
+        {/if}
         {#each episodes as episode (episode.number)}
             <div class="episode-card" transition:fade={{ duration: 200 }}>
                 <div class="number"><span>{episode.number}</span></div>
@@ -144,6 +193,16 @@
         gap: 1rem;
         overflow: auto;
         padding: 1rem;
+
+        .toolbar {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+
+            .spacer {
+                flex-grow: 1;
+            }
+        }
 
         .episode-card {
             display: flex;

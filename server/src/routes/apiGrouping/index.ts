@@ -18,6 +18,11 @@ type FilteredChainNode = {
   titleRomanji: string | null;
   titleNative: string | null;
   thumbnailUrl: string | null;
+  progress: {
+    anilistId: number;
+    watched: number;
+    total: number;
+  };
   children: FilteredChainNode[];
 };
 
@@ -28,6 +33,11 @@ const filterAnimeDetails = (a: NonChainEntry | ChainEntry["anime"]) => {
     titleRomanji: a.titleRomanji,
     titleNative: a.titleNative,
     thumbnailUrl: a.animeDetails?.thumbnailUrl || null,
+    progress: {
+      anilistId: a.anilistId,
+      watched: a.animeDetails?.episodes.filter((e) => e.watched).length || 0,
+      total: a.animeDetails?.episodes.length || 0,
+    }
   };
 };
 
