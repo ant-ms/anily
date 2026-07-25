@@ -63,9 +63,14 @@
             flex-direction: column;
             justify-content: center;
             gap: 2px;
+            min-width: 0;
 
             span {
                 font-size: 14px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+
                 &:nth-child(2) {
                     opacity: 0.6;
                 }

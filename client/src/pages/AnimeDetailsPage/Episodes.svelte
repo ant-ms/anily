@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { fade } from "svelte/transition";
     import { watch } from "runed";
     import Button from "../../lib/Button.svelte";
     import Skeleton from "../../lib/Skeleton.svelte";
@@ -8,9 +9,10 @@
     } from "../../lib/context.svelte";
     import type EpisodeData from "../../types/Episode";
     import PlayIcon from "phosphor-svelte/lib/PlayIcon";
+    import CheckIcon from "phosphor-svelte/lib/CheckIcon";
     import EyeIcon from "phosphor-svelte/lib/EyeIcon";
-    import EyeSlashIcon from "phosphor-svelte/lib/EyeSlashIcon";
     import DownloadIcon from "phosphor-svelte/lib/DownloadIcon";
+    import ImageIcon from "phosphor-svelte/lib/ImageIcon";
 
     let {
         updateSeed,
@@ -51,6 +53,36 @@
             day: "numeric",
         });
     };
+
+    const isFuture = (airingAt: string | null) => {
+        if (!airingAt) return true;
+        return new Date(airingAt).getTime() > Date.now();
+    };
+
+
+    const toggleWatch = async (episode: EpisodeData) => {
+        const newStatus = !episode.watched;
+        episode.watched = newStatus;
+
+        try {
+            const url = new URL(
+                `/api/episodes/${episode.id}/watch`,
+                apiBaseUrl.current,
+            );
+            const response = await fetch(url.toString(), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ watched: newStatus }),
+                credentials: "include",
+            });
+            if (!response.ok) {
+                throw new Error("Failed to update watch status");
+            }
+        } catch (error) {
+            console.error(error);
+            episode.watched = !newStatus;
+        }
+    };
 </script>
 
 <div class="episodes">
@@ -70,13 +102,21 @@
         {/each}
     {:else}
         {#each episodes as episode (episode.number)}
-            <div class="episode-card">
+            <div class="episode-card" transition:fade={{ duration: 200 }}>
                 <div class="number"><span>{episode.number}</span></div>
-                <img
-                    src={episode.thumbnailUrl ?? ""}
-                    alt=""
-                    class="episode-thumbnail"
-                />
+                <div class="thumbnail-container">
+                    <div class="placeholder">
+                        <ImageIcon size="2rem" color="#666" />
+                    </div>
+                    {#if episode.thumbnailUrl}
+                        <img
+                            src={episode.thumbnailUrl}
+                            alt=""
+                            class="episode-thumbnail"
+                            onerror={(e) => (e.currentTarget as HTMLImageElement).style.display='none'}
+                        />
+                    {/if}
+                </div>
                 <div class="titles">
                     <span class="title-1"
                         >{episode.titleEnglish ??
@@ -88,9 +128,9 @@
                     >
                 </div>
                 <div class="actions">
-                    <Button Icon={DownloadIcon} style="ghost" />
-                    <Button Icon={episode.watched ? EyeIcon : EyeSlashIcon} />
-                    <Button Icon={PlayIcon} />
+                    <Button Icon={DownloadIcon} style="ghost" disabled={isFuture(episode.airingAt)} />
+                    <Button Icon={episode.watched ? CheckIcon : EyeIcon} active={episode.watched} disabled={isFuture(episode.airingAt)} onclick={() => toggleWatch(episode)} />
+                    <Button Icon={PlayIcon} disabled={isFuture(episode.airingAt)} />
                 </div>
             </div>
         {/each}
@@ -126,10 +166,34 @@
                 }
             }
 
-            .episode-thumbnail {
+            .thumbnail-container {
+                position: relative;
                 width: 160px;
                 height: 90px;
-                object-fit: cover;
+                border-radius: 4px;
+                overflow: hidden;
+                flex-shrink: 0;
+
+                .placeholder {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-color: #1d1a17;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .episode-thumbnail {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
             }
 
             .titles {

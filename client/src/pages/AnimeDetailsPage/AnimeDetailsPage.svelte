@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { fade } from "svelte/transition";
     import { watch } from "runed";
     import {
         apiBaseUrl,
@@ -38,7 +39,9 @@
 <div id="anime-details-page">
     <div class="left">
         {#if animeDetails}
-            <Hero {animeDetails} />
+            <div transition:fade={{ duration: 200 }}>
+                <Hero {animeDetails} />
+            </div>
         {:else}
             <HeroSkeleton />
         {/if}
@@ -46,9 +49,7 @@
         <Episodes {updateSeed} />
     </div>
     <div class="right">
-        {#if animeDetails}
-            <Chains {animeDetails} bind:updateSeed />
-        {/if}
+        <Chains {animeDetails} bind:updateSeed />
     </div>
 </div>
 

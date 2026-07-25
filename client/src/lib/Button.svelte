@@ -62,6 +62,7 @@
             &.active {
                 background: #ffd52c14;
                 border-color: #ffd52c;
+                color: #ffd52c;
             }
         }
 
@@ -81,6 +82,7 @@
             &.active {
                 background: #ffd52c14;
                 border-color: #ffd52c;
+                color: #ffd52c;
             }
         }
     }

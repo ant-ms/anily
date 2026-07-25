@@ -1,4 +1,5 @@
 export default interface EpisodeData {
+  id: number;
   number: number;
   airingAt: string | null;
   watched: boolean;

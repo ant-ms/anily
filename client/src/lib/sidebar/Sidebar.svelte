@@ -68,6 +68,7 @@
 
 <style lang="scss">
     #sidebar {
+        width: 370px;
         display: flex;
         flex-direction: column;
         background: #1d1a17;

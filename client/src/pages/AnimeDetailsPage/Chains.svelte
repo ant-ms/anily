@@ -14,6 +14,7 @@
     import Button from "../../lib/Button.svelte";
     import type AnimeGroupingsData from "../../types/AnimeGroupings";
     import type { ChainNode } from "../../types/AnimeGroupings";
+    import { fade } from "svelte/transition";
     import { watch } from "runed";
     import ChainTree from "./chains/ChainTree.svelte";
     import NotInChain from "./chains/NotInChain.svelte";
@@ -22,11 +23,18 @@
         animeDetails,
         updateSeed = $bindable(),
     }: {
-        animeDetails: AnimeDetailsData;
+        animeDetails: AnimeDetailsData | undefined;
         updateSeed: number;
     } = $props();
 
     let animeGroupings: AnimeGroupingsData | undefined = $state();
+    let isBookmarked = $state(false);
+
+    $effect(() => {
+        if (animeDetails !== undefined) {
+            isBookmarked = animeDetails.groupingId != null;
+        }
+    });
 
     watch(
         () => [selectedAnimeAnilistId.current, updateSeed],
@@ -165,7 +173,7 @@
     <div class="actions">
         <Button
             Icon={BookmarkIcon}
-            active={animeDetails?.groupingId !== null}
+            active={isBookmarked}
             onclick={toggleGrouping}
         />
         <Button Icon={PencilIcon} />
@@ -189,11 +197,13 @@
 
     <div class="tree">
         {#if animeGroupings}
-            {#if currentPage < animeGroupings.chains.length}
-                <ChainTree root={animeGroupings.chains[currentPage]} />
-            {:else if hasNotInChain}
-                <NotInChain animes={animeGroupings.notInChain} />
-            {/if}
+            <div in:fade={{ duration: 150 }}>
+                {#if currentPage < animeGroupings.chains.length}
+                    <ChainTree root={animeGroupings.chains[currentPage]} />
+                {:else if hasNotInChain}
+                    <NotInChain animes={animeGroupings.notInChain} />
+                {/if}
+            </div>
         {/if}
     </div>
 </div>
