@@ -1,7 +1,8 @@
 <script lang="ts">
     import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
     import BookmarkIcon from "phosphor-svelte/lib/BookmarkIcon";
-    import PencilIcon from "phosphor-svelte/lib/PencilIcon";
+    import PushPinIcon from "phosphor-svelte/lib/PushPinIcon";
+    import PushPinSlashIcon from "phosphor-svelte/lib/PushPinSlashIcon";
     import CaretLeftIcon from "phosphor-svelte/lib/CaretLeftIcon";
     import CaretRightIcon from "phosphor-svelte/lib/CaretRightIcon";
 
@@ -29,10 +30,12 @@
 
     let animeGroupings: AnimeGroupingsData | undefined = $state();
     let isBookmarked = $state(false);
+    let isDisplayAnime = $state(false);
 
     $effect(() => {
         if (animeDetails !== undefined) {
             isBookmarked = animeDetails.groupingId != null;
+            isDisplayAnime = animeDetails.isDisplayAnime;
         }
     });
 
@@ -134,6 +137,24 @@
             });
         }
     };
+
+    const setDisplayAnime = () => {
+        if (!animeDetails || isDisplayAnime) return;
+
+        const url = new URL(
+            `/api/details/${selectedAnimeAnilistId.current}/grouping`,
+            apiBaseUrl.current,
+        );
+
+        fetch(url.toString(), {
+            method: "POST",
+            credentials: "include",
+        }).then((_) => {
+            updateSeed = Math.random();
+            sidebarDataRefreshSeed.set(Math.random());
+        });
+    };
+
     let refreshing = $state(false);
 
     const refreshDetails = () => {
@@ -176,7 +197,11 @@
             active={isBookmarked}
             onclick={toggleGrouping}
         />
-        <Button Icon={PencilIcon} />
+        <Button 
+            Icon={isDisplayAnime ? PushPinIcon : PushPinSlashIcon} 
+            active={isDisplayAnime} 
+            onclick={setDisplayAnime} 
+        />
         <Button
             Icon={ArrowsClockwiseIcon}
             disabled={refreshing}

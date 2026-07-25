@@ -23,6 +23,7 @@ export const apiDetailsAnilistIdGetRoute = app.get(
         description: details.description,
         thumbnailUrl: details.thumbnailUrl,
         groupingId: details.baseAnime.groupings?.[0]?.id || null,
+        isDisplayAnime: details.baseAnime.groupings?.[0]?.displayAnimeId === details.baseAnime.anilistId,
       };
       return c.json(filteredDetails);
     } catch (error) {
@@ -66,8 +67,12 @@ export const apiDetailsAnilistIdGroupingPostRoute = app.post(
       params.anilistId,
     );
 
-    // If the anime is already grouped, return a 200 status with a message
+    // If the anime is already grouped, update the display anime to this one
     if (numberOfAnimeGroupings.length > 0) {
+      await prisma.animeGrouping.updateMany({
+        where: { items: { some: { anilistId: params.anilistId } } },
+        data: { displayAnimeId: params.anilistId }
+      });
       return c.body(null, 200);
     }
 
@@ -100,9 +105,11 @@ export const apiDetailsAnilistIdGroupingDeleteRoute = app.delete(
 
     await prisma.animeGrouping.deleteMany({
       where: {
-        displayAnime: {
-          anilistId: params.anilistId,
-        },
+        items: {
+          some: {
+            anilistId: params.anilistId,
+          }
+        }
       },
     });
 
