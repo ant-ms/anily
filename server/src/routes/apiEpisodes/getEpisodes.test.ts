@@ -1,7 +1,29 @@
-import { expect, test } from "vitest";
+import { expect, test, beforeAll, afterAll } from "vitest";
 import { getEpisodes } from "./getEpisodes";
 import { getAnimeDetailsFromApiAndUpsert } from "$lib/anilistApi/getAnimeDetailsFromApiAndUpsert";
 import { upsertEpisodesForAnime } from "$lib/thetvdb/upsertEpisodesForAnime";
+
+import { prisma } from "$src/prisma";
+
+let originalKey: string | undefined;
+beforeAll(async () => {
+  originalKey = process.env.OPENROUTER_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
+
+  // Clear Frieren ONA episodes to prevent test state pollution from previous runs
+  const frierenOnaDetails = await prisma.animeDetails.findUnique({
+    where: { baseAnimeAnilistId: 170068 }
+  });
+  if (frierenOnaDetails) {
+    await prisma.episode.deleteMany({ where: { animeDetailsId: frierenOnaDetails.id } });
+  }
+});
+
+afterAll(() => {
+  if (originalKey) {
+    process.env.OPENROUTER_API_KEY = originalKey;
+  }
+});
 
 const FRIEREN = 154587;
 const FRIEREN_ONA = 170068; // 12 episodes, no TVDB mapping

@@ -55,11 +55,31 @@ const getMapping = async (): Promise<Map<number, TvdbMapping>> => {
   }
 };
 
+import { resolveTvdbMappingViaLLM } from "./llmTvdbMappingFallback";
+
 export const resolveTvdbMapping = async (
   anilistId: number,
 ): Promise<TvdbMapping | null> => {
   const mapping = await getMapping();
-  return mapping.get(anilistId) ?? null;
+  let result = mapping.get(anilistId) ?? null;
+
+  if (!result) {
+    try {
+      const llmResult = await resolveTvdbMappingViaLLM(anilistId);
+      if (llmResult) {
+        // Cache the LLM result in memory so we don't query it repeatedly during runtime
+        mapping.set(anilistId, llmResult);
+        result = llmResult;
+      }
+    } catch (e) {
+      console.warn(
+        `[TheTVDB] LLM fallback failed for anilistId ${anilistId}:`,
+        e,
+      );
+    }
+  }
+
+  return result;
 };
 
 export const refreshTvdbMappingCache = async (): Promise<void> => {
