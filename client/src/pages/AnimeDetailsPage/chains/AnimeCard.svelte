@@ -43,18 +43,18 @@
 
         .thumbnail-wrapper {
             position: relative;
-            
-            img,
-            .placeholder {
-                width: 100px;
-                aspect-ratio: 3 / 4;
-                object-fit: cover;
-                border-radius: 5px;
-                border: 3px solid transparent;
-                background: #2a2723;
-                transition: border-color 0.15s;
-                display: block; // Removes bottom gap in wrapper
-            }
+        }
+
+        img,
+        .placeholder {
+            width: 100px;
+            aspect-ratio: 3 / 4;
+            object-fit: cover;
+            border-radius: 5px;
+            border: 3px solid transparent;
+            background: #2a2723;
+            transition: border-color 0.15s;
+            display: block; /* Removes bottom gap in wrapper */
         }
 
         .caption-wrapper {
