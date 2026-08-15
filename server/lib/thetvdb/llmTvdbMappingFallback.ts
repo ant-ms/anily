@@ -31,7 +31,7 @@ export const resolveTvdbMappingViaLLM = async (
     );
 
     if (!response.ok) throw new Error(`LLM Error: ${response.statusText}`);
-    const data = await response.json();
+    const data = (await response.json()) as any;
     return data.choices[0].message.content;
   };
 

@@ -2,6 +2,7 @@ import { prisma } from "$src/prisma";
 import { resolveTvdbMapping } from "./animeTvdbMapping";
 import { getSeriesEpisodes } from "./getSeriesEpisodes";
 import { logger } from "$src/logger";
+import { getAnimeScheduleDates } from "../animeschedule/getAnimeScheduleDates";
 
 const ENGLISH = "eng";
 const JAPANESE = "jpn";
@@ -26,6 +27,7 @@ export const upsertEpisodesForAnime = async (
 ): Promise<void> => {
   const details = await prisma.animeDetails.findUnique({
     where: { baseAnimeAnilistId: anilistId },
+    include: { baseAnime: true },
   });
   if (!details) return;
 
@@ -55,6 +57,7 @@ export const upsertEpisodesForAnime = async (
   }
 
   if (!mapping) {
+    const animeScheduleDates = await getAnimeScheduleDates(details.baseAnime, effectiveEpisodeCount ?? null);
     const fallbackCount = effectiveEpisodeCount && effectiveEpisodeCount > 0 ? effectiveEpisodeCount : 1;
     for (let number = 1; number <= fallbackCount; number++) {
       await prisma.episode.upsert({
@@ -62,13 +65,13 @@ export const upsertEpisodesForAnime = async (
           animeDetailsId_number: { animeDetailsId: details.id, number },
         },
         update: {
-          airingAt: number === 1 && fallbackStartDate ? fallbackStartDate : undefined,
+          airingAt: animeScheduleDates?.get(number) ?? (number === 1 && fallbackStartDate ? fallbackStartDate : undefined),
         }, 
         create: {
           animeDetailsId: details.id,
           number,
           titleEnglish: `Episode ${number}`,
-          airingAt: number === 1 && fallbackStartDate ? fallbackStartDate : null,
+          airingAt: animeScheduleDates?.get(number) ?? (number === 1 && fallbackStartDate ? fallbackStartDate : null),
         },
       });
     }
@@ -84,6 +87,8 @@ export const upsertEpisodesForAnime = async (
     japaneseEpisodes.map((episode) => [episode.id, episode.name]),
   );
 
+  const animeScheduleDates = await getAnimeScheduleDates(details.baseAnime, effectiveEpisodeCount ?? null);
+
   for (const episode of englishEpisodes) {
     if (episode.seasonNumber !== mapping.tvdbSeason) continue;
 
@@ -95,7 +100,7 @@ export const upsertEpisodesForAnime = async (
     }
 
     const data = {
-      airingAt: parseAiredDate(episode.aired),
+      airingAt: animeScheduleDates?.get(number) ?? parseAiredDate(episode.aired),
       titleEnglish: episode.name || null,
       titleNative: nativeNameById.get(episode.id) || null,
       thumbnailUrl: normalizeImageUrl(episode.image),
