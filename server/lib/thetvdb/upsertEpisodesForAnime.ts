@@ -1,11 +1,11 @@
 import { prisma } from "$src/prisma";
-import { resolveTvdbMapping } from "./animeTvdbMapping";
-import { getSeriesEpisodes } from "./getSeriesEpisodes";
-import { logger } from "$src/logger";
+import { resolveTvdbMapping, getSeriesEpisodes } from "@ant.ms/thetvdb";
 import { getAnimeScheduleDates } from "../animeschedule/getAnimeScheduleDates";
 
-const ENGLISH = "eng";
-const JAPANESE = "jpn";
+const LANGUAGE_ENGLISH = "eng";
+const LANGUAGE_JAPANESE = "jpn";
+const TVDB_IMAGE_BASE_URL = "https://artworks.thetvdb.com";
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const parseAiredDate = (aired: string | null): Date | null => {
   if (!aired) return null;
@@ -15,79 +15,127 @@ const parseAiredDate = (aired: string | null): Date | null => {
 
 const normalizeImageUrl = (image: string | null): string | null => {
   if (!image) return null;
-  return image.startsWith("http")
-    ? image
-    : `https://artworks.thetvdb.com${image}`;
+  return image.startsWith("http") ? image : `${TVDB_IMAGE_BASE_URL}${image}`;
+};
+
+const getEffectiveEpisodeCount = async (
+  detailsId: number,
+  expectedEpisodeCount?: number | null
+): Promise<number | null | undefined> => {
+  if (expectedEpisodeCount !== undefined) {
+    return expectedEpisodeCount;
+  }
+
+  // During manual refresh, we don't query Anilist to avoid API spam.
+  // Instead, we use the highest episode number currently in the DB as the cap.
+  const maxEpisode = await prisma.episode.findFirst({
+    where: { animeDetailsId: detailsId },
+    orderBy: { number: "desc" },
+  });
+
+  return maxEpisode?.number;
+};
+
+const cleanupStrayEpisodes = async (detailsId: number, effectiveEpisodeCount: number) => {
+  if (effectiveEpisodeCount > 0) {
+    await prisma.episode.deleteMany({
+      where: {
+        animeDetailsId: detailsId,
+        number: { gt: effectiveEpisodeCount },
+      },
+    });
+  }
+};
+
+const upsertFallbackEpisodes = async (
+  details: any,
+  effectiveEpisodeCount: number | null | undefined,
+  fallbackStartDate: Date | null | undefined
+) => {
+  const animeScheduleDates = await getAnimeScheduleDates(
+    details.baseAnime,
+    effectiveEpisodeCount ?? null
+  );
+  
+  const fallbackCount = effectiveEpisodeCount && effectiveEpisodeCount > 0 ? effectiveEpisodeCount : 1;
+
+  for (let number = 1; number <= fallbackCount; number++) {
+    const airingAt =
+      animeScheduleDates?.get(number) ??
+      (number === 1 && fallbackStartDate ? fallbackStartDate : null);
+
+    await prisma.episode.upsert({
+      where: {
+        animeDetailsId_number: { animeDetailsId: details.id, number },
+      },
+      update: {
+        airingAt: airingAt ?? undefined,
+      },
+      create: {
+        animeDetailsId: details.id,
+        number,
+        titleEnglish: `Episode ${number}`,
+        airingAt,
+      },
+    });
+  }
+};
+
+const calculateSyncedAiringDate = (asDate?: Date, tvdbDate?: Date | null): Date | null => {
+  if (!asDate) return tvdbDate ?? null;
+  if (!tvdbDate) return asDate;
+
+  const diffTime = tvdbDate.getTime() - asDate.getTime();
+  const weeksDiff = Math.round(diffTime / ONE_WEEK_MS);
+  
+  return new Date(asDate.getTime() + weeksDiff * ONE_WEEK_MS);
+};
+
+const fetchAndMapTvdbEpisodes = async (tvdbSeriesId: number) => {
+  const [englishEpisodes, japaneseEpisodes] = await Promise.all([
+    getSeriesEpisodes(tvdbSeriesId, LANGUAGE_ENGLISH),
+    getSeriesEpisodes(tvdbSeriesId, LANGUAGE_JAPANESE),
+  ]);
+
+  const nativeNameById = new Map(
+    japaneseEpisodes.map((episode) => [episode.id, episode.name])
+  );
+
+  return { englishEpisodes, nativeNameById };
 };
 
 export const upsertEpisodesForAnime = async (
   anilistId: number,
   expectedEpisodeCount?: number | null,
-  fallbackStartDate?: Date | null,
+  fallbackStartDate?: Date | null
 ): Promise<void> => {
   const details = await prisma.animeDetails.findUnique({
     where: { baseAnimeAnilistId: anilistId },
     include: { baseAnime: true },
   });
+
   if (!details) return;
 
-  const mapping = await resolveTvdbMapping(anilistId);
+  const mapping = await resolveTvdbMapping(anilistId, async () => {
+    return details.baseAnime.titleEnglish || details.baseAnime.titleRomanji || null;
+  });
+  const effectiveEpisodeCount = await getEffectiveEpisodeCount(details.id, expectedEpisodeCount);
 
-  let effectiveEpisodeCount = expectedEpisodeCount;
-  
-  if (effectiveEpisodeCount === undefined) {
-    // During manual refresh, we don't query Anilist to avoid API spam.
-    // Instead, we use the highest episode number currently in the DB as the cap.
-    // The periodic sync is responsible for increasing this cap when new episodes air.
-    const maxEp = await prisma.episode.findFirst({
-      where: { animeDetailsId: details.id },
-      orderBy: { number: 'desc' }
-    });
-    effectiveEpisodeCount = maxEp?.number;
-  }
-
-  // Cleanup stray episodes that may have been previously created beyond the cap
-  if (effectiveEpisodeCount != null && effectiveEpisodeCount > 0) {
-    await prisma.episode.deleteMany({
-      where: {
-        animeDetailsId: details.id,
-        number: { gt: effectiveEpisodeCount },
-      },
-    });
+  if (effectiveEpisodeCount != null) {
+    await cleanupStrayEpisodes(details.id, effectiveEpisodeCount);
   }
 
   if (!mapping) {
-    const animeScheduleDates = await getAnimeScheduleDates(details.baseAnime, effectiveEpisodeCount ?? null);
-    const fallbackCount = effectiveEpisodeCount && effectiveEpisodeCount > 0 ? effectiveEpisodeCount : 1;
-    for (let number = 1; number <= fallbackCount; number++) {
-      await prisma.episode.upsert({
-        where: {
-          animeDetailsId_number: { animeDetailsId: details.id, number },
-        },
-        update: {
-          airingAt: animeScheduleDates?.get(number) ?? (number === 1 && fallbackStartDate ? fallbackStartDate : undefined),
-        }, 
-        create: {
-          animeDetailsId: details.id,
-          number,
-          titleEnglish: `Episode ${number}`,
-          airingAt: animeScheduleDates?.get(number) ?? (number === 1 && fallbackStartDate ? fallbackStartDate : null),
-        },
-      });
-    }
+    await upsertFallbackEpisodes(details, effectiveEpisodeCount, fallbackStartDate);
     return;
   }
 
-  const [englishEpisodes, japaneseEpisodes] = await Promise.all([
-    getSeriesEpisodes(mapping.tvdbSeriesId, ENGLISH),
-    getSeriesEpisodes(mapping.tvdbSeriesId, JAPANESE),
-  ]);
-
-  const nativeNameById = new Map(
-    japaneseEpisodes.map((episode) => [episode.id, episode.name]),
+  const { englishEpisodes, nativeNameById } = await fetchAndMapTvdbEpisodes(mapping.tvdbSeriesId);
+  
+  const animeScheduleDates = await getAnimeScheduleDates(
+    details.baseAnime,
+    effectiveEpisodeCount ?? null
   );
-
-  const animeScheduleDates = await getAnimeScheduleDates(details.baseAnime, effectiveEpisodeCount ?? null);
 
   for (const episode of englishEpisodes) {
     if (episode.seasonNumber !== mapping.tvdbSeason) continue;
@@ -99,8 +147,12 @@ export const upsertEpisodesForAnime = async (
       continue;
     }
 
-    const data = {
-      airingAt: animeScheduleDates?.get(number) ?? parseAiredDate(episode.aired),
+    const asDate = animeScheduleDates?.get(number);
+    const tvdbDate = parseAiredDate(episode.aired);
+    const airingAt = calculateSyncedAiringDate(asDate, tvdbDate);
+
+    const episodeData = {
+      airingAt,
       titleEnglish: episode.name || null,
       titleNative: nativeNameById.get(episode.id) || null,
       thumbnailUrl: normalizeImageUrl(episode.image),
@@ -110,8 +162,12 @@ export const upsertEpisodesForAnime = async (
       where: {
         animeDetailsId_number: { animeDetailsId: details.id, number },
       },
-      update: data,
-      create: { animeDetailsId: details.id, number, ...data },
+      update: episodeData,
+      create: { 
+        animeDetailsId: details.id, 
+        number, 
+        ...episodeData 
+      },
     });
   }
 };

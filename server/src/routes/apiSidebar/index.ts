@@ -96,8 +96,7 @@ const getSidebarAnimesFromDB = async (tab: string): Promise<SidebarCardData[]> =
   });
 
   return filteredGroupings.map((grouping) => {
-    // @ts-expect-error Types are complex but structural typing matches ChainableAnime
-    const groupingChains = buildChains(grouping.items);
+    const groupingChains = buildChains(grouping.items as any);
     
     // We flatten trees into simple arrays of AnimeProgress for the pill UI.
     // Each chain becomes one array of progress donuts.
