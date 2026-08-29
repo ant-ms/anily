@@ -9,24 +9,45 @@
         style = "normal",
         active = false,
         disabled = false,
+        loading = false,
     }: {
         children?: Snippet;
         Icon?: Component<IconComponentProps, {}, "">;
         style?: "normal" | "ghost";
         active?: boolean;
-        onclick?: () => void;
+        onclick?: () => void | Promise<void>;
         disabled?: boolean;
+        loading?: boolean;
     } = $props();
+
+    let internalLoading = $state(false);
+    let isBusy = $derived(loading || internalLoading);
+
+    async function handleClick(e: MouseEvent) {
+        if (disabled || isBusy || !onclick) return;
+        try {
+            const result = onclick();
+            if (result instanceof Promise) {
+                internalLoading = true;
+                await result;
+            }
+        } finally {
+            internalLoading = false;
+        }
+    }
 </script>
 
 <button
-    {onclick}
+    onclick={handleClick}
     class:active
-    {disabled}
+    disabled={disabled || isBusy}
+    class:is-busy={isBusy}
     class:style-normal={style === "normal"}
     class:style-ghost={style === "ghost"}
 >
-    {#if Icon}
+    {#if isBusy}
+        <span class="button-spinner"></span>
+    {:else if Icon}
         <Icon size="1.25rem" />
     {/if}
     {#if children}
@@ -84,6 +105,28 @@
                 border-color: #ffd52c;
                 color: #ffd52c;
             }
+        }
+
+        &.is-busy {
+            opacity: 0.65;
+            cursor: wait;
+        }
+    }
+
+    .button-spinner {
+        display: inline-block;
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 2px solid hsl(36, 5.7%, 30%);
+        border-top-color: #ffd52c;
+        border-radius: 50%;
+        animation: btn-spin 0.6s linear infinite;
+        box-sizing: border-box;
+    }
+
+    @keyframes btn-spin {
+        to {
+            transform: rotate(360deg);
         }
     }
 </style>

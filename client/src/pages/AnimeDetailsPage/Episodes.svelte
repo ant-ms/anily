@@ -410,9 +410,9 @@
                         disabled={isFuture(episode.airingAt)}
                         onclick={() => {
                             if (episode.mediaStatus === "AVAILABLE") {
-                                handleOpenPlayer(episode);
+                                return handleOpenPlayer(episode);
                             } else {
-                                handleStream(episode);
+                                return handleStream(episode);
                             }
                         }}
                     />

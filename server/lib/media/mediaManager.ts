@@ -153,9 +153,12 @@ export async function startEpisodeDownload(
 
   // Try to inspect the torrent files right away to get the exact video filename
   let exactMediaPath = `${anilistId}/ep${episode.number}`;
+  let foundVideo = false;
+
   try {
-    for (let i = 0; i < 4; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+    // Poll up to 10 times (every 400ms = 4s total) for qBittorrent to fetch metadata & file names
+    for (let i = 0; i < 10; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
       const files = await qbit.getTorrentFiles(hash);
       if (files && files.length > 0) {
         const videoFiles = files.filter((f) => {
@@ -167,14 +170,23 @@ export async function startEpisodeDownload(
             ? videoFiles.reduce((a, b) => (a.size > b.size ? a : b))
             : files.reduce((a, b) => (a.size > b.size ? a : b));
 
-        if (mainFile) {
+        if (mainFile && mainFile.name) {
           exactMediaPath = `${anilistId}/ep${episode.number}/${mainFile.name}`;
+          foundVideo = true;
           break;
         }
       }
     }
   } catch (error) {
     log.warn({ error, hash }, "Failed to get immediate file name from qBittorrent");
+  }
+
+  // Fallback: If metadata took too long, infer a sanitized filename from the torrent title with .mkv extension
+  if (!foundVideo) {
+    const safeTitle = (torrent.title || `episode_${episode.number}`).replace(/[/\\?%*:|"<>]/g, "_").trim();
+    const hasExt = Array.from(VIDEO_EXTENSIONS).some((ext) => safeTitle.toLowerCase().endsWith(ext));
+    const inferredFilename = hasExt ? safeTitle : `${safeTitle}.mkv`;
+    exactMediaPath = `${anilistId}/ep${episode.number}/${inferredFilename}`;
   }
 
   await prisma.episode.update({
