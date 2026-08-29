@@ -326,14 +326,17 @@ export async function autoDownloadNewEpisodes(): Promise<{
   const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // Find episodes that aired >= 1h ago and <= 8 days ago, with mediaStatus NONE
+  // Find episodes that aired >= 1h ago with mediaStatus NONE and either:
+  // 1. Have NEVER been searched (mediaLastSearchAt: null) -> e.g. previously bookmarked older shows
+  // 2. Aired within the last 8 days (gte: eightDaysAgo) -> ongoing shows within the retry window
   const episodes = await prisma.episode.findMany({
     where: {
       mediaStatus: MediaStatus.NONE,
-      airingAt: {
-        lte: oneHourAgo,
-        gte: eightDaysAgo, // Stop automated searching after 8 days
-      },
+      airingAt: { lte: oneHourAgo },
+      OR: [
+        { mediaLastSearchAt: null },
+        { airingAt: { gte: eightDaysAgo } },
+      ],
       animeDetails: {
         baseAnime: { animeDetails: { isNot: null } },
       },

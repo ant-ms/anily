@@ -525,6 +525,7 @@ export const apiMediaMissingGetRoute = app.get("/api/media/missing", async (c) =
       where: {
         mediaStatus: MediaStatus.NONE,
         airingAt: { lte: eightDaysAgo },
+        mediaLastSearchAt: { not: null }, // Only consider truly missing if we attempted at least once
         animeDetails: {
           baseAnime: {
             animeDetails: {
