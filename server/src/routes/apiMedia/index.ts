@@ -168,40 +168,67 @@ export const apiMediaStreamPostRoute = app.post(
 );
 
 // POST /api/media/download-season/:anilistId
-// Queue downloads for a batch of episode selections
+// Kick off background auto-download for all un-downloaded aired episodes of an anime
 export const apiMediaDownloadSeasonPostRoute = app.post(
   "/api/media/download-season/:anilistId",
   anilistParamValidator,
-  zValidator(
-    "json",
-    z.object({
-      selections: z.array(
-        z.object({
-          episodeId: z.number().int(),
-          torrentIndex: z.number().int().min(0),
-        }),
-      ),
-    }),
-  ),
   async (c) => {
-    const { selections } = c.req.valid("json");
-    let queued = 0;
+    const { anilistId } = c.req.valid("param");
+    const now = new Date();
 
-    for (const { episodeId, torrentIndex } of selections) {
-      try {
-        const { results } = await getEpisodeTorrentOptions(episodeId);
-        if (torrentIndex < results.length) {
-          await startEpisodeDownload(episodeId, results[torrentIndex], false);
-          queued++;
-        } else {
-          log.warn({ episodeId, torrentIndex }, "torrentIndex out of range, skipping");
+    // Find all aired episodes that are not yet downloaded/queued
+    const episodes = await prisma.episode.findMany({
+      where: {
+        mediaStatus: MediaStatus.NONE,
+        airingAt: { lte: now },
+        animeDetails: { baseAnimeAnilistId: anilistId },
+      },
+      include: { animeDetails: { include: { baseAnime: true } } },
+      orderBy: { number: "asc" },
+    });
+
+    // Mark them as QUEUED immediately so UI reflects downloading state
+    await prisma.episode.updateMany({
+      where: {
+        id: { in: episodes.map((e) => e.id) },
+        mediaStatus: MediaStatus.NONE,
+      },
+      data: { mediaStatus: MediaStatus.QUEUED },
+    });
+
+    // Run download orchestrator in the background without blocking the HTTP response
+    (async () => {
+      log.info({ anilistId, count: episodes.length }, "Starting background season download");
+      for (const episode of episodes) {
+        try {
+          const { results, recommendation } = await getEpisodeTorrentOptions(episode.id);
+          if (results.length > 0 && recommendation.index >= 0) {
+            const torrent = results[recommendation.index];
+            await startEpisodeDownload(episode.id, torrent, false);
+          } else if (results.length > 0) {
+            // If AI is low confidence, pick highest seeded torrent
+            await startEpisodeDownload(episode.id, results[0], false);
+          } else {
+            // Reset status if no torrents found
+            await prisma.episode.update({
+              where: { id: episode.id },
+              data: { mediaStatus: MediaStatus.NONE },
+            });
+          }
+        } catch (error) {
+          log.warn({ error, episodeId: episode.id }, "Failed background download for episode");
+          await prisma.episode.update({
+            where: { id: episode.id },
+            data: { mediaStatus: MediaStatus.NONE },
+          }).catch(() => {});
         }
-      } catch (error) {
-        log.warn({ error, episodeId }, "Failed to queue episode download in season batch");
       }
-    }
+      log.info({ anilistId }, "Finished background season download batch");
+    })().catch((err) => {
+      log.error({ err, anilistId }, "Background season download error");
+    });
 
-    return c.json({ queued });
+    return c.json({ success: true, count: episodes.length });
   },
 );
 

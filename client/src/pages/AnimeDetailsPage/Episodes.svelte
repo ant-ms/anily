@@ -217,14 +217,23 @@
         torrentModalEpisode = null;
     }
 
-    async function handleSeasonConfirm() {
-        seasonModalOpen = false;
+    async function handleDownloadSeason() {
+        if (!selectedAnimeAnilistId.current) return;
+        try {
+            const url = new URL(
+                `/api/media/download-season/${selectedAnimeAnilistId.current}`,
+                apiBaseUrl.current,
+            );
+            const res = await fetch(url.toString(), {
+                method: "POST",
+                credentials: "include",
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        } catch (e) {
+            console.error("Failed to start season background download", e);
+        }
         await refreshEpisodes();
         startPollingIfNeeded();
-    }
-
-    function handleSeasonCancel() {
-        seasonModalOpen = false;
     }
 
     // ── Media URL / player helpers ─────────────────────────────────────────────
@@ -347,7 +356,7 @@
                 <Button
                     Icon={DownloadIcon}
                     style="ghost"
-                    onclick={() => (seasonModalOpen = true)}
+                    onclick={handleDownloadSeason}
                 />
                 <Button
                     Icon={allReleasedWatched ? CheckIcon : EyeIcon}
@@ -440,14 +449,6 @@
         : ""}
     onconfirm={handleTorrentConfirm}
     oncancel={handleTorrentCancel}
-/>
-
-<SeasonDownloadModal
-    show={seasonModalOpen}
-    anilistId={selectedAnimeAnilistId.current ?? 0}
-    {animeName}
-    onconfirm={handleSeasonConfirm}
-    oncancel={handleSeasonCancel}
 />
 
 <style lang="scss">
