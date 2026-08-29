@@ -189,14 +189,17 @@
     }) {
         torrentModalEpisode = null;
         const url = new URL(
-            `/api/media/download/${detail.episodeId}`,
+            `/api/media/download`,
             apiBaseUrl.current,
         );
         try {
             const res = await fetch(url.toString(), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ torrentIndex: detail.torrentIndex }),
+                body: JSON.stringify({
+                    episodeId: detail.episodeId,
+                    torrentIndex: detail.torrentIndex,
+                }),
                 credentials: "include",
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -256,7 +259,7 @@
         }
     };
 
-    /** Stream: POST /api/media/stream/{id} → get URL → open in player immediately */
+    /** Stream: POST /api/media/stream/{id} → get URL → open in player immediately. If AI is unsure, open manual modal */
     const handleStream = async (episode: EpisodeData) => {
         try {
             const url = new URL(
@@ -267,7 +270,13 @@
                 method: "POST",
                 credentials: "include",
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            if (res.status === 422 || !res.ok) {
+                // If AI is unsure or no confident match found, fallback to manual selection modal
+                openTorrentModal(episode);
+                return;
+            }
+
             const data = await res.json();
             const mediaUrl = data.url ?? data.mediaUrl;
             if (mediaUrl) {
@@ -279,7 +288,8 @@
                 }
             }
         } catch (e) {
-            console.error("Failed to stream episode", e);
+            console.error("Failed to stream episode, opening manual selection", e);
+            openTorrentModal(episode);
         }
         await refreshEpisodes();
         startPollingIfNeeded();

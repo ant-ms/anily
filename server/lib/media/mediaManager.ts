@@ -52,10 +52,38 @@ export async function getEpisodeTorrentOptions(episodeId: number): Promise<{
     baseAnime.titleEnglish ?? baseAnime.titleRomanji ?? baseAnime.titleNative ?? "Unknown";
   const anilistId = baseAnime.anilistId;
 
-  const query = buildSearchQuery(animeName, episode.number);
-  log.info({ query, episodeId }, "Searching for torrents");
+  const epStr = episode.number !== null ? String(episode.number) : null;
+  const epPadded = episode.number !== null ? String(episode.number).padStart(2, "0") : null;
 
-  const results = await searchTorrents(query);
+  const queries: string[] = [buildSearchQuery(animeName, episode.number)];
+  if (epPadded && epPadded !== epStr) {
+    queries.push(buildSearchQuery(animeName, null) + ` ${epPadded}`);
+  }
+  if (baseAnime.titleRomanji && baseAnime.titleRomanji !== animeName) {
+    queries.push(buildSearchQuery(baseAnime.titleRomanji, episode.number));
+    if (epPadded && epPadded !== epStr) {
+      queries.push(buildSearchQuery(baseAnime.titleRomanji, null) + ` ${epPadded}`);
+    }
+  }
+
+  let results: TorrentResult[] = [];
+  const seen = new Set<string>();
+
+  for (const query of queries) {
+    log.info({ query, episodeId }, "Searching for torrents");
+    const queryResults = await searchTorrents(query);
+    for (const r of queryResults) {
+      const key = r.link || r.title;
+      if (!seen.has(key)) {
+        results.push(r);
+        seen.add(key);
+      }
+    }
+    // If we found ample results, stop querying further variations
+    if (results.length >= 10) break;
+  }
+
+  results.sort((a, b) => b.seeders - a.seeders);
   const recommendation = await rankTorrents(animeName, episode.number, results);
 
   return {

@@ -45,7 +45,6 @@ export async function searchTorrents(query: string): Promise<TorrentResult[]> {
   const url = new URL(`${jackettUrl}/api/v2.0/indexers/all/results`);
   url.searchParams.set("apikey", apiKey);
   url.searchParams.set("Query", query);
-  url.searchParams.set("Category", "5070");
 
   try {
     const response = await fetch(url.toString(), {
