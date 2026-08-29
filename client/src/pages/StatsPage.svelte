@@ -2,14 +2,12 @@
     import { onMount } from "svelte";
     import { apiBaseUrl } from "$lib/context.svelte";
     import Button from "$lib/Button.svelte";
-    import {
-        ArrowClockwise,
-        HardDrives,
-        UploadSimple,
-        WarningCircle,
-        FolderNotchOpen,
-        FileVideo,
-    } from "phosphor-svelte";
+    import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
+    import HardDrivesIcon from "phosphor-svelte/lib/HardDrivesIcon";
+    import UploadSimpleIcon from "phosphor-svelte/lib/UploadSimpleIcon";
+    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
+    import FolderIcon from "phosphor-svelte/lib/FolderIcon";
+    import FileVideoIcon from "phosphor-svelte/lib/FileVideoIcon";
 
     type GroupingStat = {
         id: number;
@@ -82,7 +80,7 @@
             <p class="subtitle">Storage usage, seeding statistics per anime grouping, and storage integrity checks.</p>
         </div>
         <div class="actions">
-            <Button Icon={ArrowClockwise} onclick={fetchStats} style="ghost" />
+            <Button Icon={ArrowsClockwiseIcon} onclick={fetchStats} style="ghost" />
         </div>
     </header>
 
@@ -95,7 +93,7 @@
         {#if stats.orphanTorrents.length > 0}
             <div class="orphan-alert">
                 <div class="alert-header">
-                    <WarningCircle size="1.5rem" color="#ff5252" weight="fill" />
+                    <WarningCircleIcon size="1.5rem" color="#ff5252" weight="fill" />
                     <h2>Unbookmarked Media Detected ({stats.orphanTorrents.length})</h2>
                 </div>
                 <p>
@@ -105,7 +103,7 @@
                 <div class="orphan-list">
                     {#each stats.orphanTorrents as orphan}
                         <div class="orphan-item">
-                            <FileVideo size="1.2rem" color="#ff5252" />
+                            <FileVideoIcon size="1.2rem" color="#ff5252" />
                             <div class="orphan-info">
                                 <span class="orphan-name">{orphan.name}</span>
                                 <span class="orphan-meta">{formatBytes(orphan.size)} &bull; {orphan.savePath}</span>
@@ -128,7 +126,7 @@
                                 <img src={g.thumbnailUrl} alt="" class="card-thumb" />
                             {:else}
                                 <div class="thumb-placeholder">
-                                    <FolderNotchOpen size="2rem" color="#666" />
+                                    <FolderIcon size="2rem" color="#666" />
                                 </div>
                             {/if}
                             <div class="card-meta">
@@ -139,14 +137,14 @@
 
                         <div class="stats-row">
                             <div class="stat-pill">
-                                <HardDrives size="1.1rem" color="#ffd52c" />
+                                <HardDrivesIcon size="1.1rem" color="#ffd52c" />
                                 <div class="stat-data">
                                     <span class="val">{formatBytes(g.totalBytes)}</span>
                                     <span class="lbl">Storage Used</span>
                                 </div>
                             </div>
                             <div class="stat-pill">
-                                <UploadSimple size="1.1rem" color="#6fbf6f" />
+                                <UploadSimpleIcon size="1.1rem" color="#6fbf6f" />
                                 <div class="stat-data">
                                     <span class="val">{formatBytes(g.totalUploadedBytes)}</span>
                                     <span class="lbl">Uploaded ({g.uploadingCount} seeding)</span>
