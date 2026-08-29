@@ -249,10 +249,10 @@
         const mediaUrl = await fetchMediaUrl(episode.id);
         if (!mediaUrl) return;
         const playerUrl = buildPlayerUrl(mediaUrl, player);
-        if (player === "copy") {
+        if (player === "copy" || player === "mpv") {
             await navigator.clipboard.writeText(playerUrl);
         } else {
-            window.open(playerUrl, "_blank");
+            window.location.href = playerUrl;
         }
     };
 
@@ -269,12 +269,13 @@
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            if (data.mediaUrl) {
-                const playerUrl = buildPlayerUrl(data.mediaUrl, player);
-                if (player === "copy") {
+            const mediaUrl = data.url ?? data.mediaUrl;
+            if (mediaUrl) {
+                const playerUrl = buildPlayerUrl(mediaUrl, player);
+                if (player === "copy" || player === "mpv") {
                     await navigator.clipboard.writeText(playerUrl);
                 } else {
-                    window.open(playerUrl, "_blank");
+                    window.location.href = playerUrl;
                 }
             }
         } catch (e) {
