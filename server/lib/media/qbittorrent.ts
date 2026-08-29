@@ -174,6 +174,16 @@ class QBittorrentClient {
     return torrents[0].hash;
   }
 
+  async getAllTorrents(): Promise<QBitTorrentInfo[]> {
+    const response = await this.request("/api/v2/torrents/info");
+    if (!response.ok) {
+      this.log.warn(`getAllTorrents failed: HTTP ${response.status}`);
+      return [];
+    }
+
+    return (await response.json()) as QBitTorrentInfo[];
+  }
+
   async getTorrentInfo(hash: string): Promise<QBitTorrentInfo | null> {
     const response = await this.request(`/api/v2/torrents/info?hashes=${hash}`);
     if (!response.ok) {

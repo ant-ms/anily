@@ -6,6 +6,11 @@ import { fillAnimeGroupingDetails } from "../apiGrouping/buildAnimeGroupings";
 import { collectGroupingMemberIds } from "../apiGrouping/collectGroupingMemberIds";
 import { anilistParamValidator } from "$src/validators/anilistId";
 import { app } from "$src/app";
+import { MediaStatus } from "../../../generated/prisma/enums";
+import { getEpisodeTorrentOptions, startEpisodeDownload } from "$lib/media/mediaManager";
+import { logger } from "$src/logger";
+
+const log = logger.child({ route: "apiDetails" });
 
 export const apiDetailsAnilistIdGetRoute = app.get(
   "/api/details/:anilistId",
@@ -92,6 +97,35 @@ export const apiDetailsAnilistIdGroupingPostRoute = app.post(
         },
       },
     });
+
+    // Automatically queue background downloads for all aired episodes in newly bookmarked grouping
+    (async () => {
+      for (const id of groupingMemberIds) {
+        try {
+          const now = new Date();
+          const episodes = await prisma.episode.findMany({
+            where: {
+              mediaStatus: MediaStatus.NONE,
+              airingAt: { lte: now },
+              animeDetails: { baseAnimeAnilistId: id },
+            },
+            include: { animeDetails: { include: { baseAnime: true } } },
+            orderBy: { number: "asc" },
+          });
+
+          for (const episode of episodes) {
+            const { results, recommendation } = await getEpisodeTorrentOptions(episode.id);
+            if (results.length > 0 && recommendation.index >= 0) {
+              await startEpisodeDownload(episode.id, results[recommendation.index], false);
+            } else if (results.length > 0) {
+              await startEpisodeDownload(episode.id, results[0], false);
+            }
+          }
+        } catch (error) {
+          log.warn({ error, id }, "Failed auto-downloading episodes for newly bookmarked anime");
+        }
+      }
+    })().catch(() => {});
 
     return c.body(null, 200);
   },

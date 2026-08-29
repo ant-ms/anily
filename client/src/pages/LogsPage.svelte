@@ -63,6 +63,17 @@
 
     const hasRunningJob = $derived(jobs.some((j) => j.status === "RUNNING"));
 
+    onMount(() => {
+        fetchJobs();
+    });
+
+    onDestroy(() => {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    });
+
     // Poll every 3s while a job is running
     $effect(() => {
         if (hasRunningJob) {

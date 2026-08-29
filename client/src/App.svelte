@@ -4,6 +4,7 @@
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import LoginPage from "./pages/LoginPage.svelte";
     import LogsPage from "./pages/LogsPage.svelte";
+    import StatsPage from "./pages/StatsPage.svelte";
     import SettingsPage from "./pages/SettingsPage.svelte";
     import HomePage from "./pages/HomePage.svelte";
     import type ProfileData from "./types/ProfileData";
@@ -21,6 +22,8 @@
         <div id="content">
             {#if activeTab?.id === "settings"}
                 <SettingsPage />
+            {:else if activeTab?.id === "stats"}
+                <StatsPage />
             {:else if activeTab?.id === "logs"}
                 <LogsPage />
             {:else if selectedAnimeAnilistId.current}
@@ -38,6 +41,14 @@
     main {
         display: grid;
         grid-template-columns: auto 1fr;
-        grid-template-rows: 100vh;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+    }
+
+    #content {
+        height: 100vh;
+        overflow-y: auto;
+        min-width: 0;
     }
 </style>

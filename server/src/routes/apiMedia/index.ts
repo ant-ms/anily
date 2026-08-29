@@ -390,3 +390,127 @@ export const apiMediaSearchSeasonGetRoute = app.get(
     }
   },
 );
+
+// GET /api/media/stats
+// Return media statistics: storage usage per grouping, qBittorrent seeding stats, and orphan unbookmarked files
+export const apiMediaStatsGetRoute = app.get("/api/media/stats", async (c) => {
+  try {
+    // 1. Fetch all anime groupings with their member anime and episodes
+    const groupings = await prisma.animeGrouping.findMany({
+      include: {
+        displayAnime: true,
+        items: {
+          include: {
+            animeDetails: {
+              include: {
+                episodes: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // 2. Fetch all qBittorrent torrents
+    let qbitTorrents: any[] = [];
+    try {
+      qbitTorrents = await qbit.getAllTorrents();
+    } catch (err) {
+      log.warn({ err }, "Failed to fetch torrent list from qBittorrent for stats");
+    }
+
+    const qbitMap = new Map<string, any>();
+    for (const t of qbitTorrents) {
+      if (t.hash) qbitMap.set(t.hash.toLowerCase(), t);
+    }
+
+    const bookmarkedAnilistIds = new Set<number>();
+    const groupingStats = groupings.map((grouping) => {
+      let totalBytes = BigInt(0);
+      let episodeCount = 0;
+      let downloadedCount = 0;
+      let uploadingCount = 0;
+      let totalUploadedBytes = BigInt(0);
+      let uploadSpeed = 0;
+
+      for (const item of grouping.items) {
+        bookmarkedAnilistIds.add(item.anilistId);
+        const eps = item.animeDetails?.episodes ?? [];
+        episodeCount += eps.length;
+
+        for (const ep of eps) {
+          if (ep.mediaSize) totalBytes += ep.mediaSize;
+          if (ep.mediaStatus === MediaStatus.AVAILABLE) downloadedCount++;
+
+          if (ep.mediaTorrentHash) {
+            const t = qbitMap.get(ep.mediaTorrentHash.toLowerCase());
+            if (t) {
+              if (t.state === "uploading" || t.state === "stalledUP" || t.state === "queuedUP") {
+                uploadingCount++;
+              }
+              if (t.uploaded) totalUploadedBytes += BigInt(t.uploaded);
+              if (t.upspeed) uploadSpeed += t.upspeed;
+            }
+          }
+        }
+      }
+
+      return {
+        id: grouping.id,
+        title:
+          grouping.displayAnime.titleEnglish ??
+          grouping.displayAnime.titleRomanji ??
+          grouping.displayAnime.titleNative ??
+          "Unknown",
+        thumbnailUrl: grouping.items.find((i) => i.animeDetails?.thumbnailUrl)?.animeDetails?.thumbnailUrl ?? null,
+        itemsCount: grouping.items.length,
+        episodeCount,
+        downloadedCount,
+        totalBytes: totalBytes.toString(),
+        uploadingCount,
+        totalUploadedBytes: totalUploadedBytes.toString(),
+        uploadSpeed,
+      };
+    });
+
+    // 3. Find unbookmarked / orphan torrents or media in qBittorrent
+    const orphanTorrents: Array<{
+      hash: string;
+      name: string;
+      size: number;
+      savePath: string;
+    }> = [];
+
+    for (const t of qbitTorrents) {
+      // Check if this torrent is tracked by any bookmarked episode
+      const savePath = t.save_path || "";
+      // Extract anilistId if path is /downloads/<anilistId>/...
+      const match = savePath.match(/\/downloads\/(\d+)/);
+      const folderAnilistId = match ? parseInt(match[1], 10) : null;
+
+      if (!folderAnilistId || !bookmarkedAnilistIds.has(folderAnilistId)) {
+        orphanTorrents.push({
+          hash: t.hash,
+          name: t.name,
+          size: t.size,
+          savePath: t.save_path,
+        });
+      }
+    }
+
+    return c.json({
+      groupings: groupingStats,
+      orphanTorrents,
+      totalTorrents: qbitTorrents.length,
+    });
+  } catch (error) {
+    log.error({ error }, "Failed to get media stats");
+    return c.json(
+      {
+        error: "Failed to get media stats",
+        reason: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
+  }
+});

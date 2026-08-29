@@ -50,7 +50,24 @@
 <div id="sidebar">
     <SidebarTabs bind:activeTab />
     <div class="sidebar-content">
-        {#if activeTab?.id !== "logs" && activeTab?.id !== "settings"}
+        {#if activeTab?.id === "logs" || activeTab?.id === "stats"}
+            <div class="logs-sidebar-nav">
+                <button
+                    class="nav-item"
+                    class:active={activeTab?.id === "stats"}
+                    onclick={() => (activeTab = { id: "stats", name: "Statistics" })}
+                >
+                    <span>📊 Statistics</span>
+                </button>
+                <button
+                    class="nav-item"
+                    class:active={activeTab?.id === "logs"}
+                    onclick={() => (activeTab = { id: "logs", name: "Logs" })}
+                >
+                    <span>📜 Import Logs</span>
+                </button>
+            </div>
+        {:else if activeTab?.id !== "settings"}
             <div class="cards">
                 {#each visibleCardData as data}
                     <SidebarCard {data} />
@@ -64,15 +81,51 @@
 <style lang="scss">
     #sidebar {
         width: 370px;
+        height: 100vh;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         background: #1d1a17;
         border-right: 1px solid #2e2c29;
+        overflow: hidden;
 
         .sidebar-content {
             flex-grow: 1;
-            overflow-y: scroll;
+            overflow-y: auto;
             scrollbar-width: none;
+
+            .logs-sidebar-nav {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                padding: 12px;
+
+                .nav-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    background: hsl(20, 17.6%, 8.5%);
+                    border: 1px solid hsl(36, 5.7%, 20%);
+                    color: #ddd;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: background 0.2s, border 0.2s, color 0.2s;
+
+                    &:hover {
+                        background: hsl(20, 17.6%, 14%);
+                        color: #fff;
+                    }
+
+                    &.active {
+                        background: #ffd52c18;
+                        border-color: #ffd52c;
+                        color: #ffd52c;
+                    }
+                }
+            }
         }
     }
 </style>

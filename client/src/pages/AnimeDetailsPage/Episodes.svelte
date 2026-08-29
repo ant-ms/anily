@@ -354,11 +354,6 @@
             <div class="toolbar" transition:fade={{ duration: 200 }}>
                 <div class="spacer"></div>
                 <Button
-                    Icon={DownloadIcon}
-                    style="ghost"
-                    onclick={handleDownloadSeason}
-                />
-                <Button
                     Icon={allReleasedWatched ? CheckIcon : EyeIcon}
                     active={allReleasedWatched}
                     style="ghost"
