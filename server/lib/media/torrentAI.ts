@@ -83,7 +83,7 @@ If no good match or all results seem wrong (wrong anime, wrong episode, implausi
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "z-ai/glm-5.3-flash",
         messages,
         response_format: { type: "json_object" },
       }),

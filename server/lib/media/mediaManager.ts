@@ -145,16 +145,41 @@ export async function startEpisodeDownload(
   // Initial mediaPath uses savePath-relative form; updated to real filename after download
   const mediaPath = `${anilistId}/ep${episode.number}`;
 
-  log.info({ episodeId, savePath, sequential }, "Adding torrent to qBittorrent");
-
   const hash = await qbit.addTorrent(torrent.link, savePath, { sequential });
+
+  // Try to inspect the torrent files right away to get the exact video filename
+  let exactMediaPath = `${anilistId}/ep${episode.number}`;
+  try {
+    // Give qBittorrent a moment to parse metadata
+    for (let i = 0; i < 6; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const files = await qbit.getTorrentFiles(hash);
+      if (files && files.length > 0) {
+        const videoFiles = files.filter((f) => {
+          const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
+          return VIDEO_EXTENSIONS.has(ext);
+        });
+        const mainFile =
+          videoFiles.length > 0
+            ? videoFiles.reduce((a, b) => (a.size > b.size ? a : b))
+            : files.reduce((a, b) => (a.size > b.size ? a : b));
+
+        if (mainFile) {
+          exactMediaPath = `${anilistId}/ep${episode.number}/${mainFile.name}`;
+          break;
+        }
+      }
+    }
+  } catch (error) {
+    log.warn({ error, hash }, "Failed to get immediate file name from qBittorrent");
+  }
 
   await prisma.episode.update({
     where: { id: episodeId },
     data: {
       mediaStatus: MediaStatus.QUEUED,
       mediaTorrentHash: hash,
-      mediaPath,
+      mediaPath: exactMediaPath,
       mediaSelectedTorrent: {
         title: torrent.title,
         link: torrent.link,
@@ -168,9 +193,9 @@ export async function startEpisodeDownload(
     },
   });
 
-  log.info({ episodeId, hash, mediaPath }, "Torrent queued");
+  log.info({ episodeId, hash, mediaPath: exactMediaPath }, "Torrent queued");
 
-  return { hash, mediaPath };
+  return { hash, mediaPath: exactMediaPath };
 }
 
 /**
