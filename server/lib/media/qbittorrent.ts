@@ -23,19 +23,26 @@ export interface QBitFileInfo {
 }
 
 class QBittorrentClient {
-  private baseUrl: string;
-  private username: string;
-  private password: string;
   private sessionCookie: string | null = null;
   private readonly log = logger.child({ module: "qbittorrent" });
 
-  constructor() {
-    this.baseUrl = process.env.QBITTORRENT_URL ?? "";
-    this.username = process.env.QBITTORRENT_USERNAME ?? "";
-    this.password = process.env.QBITTORRENT_PASSWORD ?? "";
+  private get baseUrl(): string {
+    return (process.env.QBITTORRENT_URL ?? "").replace(/\/$/, "");
+  }
+
+  private get username(): string {
+    return process.env.QBITTORRENT_USERNAME ?? "admin";
+  }
+
+  private get password(): string {
+    return process.env.QBITTORRENT_PASSWORD ?? "";
   }
 
   private async login(): Promise<void> {
+    if (!this.baseUrl) {
+      throw new Error("QBITTORRENT_URL not configured");
+    }
+
     const body = new URLSearchParams({
       username: this.username,
       password: this.password,
@@ -43,7 +50,11 @@ class QBittorrentClient {
 
     const response = await fetch(`${this.baseUrl}/api/v2/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Referer: this.baseUrl,
+        Origin: this.baseUrl,
+      },
       body: body.toString(),
       signal: AbortSignal.timeout(15_000),
     });
@@ -53,20 +64,19 @@ class QBittorrentClient {
     }
 
     const text = await response.text();
-    if (text.trim() !== "Ok.") {
+    // Some qBittorrent versions return 'Ok.' while others (or subnet whitelist) might return empty string or redirect
+    if (text.trim() !== "Ok." && text.trim() !== "") {
       throw new Error(`qBittorrent login rejected: ${text}`);
     }
 
     // Extract the session cookie (SID=...)
     const setCookie = response.headers.get("set-cookie");
-    if (!setCookie) {
-      throw new Error("qBittorrent login did not return a session cookie");
+    if (setCookie) {
+      const match = setCookie.match(/SID=[^;]+/);
+      if (match) {
+        this.sessionCookie = match[0];
+      }
     }
-    const match = setCookie.match(/SID=[^;]+/);
-    if (!match) {
-      throw new Error("Could not parse SID cookie from qBittorrent response");
-    }
-    this.sessionCookie = match[0];
     this.log.debug("qBittorrent session established");
   }
 
