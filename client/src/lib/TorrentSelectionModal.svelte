@@ -15,7 +15,7 @@
         episodeId: number;
         episodeTitle: string;
         mode?: "single" | "season";
-        onconfirm?: (detail: { episodeId: number; torrentIndex: number }) => void;
+        onconfirm?: (detail: { episodeId: number; torrentIndex: number; torrent?: TorrentResult }) => void;
         oncancel?: () => void;
     } = $props();
 
@@ -74,8 +74,9 @@
     }
 
     function handleConfirm() {
-        if (selectedIndex === null) return;
-        onconfirm?.({ episodeId, torrentIndex: selectedIndex });
+        if (selectedIndex === null || !searchData) return;
+        const torrent = searchData.results[selectedIndex];
+        onconfirm?.({ episodeId, torrentIndex: selectedIndex, torrent });
     }
 
     function handleCancel() {

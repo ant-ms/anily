@@ -53,22 +53,38 @@ export const apiMediaDownloadPostRoute = app.post(
     "json",
     z.object({
       episodeId: z.number().int(),
-      torrentIndex: z.number().int().min(0),
+      torrentIndex: z.number().int().min(0).optional(),
+      torrent: z
+        .object({
+          title: z.string(),
+          link: z.string(),
+          size: z.number(),
+          seeders: z.number(),
+          peers: z.number(),
+          source: z.string(),
+          publishDate: z.string(),
+          category: z.string(),
+          infoHash: z.string().optional(),
+        })
+        .optional(),
     }),
   ),
   async (c) => {
-    const { episodeId, torrentIndex } = c.req.valid("json");
+    const { episodeId, torrentIndex, torrent: directTorrent } = c.req.valid("json");
     try {
-      const { results } = await getEpisodeTorrentOptions(episodeId);
-
-      if (torrentIndex >= results.length) {
-        return c.json({ error: `torrentIndex ${torrentIndex} out of range (${results.length} results)` }, 400);
+      let torrent = directTorrent;
+      if (!torrent) {
+        const { results } = await getEpisodeTorrentOptions(episodeId);
+        const idx = torrentIndex ?? 0;
+        if (idx >= results.length) {
+          return c.json({ error: `torrentIndex ${idx} out of range (${results.length} results)` }, 400);
+        }
+        torrent = results[idx];
       }
 
-      const torrent = results[torrentIndex];
-      const { hash } = await startEpisodeDownload(episodeId, torrent, false);
+      const { hash, mediaPath } = await startEpisodeDownload(episodeId, torrent, false);
 
-      return c.json({ hash, mediaStatus: "QUEUED" });
+      return c.json({ hash, mediaPath, mediaStatus: "QUEUED" });
     } catch (error) {
       log.error({ error, episodeId }, "Failed to start download");
       return c.json(

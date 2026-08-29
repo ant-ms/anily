@@ -187,6 +187,7 @@
     async function handleTorrentConfirm(detail: {
         episodeId: number;
         torrentIndex: number;
+        torrent?: any;
     }) {
         torrentModalEpisode = null;
         const url = new URL(
@@ -200,6 +201,7 @@
                 body: JSON.stringify({
                     episodeId: detail.episodeId,
                     torrentIndex: detail.torrentIndex,
+                    torrent: detail.torrent,
                 }),
                 credentials: "include",
             });
@@ -426,7 +428,15 @@
     show={torrentModalEpisode !== null}
     episodeId={torrentModalEpisode?.id ?? 0}
     episodeTitle={torrentModalEpisode
-        ? (torrentModalEpisode.titleEnglish ?? `Episode ${torrentModalEpisode.number}`)
+        ? (() => {
+            const seasonMatch = animeName.match(/(?:Season|S)\s*(\d+)/i) || animeName.match(/(\d+)(?:st|nd|rd|th)\s*Season/i);
+            const seasonNum = seasonMatch ? parseInt(seasonMatch[1], 10) : 1;
+            const sPadded = String(seasonNum).padStart(2, "0");
+            const ePadded = String(torrentModalEpisode.number).padStart(2, "0");
+            const cleanTitle = animeName.replace(/(?:Season|\bS)\s*\d+/gi, "").replace(/\d+(?:st|nd|rd|th)\s*Season/gi, "").trim();
+            const epTitle = torrentModalEpisode.titleEnglish ? ` — ${torrentModalEpisode.titleEnglish}` : "";
+            return `${cleanTitle} S${sPadded}E${ePadded}${epTitle}`;
+        })()
         : ""}
     onconfirm={handleTorrentConfirm}
     oncancel={handleTorrentCancel}
