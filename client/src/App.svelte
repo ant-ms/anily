@@ -19,12 +19,12 @@
     <main>
         <Sidebar bind:activeTab {profileData} />
         <div id="content">
-            {#if selectedAnimeAnilistId.current}
-                <AnimeDetailsPage />
+            {#if activeTab?.id === "settings"}
+                <SettingsPage />
             {:else if activeTab?.id === "logs"}
                 <LogsPage />
-            {:else if activeTab?.id === "settings"}
-                <SettingsPage />
+            {:else if selectedAnimeAnilistId.current}
+                <AnimeDetailsPage />
             {:else}
                 <HomePage />
             {/if}

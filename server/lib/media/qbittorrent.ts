@@ -130,14 +130,33 @@ class QBittorrentClient {
     }
 
     const text = await response.text();
-    if (text.trim() !== "Ok.") {
-      throw new Error(`qBittorrent add torrent rejected: ${text}`);
+    let torrentHash: string | null = null;
+
+    // qBittorrent v5+ returns JSON: {"added_torrent_ids":["..."],"failure_count":0,"pending_count":0,"success_count":1}
+    try {
+      const json = JSON.parse(text);
+      if (json.added_torrent_ids && Array.isArray(json.added_torrent_ids) && json.added_torrent_ids.length > 0) {
+        torrentHash = json.added_torrent_ids[0];
+      } else if (json.failure_count > 0 && json.success_count === 0) {
+        throw new Error(`qBittorrent add torrent failed: ${text}`);
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("qBittorrent add torrent failed")) {
+        throw e;
+      }
+      // Older versions return string "Ok." or similar
+      if (text.trim() !== "Ok." && text.trim() !== "") {
+        throw new Error(`qBittorrent add torrent rejected: ${text}`);
+      }
     }
 
-    // Wait briefly for qBittorrent to register the torrent
+    if (torrentHash) {
+      return torrentHash;
+    }
+
+    // Fallback for older versions: retrieve hash by listing recently added torrents
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Retrieve the hash by listing recently added torrents
     const listResponse = await this.request(
       "/api/v2/torrents/info?sort=added_on&reverse=true&limit=5",
     );

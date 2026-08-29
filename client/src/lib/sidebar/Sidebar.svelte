@@ -24,6 +24,14 @@
             const tabChanged = !previous || previous[0] !== tab;
             if (tabChanged) {
                 visibleCardData = [];
+                // If switching to a non-anime tab like settings or logs, clear selected anime
+                if (tab && (tab.id === "settings" || tab.id === "logs")) {
+                    selectedAnimeAnilistId.set(undefined);
+                }
+            }
+
+            if (tab?.id === "settings" || tab?.id === "logs") {
+                return;
             }
 
             const url = new URL(
@@ -42,11 +50,7 @@
 <div id="sidebar">
     <SidebarTabs bind:activeTab />
     <div class="sidebar-content">
-        {#if activeTab?.id === "logs"}
-            <div>TODO logs</div>
-        {:else if activeTab?.id === "settings"}
-            <div>TODO settings</div>
-        {:else}
+        {#if activeTab?.id !== "logs" && activeTab?.id !== "settings"}
             <div class="cards">
                 {#each visibleCardData as data}
                     <SidebarCard {data} />
