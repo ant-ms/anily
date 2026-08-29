@@ -6,7 +6,7 @@ import { logger } from "$src/logger";
 import { Logger } from "pino";
 import { updateAnimeGroupingIfNeeded } from "$src/routes/apiGrouping/updateAnimeGroupingIfNeeded";
 import { upsertEpisodesForAnime } from "$lib/thetvdb/upsertEpisodesForAnime";
-import { SyncJobTrigger } from "../../generated/prisma";
+import { SyncJobTrigger } from "../../generated/prisma/enums";
 
 type RecentlyUpdatedAnime = Awaited<
   ReturnType<typeof getRecentlyUpdatedAnime>

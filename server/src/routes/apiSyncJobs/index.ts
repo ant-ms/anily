@@ -1,7 +1,7 @@
 import { app } from "$src/app";
 import { prisma } from "$src/prisma";
 import { keepAnilistDataUpdated } from "$src/syncs/keepAnilistDataUpdated";
-import { SyncJobTrigger } from "../../../generated/prisma";
+import { SyncJobTrigger } from "../../../generated/prisma/enums";
 
 export const apiSyncJobsGetRoute = app.get("/api/sync-jobs", async (c) => {
   try {
