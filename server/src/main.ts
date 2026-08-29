@@ -13,6 +13,7 @@ import "$src/routes/apiEpisodes";
 import "$src/routes/apiGrouping";
 import "$src/routes/apiSearch";
 import "$src/routes/apiSidebar";
+import "$src/routes/apiSyncJobs";
 
 setupAuthHandlers(app);
 setupLoggerMiddleware(app);

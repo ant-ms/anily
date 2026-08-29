@@ -112,6 +112,27 @@ model AnimeGrouping {
   displayAnimeId Int
 }
 
+enum SyncJobTrigger {
+  SCHEDULED
+  MANUAL
+}
+
+enum SyncJobStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model SyncJob {
+  id          Int            @id @default(autoincrement())
+  trigger     SyncJobTrigger
+  status      SyncJobStatus
+  startedAt   DateTime       @default(now())
+  completedAt DateTime?
+  updatesCount Int?
+  error       String?
+}
+
 model Episode {
   id             Int          @id @default(autoincrement())
   animeDetails   AnimeDetails @relation(fields: [animeDetailsId], references: [id], onDelete: Cascade)
