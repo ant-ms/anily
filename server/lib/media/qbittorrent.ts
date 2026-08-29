@@ -1,0 +1,218 @@
+import { logger } from "$src/logger";
+
+export interface QBitTorrentInfo {
+  hash: string;
+  name: string;
+  state: string;
+  progress: number;
+  size: number;
+  save_path: string;
+  content_path: string;
+  num_seeds: number;
+  num_leechs: number;
+  dlspeed: number;
+  uploaded: number;
+}
+
+export interface QBitFileInfo {
+  index: number;
+  name: string;
+  size: number;
+  progress: number;
+  priority: number;
+}
+
+class QBittorrentClient {
+  private baseUrl: string;
+  private username: string;
+  private password: string;
+  private sessionCookie: string | null = null;
+  private readonly log = logger.child({ module: "qbittorrent" });
+
+  constructor() {
+    this.baseUrl = process.env.QBITTORRENT_URL ?? "";
+    this.username = process.env.QBITTORRENT_USERNAME ?? "";
+    this.password = process.env.QBITTORRENT_PASSWORD ?? "";
+  }
+
+  private async login(): Promise<void> {
+    const body = new URLSearchParams({
+      username: this.username,
+      password: this.password,
+    });
+
+    const response = await fetch(`${this.baseUrl}/api/v2/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`qBittorrent login failed: HTTP ${response.status}`);
+    }
+
+    const text = await response.text();
+    if (text.trim() !== "Ok.") {
+      throw new Error(`qBittorrent login rejected: ${text}`);
+    }
+
+    // Extract the session cookie (SID=...)
+    const setCookie = response.headers.get("set-cookie");
+    if (!setCookie) {
+      throw new Error("qBittorrent login did not return a session cookie");
+    }
+    const match = setCookie.match(/SID=[^;]+/);
+    if (!match) {
+      throw new Error("Could not parse SID cookie from qBittorrent response");
+    }
+    this.sessionCookie = match[0];
+    this.log.debug("qBittorrent session established");
+  }
+
+  private async request(
+    path: string,
+    options: RequestInit = {},
+    retry = true,
+  ): Promise<Response> {
+    if (!this.sessionCookie) {
+      await this.login();
+    }
+
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      ...options,
+      headers: {
+        Cookie: this.sessionCookie!,
+        ...options.headers,
+      },
+      signal: options.signal ?? AbortSignal.timeout(15_000),
+    });
+
+    // 403 means session expired — re-login once
+    if (response.status === 403 && retry) {
+      this.sessionCookie = null;
+      await this.login();
+      return this.request(path, options, false);
+    }
+
+    return response;
+  }
+
+  async addTorrent(
+    magnetOrUrl: string,
+    savePath: string,
+    options?: { sequential?: boolean },
+  ): Promise<string> {
+    const form = new FormData();
+    form.append("urls", magnetOrUrl);
+    form.append("savepath", savePath);
+    if (options?.sequential) {
+      form.append("sequentialDownload", "true");
+    }
+
+    const response = await this.request("/api/v2/torrents/add", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add torrent: HTTP ${response.status}`);
+    }
+
+    const text = await response.text();
+    if (text.trim() !== "Ok.") {
+      throw new Error(`qBittorrent add torrent rejected: ${text}`);
+    }
+
+    // Wait briefly for qBittorrent to register the torrent
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Retrieve the hash by listing recently added torrents
+    const listResponse = await this.request(
+      "/api/v2/torrents/info?sort=added_on&reverse=true&limit=5",
+    );
+    if (!listResponse.ok) {
+      throw new Error(`Failed to list torrents after add: HTTP ${listResponse.status}`);
+    }
+
+    const torrents = (await listResponse.json()) as QBitTorrentInfo[];
+
+    if (torrents.length === 0) {
+      throw new Error("No torrents found after adding — cannot determine hash");
+    }
+
+    // Return the most recently added torrent's hash
+    return torrents[0].hash;
+  }
+
+  async getTorrentInfo(hash: string): Promise<QBitTorrentInfo | null> {
+    const response = await this.request(`/api/v2/torrents/info?hashes=${hash}`);
+    if (!response.ok) {
+      this.log.warn({ hash }, `getTorrentInfo failed: HTTP ${response.status}`);
+      return null;
+    }
+
+    const list = (await response.json()) as QBitTorrentInfo[];
+    return list[0] ?? null;
+  }
+
+  async getTorrentFiles(hash: string): Promise<QBitFileInfo[]> {
+    const response = await this.request(`/api/v2/torrents/files?hash=${hash}`);
+    if (!response.ok) {
+      this.log.warn({ hash }, `getTorrentFiles failed: HTTP ${response.status}`);
+      return [];
+    }
+
+    return (await response.json()) as QBitFileInfo[];
+  }
+
+  async setFilePriority(hash: string, fileIndex: number, priority: number): Promise<void> {
+    const form = new URLSearchParams({
+      hash,
+      id: String(fileIndex),
+      priority: String(priority),
+    });
+
+    const response = await this.request("/api/v2/torrents/filePrio", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`setFilePriority failed: HTTP ${response.status}`);
+    }
+  }
+
+  async pauseTorrent(hash: string): Promise<void> {
+    const form = new URLSearchParams({ hashes: hash });
+    const response = await this.request("/api/v2/torrents/pause", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`pauseTorrent failed: HTTP ${response.status}`);
+    }
+  }
+
+  async deleteTorrent(hash: string, deleteFiles: boolean): Promise<void> {
+    const form = new URLSearchParams({
+      hashes: hash,
+      deleteFiles: deleteFiles ? "true" : "false",
+    });
+
+    const response = await this.request("/api/v2/torrents/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`deleteTorrent failed: HTTP ${response.status}`);
+    }
+  }
+}
+
+export const qbit = new QBittorrentClient();

@@ -123,6 +123,13 @@ enum SyncJobStatus {
   FAILED
 }
 
+enum MediaStatus {
+  NONE
+  QUEUED
+  DOWNLOADING
+  AVAILABLE
+}
+
 model SyncJob {
   id          Int            @id @default(autoincrement())
   trigger     SyncJobTrigger
@@ -149,6 +156,13 @@ model Episode {
 
   watched Boolean @default(false)
 
+  mediaStatus          MediaStatus @default(NONE)
+  mediaPath            String?     // relative path within media volume, e.g. "21234/ep01/[SubsPlease] Show - 01.mkv"
+  mediaTorrentHash     String?     // qBittorrent torrent hash
+  mediaSize            BigInt?     // file size in bytes once available
+  mediaSelectedTorrent Json?       // stored torrent selection info (title, seeders, etc.)
+
   @@unique([animeDetailsId, number])
   @@index([animeDetailsId])
+  @@index([mediaTorrentHash])
 }

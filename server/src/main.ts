@@ -5,6 +5,8 @@ import packageJson from "../package.json";
 import { setupAuthHandlers } from "./auth";
 import { logger, setupLoggerMiddleware } from "./logger";
 import { keepAnilistDataUpdated } from "./syncs/keepAnilistDataUpdated";
+import { runAutoDownload } from "./syncs/autoDownload";
+import { syncDownloadStatuses } from "$lib/media/mediaManager";
 import "dotenv/config";
 import { app } from "./app";
 
@@ -14,6 +16,7 @@ import "$src/routes/apiGrouping";
 import "$src/routes/apiSearch";
 import "$src/routes/apiSidebar";
 import "$src/routes/apiSyncJobs";
+import "$src/routes/apiMedia";
 
 setupAuthHandlers(app);
 setupLoggerMiddleware(app);
@@ -44,6 +47,11 @@ serve(
 
     if (process.env.ANILY_DISABLE_SCHEDULES !== "true") {
       setInterval(keepAnilistDataUpdated, 5 * 60 * 1000);
+      // Sync download statuses every 30 seconds
+      setInterval(syncDownloadStatuses, 30 * 1000);
+      // Auto-download newly aired episodes every 15 minutes
+      setInterval(runAutoDownload, 15 * 60 * 1000);
     }
   },
 );
+

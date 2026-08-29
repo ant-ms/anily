@@ -24,6 +24,8 @@ export const apiEpisodesAnilistIdGetRoute = app.get(
         titleNative: episode.titleNative,
         titleRomanji: episode.titleRomanji,
         thumbnailUrl: episode.thumbnailUrl,
+        mediaStatus: episode.mediaStatus,
+        mediaPath: episode.mediaPath,
       }));
       return c.json(filteredEpisodes);
     } catch (error) {

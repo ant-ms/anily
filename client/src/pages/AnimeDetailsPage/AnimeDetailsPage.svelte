@@ -46,7 +46,7 @@
             <HeroSkeleton />
         {/if}
 
-        <Episodes {updateSeed} />
+        <Episodes {updateSeed} animeName={animeDetails?.titleEnglish ?? animeDetails?.titleRomanji ?? ""} />
     </div>
     <div class="right">
         <Chains {animeDetails} bind:updateSeed />

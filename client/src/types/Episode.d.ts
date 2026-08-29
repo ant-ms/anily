@@ -1,3 +1,5 @@
+import type { MediaStatus } from './Media';
+
 export default interface EpisodeData {
   id: number;
   number: number;
@@ -7,4 +9,6 @@ export default interface EpisodeData {
   titleNative: string | null;
   titleRomanji: string | null;
   thumbnailUrl: string | null;
+  mediaStatus: MediaStatus;
+  mediaPath?: string;
 }

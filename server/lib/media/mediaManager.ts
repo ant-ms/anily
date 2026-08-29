@@ -1,0 +1,289 @@
+import { prisma } from "$src/prisma";
+import { searchTorrents, type TorrentResult } from "./jackett";
+import { qbit } from "./qbittorrent";
+import { rankTorrents, type TorrentAIResult } from "./torrentAI";
+import { logger } from "$src/logger";
+import { MediaStatus } from "../../generated/prisma/client";
+
+const log = logger.child({ module: "mediaManager" });
+
+const VIDEO_EXTENSIONS = new Set([
+  ".mkv", ".mp4", ".avi", ".m4v", ".mov", ".wmv", ".flv", ".webm",
+]);
+
+/**
+ * Build a Jackett search query for an episode.
+ * Strips special characters that would confuse the query.
+ */
+export function buildSearchQuery(animeName: string, episodeNumber: number | null): string {
+  // Remove special characters, keep alphanumerics and spaces
+  const cleanName = animeName.replace(/[^a-zA-Z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (episodeNumber === null) {
+    return cleanName;
+  }
+  return `${cleanName} ${episodeNumber}`;
+}
+
+/**
+ * Get torrents + AI recommendation for an episode.
+ */
+export async function getEpisodeTorrentOptions(episodeId: number): Promise<{
+  episode: { id: number; number: number; animeTitle: string; anilistId: number };
+  results: TorrentResult[];
+  recommendation: TorrentAIResult;
+}> {
+  const episode = await prisma.episode.findUnique({
+    where: { id: episodeId },
+    include: {
+      animeDetails: {
+        include: {
+          baseAnime: true,
+        },
+      },
+    },
+  });
+
+  if (!episode) {
+    throw new Error(`Episode ${episodeId} not found`);
+  }
+
+  const baseAnime = episode.animeDetails.baseAnime;
+  const animeName =
+    baseAnime.titleEnglish ?? baseAnime.titleRomanji ?? baseAnime.titleNative ?? "Unknown";
+  const anilistId = baseAnime.anilistId;
+
+  const query = buildSearchQuery(animeName, episode.number);
+  log.info({ query, episodeId }, "Searching for torrents");
+
+  const results = await searchTorrents(query);
+  const recommendation = await rankTorrents(animeName, episode.number, results);
+
+  return {
+    episode: { id: episode.id, number: episode.number, animeTitle: animeName, anilistId },
+    results,
+    recommendation,
+  };
+}
+
+/**
+ * Start downloading/streaming an episode with a chosen torrent.
+ */
+export async function startEpisodeDownload(
+  episodeId: number,
+  torrent: TorrentResult,
+  sequential: boolean,
+): Promise<{ hash: string; mediaPath: string }> {
+  const episode = await prisma.episode.findUnique({
+    where: { id: episodeId },
+    include: {
+      animeDetails: {
+        include: { baseAnime: true },
+      },
+    },
+  });
+
+  if (!episode) {
+    throw new Error(`Episode ${episodeId} not found`);
+  }
+
+  const anilistId = episode.animeDetails.baseAnime.anilistId;
+  const savePath = `/downloads/${anilistId}/ep${episode.number}`;
+  // Initial mediaPath uses savePath-relative form; updated to real filename after download
+  const mediaPath = `${anilistId}/ep${episode.number}`;
+
+  log.info({ episodeId, savePath, sequential }, "Adding torrent to qBittorrent");
+
+  const hash = await qbit.addTorrent(torrent.link, savePath, { sequential });
+
+  await prisma.episode.update({
+    where: { id: episodeId },
+    data: {
+      mediaStatus: MediaStatus.QUEUED,
+      mediaTorrentHash: hash,
+      mediaPath,
+      mediaSelectedTorrent: {
+        title: torrent.title,
+        link: torrent.link,
+        size: torrent.size,
+        seeders: torrent.seeders,
+        source: torrent.source,
+        publishDate: torrent.publishDate,
+        category: torrent.category,
+        infoHash: torrent.infoHash,
+      },
+    },
+  });
+
+  log.info({ episodeId, hash, mediaPath }, "Torrent queued");
+
+  return { hash, mediaPath };
+}
+
+/**
+ * Poll all QUEUED/DOWNLOADING episodes and update their status in DB.
+ */
+export async function syncDownloadStatuses(): Promise<void> {
+  const episodes = await prisma.episode.findMany({
+    where: {
+      mediaStatus: { in: [MediaStatus.QUEUED, MediaStatus.DOWNLOADING] },
+      mediaTorrentHash: { not: null },
+    },
+  });
+
+  if (episodes.length === 0) return;
+
+  log.info({ count: episodes.length }, "Syncing download statuses");
+
+  for (const episode of episodes) {
+    if (!episode.mediaTorrentHash) continue;
+
+    try {
+      const info = await qbit.getTorrentInfo(episode.mediaTorrentHash);
+
+      if (!info) {
+        log.warn({ episodeId: episode.id, hash: episode.mediaTorrentHash }, "Torrent info not found");
+        continue;
+      }
+
+      const state = info.state;
+
+      if (state === "uploading" || state === "stalledUP" || state === "pausedUP" || state === "checkingUP") {
+        // Download complete — find the video file
+        const files = await qbit.getTorrentFiles(episode.mediaTorrentHash);
+
+        // Pick largest file that looks like a video
+        const videoFiles = files.filter((f) => {
+          const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
+          return VIDEO_EXTENSIONS.has(ext);
+        });
+
+        const mainFile =
+          videoFiles.length > 0
+            ? videoFiles.reduce((a, b) => (a.size > b.size ? a : b))
+            : files.reduce((a, b) => (a.size > b.size ? a : b));
+
+        // Compute path relative to /downloads
+        // save_path is e.g. "/downloads/21234/ep12/"
+        const savePathRelative = info.save_path.replace(/^\/downloads\/?/, "");
+        const cleanSave = savePathRelative.replace(/\/$/, "");
+        // mainFile.name may include subdirectory inside the torrent
+        const mediaPath = cleanSave ? `${cleanSave}/${mainFile.name}` : mainFile.name;
+
+        await prisma.episode.update({
+          where: { id: episode.id },
+          data: {
+            mediaStatus: MediaStatus.AVAILABLE,
+            mediaPath,
+            mediaSize: BigInt(mainFile.size),
+          },
+        });
+
+        log.info({ episodeId: episode.id, mediaPath }, "Episode download complete");
+      } else if (
+        state === "downloading" ||
+        state === "stalledDL" ||
+        state === "queuedDL" ||
+        state === "checkingDL" ||
+        state === "moving"
+      ) {
+        if (episode.mediaStatus !== MediaStatus.DOWNLOADING) {
+          await prisma.episode.update({
+            where: { id: episode.id },
+            data: { mediaStatus: MediaStatus.DOWNLOADING },
+          });
+        }
+      } else if (state === "error" || state === "missingFiles") {
+        log.warn(
+          { episodeId: episode.id, hash: episode.mediaTorrentHash, state },
+          "Torrent in error state",
+        );
+      }
+    } catch (error) {
+      log.warn({ episodeId: episode.id, error }, "Failed to sync download status for episode");
+    }
+  }
+}
+
+/**
+ * Get the public HTTP URL for an episode's media file.
+ */
+export function getMediaUrl(mediaPath: string): string {
+  const base = (process.env.MEDIA_SERVE_BASE_URL ?? "").replace(/\/$/, "");
+  const path = mediaPath.startsWith("/") ? mediaPath : `/${mediaPath}`;
+  return `${base}${path}`;
+}
+
+/**
+ * Auto-download newly released episodes for all anime with AnimeDetails.
+ * Called by scheduler. Skips already downloading/downloaded episodes.
+ */
+export async function autoDownloadNewEpisodes(): Promise<{
+  downloaded: number;
+  skipped: number;
+}> {
+  const now = new Date();
+
+  // Find episodes that have aired, have no media yet, and belong to an anime with details
+  const episodes = await prisma.episode.findMany({
+    where: {
+      mediaStatus: MediaStatus.NONE,
+      airingAt: { lte: now },
+      animeDetails: {
+        baseAnime: { animeDetails: { isNot: null } },
+      },
+    },
+    include: {
+      animeDetails: {
+        include: { baseAnime: true },
+      },
+    },
+    orderBy: { airingAt: "asc" },
+  });
+
+  log.info({ count: episodes.length }, "Checking episodes for auto-download");
+
+  let downloaded = 0;
+  let skipped = 0;
+
+  for (const episode of episodes) {
+    const baseAnime = episode.animeDetails.baseAnime;
+    const animeName =
+      baseAnime.titleEnglish ?? baseAnime.titleRomanji ?? baseAnime.titleNative ?? "Unknown";
+
+    try {
+      const query = buildSearchQuery(animeName, episode.number);
+      const results = await searchTorrents(query);
+
+      if (results.length === 0) {
+        log.debug({ episodeId: episode.id, query }, "No results found, skipping");
+        skipped++;
+        continue;
+      }
+
+      const recommendation = await rankTorrents(animeName, episode.number, results);
+
+      if (recommendation.index === -1 || recommendation.confidence === "low") {
+        log.debug(
+          { episodeId: episode.id, confidence: recommendation.confidence, reason: recommendation.reason },
+          "Low confidence recommendation, skipping auto-download",
+        );
+        skipped++;
+        continue;
+      }
+
+      const torrent = results[recommendation.index];
+      await startEpisodeDownload(episode.id, torrent, false);
+
+      log.info(
+        { episodeId: episode.id, animeName, episode: episode.number, torrent: torrent.title },
+        "Auto-download started",
+      );
+      downloaded++;
+    } catch (error) {
+      log.warn({ episodeId: episode.id, error }, "Failed to auto-download episode");
+      skipped++;
+    }
+  }
+
+  return { downloaded, skipped };
+}

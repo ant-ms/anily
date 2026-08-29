@@ -3,22 +3,33 @@
     import { watch } from "runed";
     import Button from "../../lib/Button.svelte";
     import Skeleton from "../../lib/Skeleton.svelte";
+    import TorrentSelectionModal from "../../lib/TorrentSelectionModal.svelte";
+    import SeasonDownloadModal from "../../lib/SeasonDownloadModal.svelte";
     import {
         apiBaseUrl,
         selectedAnimeAnilistId,
         sidebarDataRefreshSeed,
     } from "../../lib/context.svelte";
     import type EpisodeData from "../../types/Episode";
+    import {
+        getStoredPlayer,
+        buildPlayerUrl,
+        type MediaPlayer,
+    } from "../../types/Media";
     import PlayIcon from "phosphor-svelte/lib/PlayIcon";
     import CheckIcon from "phosphor-svelte/lib/CheckIcon";
     import EyeIcon from "phosphor-svelte/lib/EyeIcon";
     import DownloadIcon from "phosphor-svelte/lib/DownloadIcon";
     import ImageIcon from "phosphor-svelte/lib/ImageIcon";
+    import CopySimpleIcon from "phosphor-svelte/lib/CopySimpleIcon";
+    import ArrowSquareOutIcon from "phosphor-svelte/lib/ArrowSquareOutIcon";
 
     let {
         updateSeed,
+        animeName = "",
     }: {
         updateSeed: number;
+        animeName?: string;
     } = $props();
 
     let episodes: EpisodeData[] = $state([]);
@@ -28,12 +39,54 @@
     );
     let loading = $state(true);
 
+    // Torrent / media modal state
+    let torrentModalEpisode: EpisodeData | null = $state(null);
+    let seasonModalOpen = $state(false);
+    let player: MediaPlayer = $state(getStoredPlayer());
+
+    // Polling interval handle
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    function hasActiveDownloads(): boolean {
+        return episodes.some(
+            (e) => e.mediaStatus === "QUEUED" || e.mediaStatus === "DOWNLOADING",
+        );
+    }
+
+    async function refreshEpisodes() {
+        const anilistId = selectedAnimeAnilistId.current;
+        if (anilistId === undefined) return;
+        const url = new URL(`/api/episodes/${anilistId}`, apiBaseUrl.current);
+        const data = await fetch(url.toString(), { credentials: "include" }).then(
+            (r) => r.json(),
+        );
+        if (selectedAnimeAnilistId.current !== anilistId) return;
+        episodes = Array.isArray(data) ? data : [];
+    }
+
+    function startPollingIfNeeded() {
+        if (hasActiveDownloads() && !pollInterval) {
+            pollInterval = setInterval(async () => {
+                await refreshEpisodes();
+                if (!hasActiveDownloads()) stopPolling();
+            }, 10_000);
+        }
+    }
+
+    function stopPolling() {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    }
+
     watch(
         () => [selectedAnimeAnilistId.current, updateSeed],
         () => {
             const anilistId = selectedAnimeAnilistId.current;
             if (anilistId === undefined) return;
 
+            stopPolling();
             loading = true;
 
             const url = new URL(
@@ -46,6 +99,7 @@
                     if (selectedAnimeAnilistId.current !== anilistId) return;
                     episodes = Array.isArray(data) ? data : [];
                     loading = false;
+                    startPollingIfNeeded();
                 });
         },
     );
@@ -63,7 +117,6 @@
         if (!airingAt) return true;
         return new Date(airingAt).getTime() > Date.now();
     }
-
 
     const toggleWatch = async (episode: EpisodeData) => {
         const newStatus = !episode.watched;
@@ -123,6 +176,122 @@
             episodes.forEach((e, i) => (e.watched = previousStatuses[i]));
         }
     };
+
+    // ── Torrent / download handlers ────────────────────────────────────────────
+
+    function openTorrentModal(episode: EpisodeData) {
+        torrentModalEpisode = episode;
+    }
+
+    async function handleTorrentConfirm(detail: {
+        episodeId: number;
+        torrentIndex: number;
+    }) {
+        torrentModalEpisode = null;
+        const url = new URL(
+            `/api/media/download/${detail.episodeId}`,
+            apiBaseUrl.current,
+        );
+        try {
+            const res = await fetch(url.toString(), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ torrentIndex: detail.torrentIndex }),
+                credentials: "include",
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        } catch (e) {
+            console.error("Failed to start download", e);
+        }
+        await refreshEpisodes();
+        startPollingIfNeeded();
+    }
+
+    function handleTorrentCancel() {
+        torrentModalEpisode = null;
+    }
+
+    async function handleSeasonConfirm() {
+        seasonModalOpen = false;
+        await refreshEpisodes();
+        startPollingIfNeeded();
+    }
+
+    function handleSeasonCancel() {
+        seasonModalOpen = false;
+    }
+
+    // ── Media URL / player helpers ─────────────────────────────────────────────
+
+    async function fetchMediaUrl(episodeId: number): Promise<string | null> {
+        try {
+            const url = new URL(
+                `/api/media/status/${episodeId}`,
+                apiBaseUrl.current,
+            );
+            const res = await fetch(url.toString(), { credentials: "include" });
+            if (!res.ok) return null;
+            const data = await res.json();
+            return data.mediaUrl ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    const handleCopyUrl = async (episode: EpisodeData) => {
+        const mediaUrl = await fetchMediaUrl(episode.id);
+        if (mediaUrl) {
+            await navigator.clipboard.writeText(mediaUrl);
+        }
+    };
+
+    const handleOpenPlayer = async (episode: EpisodeData) => {
+        const mediaUrl = await fetchMediaUrl(episode.id);
+        if (!mediaUrl) return;
+        const playerUrl = buildPlayerUrl(mediaUrl, player);
+        if (player === "copy") {
+            await navigator.clipboard.writeText(playerUrl);
+        } else {
+            window.open(playerUrl, "_blank");
+        }
+    };
+
+    /** Stream: POST /api/media/stream/{id} → get URL → open in player immediately */
+    const handleStream = async (episode: EpisodeData) => {
+        try {
+            const url = new URL(
+                `/api/media/stream/${episode.id}`,
+                apiBaseUrl.current,
+            );
+            const res = await fetch(url.toString(), {
+                method: "POST",
+                credentials: "include",
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.mediaUrl) {
+                const playerUrl = buildPlayerUrl(data.mediaUrl, player);
+                if (player === "copy") {
+                    await navigator.clipboard.writeText(playerUrl);
+                } else {
+                    window.open(playerUrl, "_blank");
+                }
+            }
+        } catch (e) {
+            console.error("Failed to stream episode", e);
+        }
+        await refreshEpisodes();
+        startPollingIfNeeded();
+    };
+
+    function statusDotClass(episode: EpisodeData): string {
+        switch (episode.mediaStatus) {
+            case "QUEUED": return "dot-queued";
+            case "DOWNLOADING": return "dot-downloading";
+            case "AVAILABLE": return "dot-available";
+            default: return "";
+        }
+    }
 </script>
 
 <div class="episodes">
@@ -144,7 +313,11 @@
         {#if episodes.length > 0}
             <div class="toolbar" transition:fade={{ duration: 200 }}>
                 <div class="spacer"></div>
-                <Button Icon={DownloadIcon} style="ghost" disabled={true} />
+                <Button
+                    Icon={DownloadIcon}
+                    style="ghost"
+                    onclick={() => (seasonModalOpen = true)}
+                />
                 <Button
                     Icon={allReleasedWatched ? CheckIcon : EyeIcon}
                     active={allReleasedWatched}
@@ -180,14 +353,57 @@
                     >
                 </div>
                 <div class="actions">
-                    <Button Icon={DownloadIcon} style="ghost" disabled={isFuture(episode.airingAt)} />
+                    {#if episode.mediaStatus !== "NONE"}
+                        <span class="status-dot {statusDotClass(episode)}" title={episode.mediaStatus}></span>
+                    {/if}
+                    <Button
+                        Icon={DownloadIcon}
+                        style="ghost"
+                        disabled={isFuture(episode.airingAt) || episode.mediaStatus === "AVAILABLE" || episode.mediaStatus === "DOWNLOADING" || episode.mediaStatus === "QUEUED"}
+                        onclick={() => openTorrentModal(episode)}
+                    />
+                    <Button
+                        Icon={PlayIcon}
+                        style="ghost"
+                        disabled={isFuture(episode.airingAt) || episode.mediaStatus !== "NONE"}
+                        onclick={() => handleStream(episode)}
+                    />
+                    <Button
+                        Icon={CopySimpleIcon}
+                        style="ghost"
+                        disabled={episode.mediaStatus !== "AVAILABLE"}
+                        onclick={() => handleCopyUrl(episode)}
+                    />
+                    <Button
+                        Icon={ArrowSquareOutIcon}
+                        style="ghost"
+                        disabled={episode.mediaStatus !== "AVAILABLE"}
+                        onclick={() => handleOpenPlayer(episode)}
+                    />
                     <Button Icon={episode.watched ? CheckIcon : EyeIcon} active={episode.watched} disabled={isFuture(episode.airingAt)} onclick={() => toggleWatch(episode)} />
-                    <Button Icon={PlayIcon} disabled={isFuture(episode.airingAt)} />
                 </div>
             </div>
         {/each}
     {/if}
 </div>
+
+<TorrentSelectionModal
+    show={torrentModalEpisode !== null}
+    episodeId={torrentModalEpisode?.id ?? 0}
+    episodeTitle={torrentModalEpisode
+        ? (torrentModalEpisode.titleEnglish ?? `Episode ${torrentModalEpisode.number}`)
+        : ""}
+    onconfirm={handleTorrentConfirm}
+    oncancel={handleTorrentCancel}
+/>
+
+<SeasonDownloadModal
+    show={seasonModalOpen}
+    anilistId={selectedAnimeAnilistId.current ?? 0}
+    {animeName}
+    onconfirm={handleSeasonConfirm}
+    oncancel={handleSeasonCancel}
+/>
 
 <style lang="scss">
     .episodes {
@@ -285,5 +501,30 @@
                 align-items: center;
             }
         }
+    }
+
+    .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+
+        &.dot-queued {
+            background: #d4a843;
+        }
+
+        &.dot-downloading {
+            background: #4a9fd4;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+
+        &.dot-available {
+            background: #6fbf6f;
+        }
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
     }
 </style>
