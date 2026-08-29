@@ -295,18 +295,20 @@ export function getMediaUrl(mediaPath: string): string {
 /**
  * Auto-download newly released episodes for all anime with AnimeDetails.
  * Called by scheduler. Skips already downloading/downloaded episodes.
+ * Uses a 1-hour offset after airing time to ensure rip groups have uploaded.
  */
 export async function autoDownloadNewEpisodes(): Promise<{
   downloaded: number;
   skipped: number;
 }> {
-  const now = new Date();
+  // 1-hour offset: only process episodes that aired at least 1 hour ago
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  // Find episodes that have aired, have no media yet, and belong to an anime with details
+  // Find episodes that aired >= 1h ago, have no media yet, and belong to an anime with details
   const episodes = await prisma.episode.findMany({
     where: {
       mediaStatus: MediaStatus.NONE,
-      airingAt: { lte: now },
+      airingAt: { lte: oneHourAgo },
       animeDetails: {
         baseAnime: { animeDetails: { isNot: null } },
       },
@@ -319,7 +321,7 @@ export async function autoDownloadNewEpisodes(): Promise<{
     orderBy: { airingAt: "asc" },
   });
 
-  log.info({ count: episodes.length }, "Checking episodes for auto-download");
+  log.info({ count: episodes.length }, "Checking episodes for auto-download (1h offset)");
 
   let downloaded = 0;
   let skipped = 0;
@@ -330,16 +332,13 @@ export async function autoDownloadNewEpisodes(): Promise<{
       baseAnime.titleEnglish ?? baseAnime.titleRomanji ?? baseAnime.titleNative ?? "Unknown";
 
     try {
-      const query = buildSearchQuery(animeName, episode.number);
-      const results = await searchTorrents(query);
+      const { results, recommendation } = await getEpisodeTorrentOptions(episode.id);
 
       if (results.length === 0) {
-        log.debug({ episodeId: episode.id, query }, "No results found, skipping");
+        log.debug({ episodeId: episode.id, animeName }, "No results found, skipping");
         skipped++;
         continue;
       }
-
-      const recommendation = await rankTorrents(animeName, episode.number, results);
 
       if (recommendation.index === -1 || recommendation.confidence === "low") {
         log.debug(

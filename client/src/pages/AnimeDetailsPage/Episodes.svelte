@@ -392,22 +392,10 @@
                         onclick={() => openTorrentModal(episode)}
                     />
                     <Button
-                        Icon={PlayIcon}
-                        style="ghost"
-                        disabled={isFuture(episode.airingAt) || episode.mediaStatus !== "NONE"}
-                        onclick={() => handleStream(episode)}
-                    />
-                    <Button
                         Icon={CopySimpleIcon}
                         style="ghost"
-                        disabled={episode.mediaStatus !== "AVAILABLE"}
+                        disabled={episode.mediaStatus !== "AVAILABLE" && episode.mediaStatus !== "QUEUED" && episode.mediaStatus !== "DOWNLOADING"}
                         onclick={() => handleCopyUrl(episode)}
-                    />
-                    <Button
-                        Icon={ArrowSquareOutIcon}
-                        style="ghost"
-                        disabled={episode.mediaStatus !== "AVAILABLE"}
-                        onclick={() => handleOpenPlayer(episode)}
                     />
                     {#if episode.mediaStatus !== "NONE"}
                         <Button
@@ -417,6 +405,17 @@
                         />
                     {/if}
                     <Button Icon={episode.watched ? CheckIcon : EyeIcon} active={episode.watched} disabled={isFuture(episode.airingAt)} onclick={() => toggleWatch(episode)} />
+                    <Button
+                        Icon={PlayIcon}
+                        disabled={isFuture(episode.airingAt)}
+                        onclick={() => {
+                            if (episode.mediaStatus === "AVAILABLE") {
+                                handleOpenPlayer(episode);
+                            } else {
+                                handleStream(episode);
+                            }
+                        }}
+                    />
                 </div>
             </div>
         {/each}
