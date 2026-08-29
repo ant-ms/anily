@@ -2,15 +2,13 @@
     import { onMount, onDestroy } from "svelte";
     import Button from "$lib/Button.svelte";
     import { apiBaseUrl } from "$lib/context.svelte";
-    import {
-        ArrowClockwise,
-        Play,
-        CheckCircle,
-        XCircle,
-        Clock,
-        CalendarBlank,
-        Cursor,
-    } from "phosphor-svelte";
+    import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
+    import PlayIcon from "phosphor-svelte/lib/PlayIcon";
+    import CheckCircleIcon from "phosphor-svelte/lib/CheckCircleIcon";
+    import XCircleIcon from "phosphor-svelte/lib/XCircleIcon";
+    import ClockIcon from "phosphor-svelte/lib/ClockIcon";
+    import CalendarBlankIcon from "phosphor-svelte/lib/CalendarBlankIcon";
+    import CursorIcon from "phosphor-svelte/lib/CursorIcon";
 
     type SyncJobStatus = "RUNNING" | "COMPLETED" | "FAILED";
     type SyncJobTrigger = "SCHEDULED" | "MANUAL";
@@ -109,19 +107,14 @@
         const s = Math.floor((ms % 60000) / 1000);
         return `${m}m ${s}s`;
     };
-
-    onMount(fetchJobs);
-    onDestroy(() => {
-        if (pollInterval) clearInterval(pollInterval);
-    });
 </script>
 
 <div id="logs-page">
     <header>
         <h1>Import Jobs</h1>
         <div class="actions">
-            <Button Icon={ArrowClockwise} onclick={fetchJobs} style="ghost" />
-            <Button Icon={Play} onclick={triggerSync} disabled={triggering || hasRunningJob}>
+            <Button Icon={ArrowsClockwiseIcon} onclick={fetchJobs} style="ghost" />
+            <Button Icon={PlayIcon} onclick={triggerSync} disabled={triggering || hasRunningJob}>
                 {triggering ? "Starting…" : "Run Now"}
             </Button>
         </div>
@@ -141,20 +134,20 @@
                     <div class="job-header">
                         <div class="job-status">
                             {#if job.status === "COMPLETED"}
-                                <CheckCircle class="icon completed" weight="fill" size="1.1rem" />
+                                <CheckCircleIcon class="icon completed" weight="fill" size="1.1rem" />
                             {:else if job.status === "FAILED"}
-                                <XCircle class="icon failed" weight="fill" size="1.1rem" />
+                                <XCircleIcon class="icon failed" weight="fill" size="1.1rem" />
                             {:else}
-                                <Clock class="icon running" size="1.1rem" />
+                                <ClockIcon class="icon running" size="1.1rem" />
                             {/if}
                             <span class="status-label {job.status.toLowerCase()}">{job.status}</span>
                         </div>
                         <div class="job-trigger">
                             {#if job.trigger === "SCHEDULED"}
-                                <CalendarBlank size="0.85rem" />
+                                <CalendarBlankIcon size="0.85rem" />
                                 <span>Scheduled</span>
                             {:else}
-                                <Cursor size="0.85rem" />
+                                <CursorIcon size="0.85rem" />
                                 <span>Manual</span>
                             {/if}
                         </div>

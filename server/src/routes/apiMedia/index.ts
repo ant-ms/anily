@@ -514,3 +514,57 @@ export const apiMediaStatsGetRoute = app.get("/api/media/stats", async (c) => {
     );
   }
 });
+
+// GET /api/media/missing
+// Return all episodes that aired > 8 days ago and are still missing for bookmarked anime
+export const apiMediaMissingGetRoute = app.get("/api/media/missing", async (c) => {
+  try {
+    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+
+    const episodes = await prisma.episode.findMany({
+      where: {
+        mediaStatus: MediaStatus.NONE,
+        airingAt: { lte: eightDaysAgo },
+        animeDetails: {
+          baseAnime: {
+            animeDetails: {
+              groupingId: { not: null },
+            },
+          },
+        },
+      },
+      include: {
+        animeDetails: {
+          include: {
+            baseAnime: true,
+          },
+        },
+      },
+      orderBy: { airingAt: "desc" },
+    });
+
+    const formatted = episodes.map((ep) => {
+      const base = ep.animeDetails.baseAnime;
+      return {
+        id: ep.id,
+        number: ep.number,
+        title: ep.titleEnglish ?? `Episode ${ep.number}`,
+        airingAt: ep.airingAt,
+        animeTitle: base.titleEnglish ?? base.titleRomanji ?? base.titleNative ?? "Unknown",
+        thumbnailUrl: ep.thumbnailUrl ?? ep.animeDetails.thumbnailUrl ?? null,
+        lastSearchAt: ep.mediaLastSearchAt,
+      };
+    });
+
+    return c.json(formatted);
+  } catch (error) {
+    log.error({ error }, "Failed to fetch missing episodes");
+    return c.json(
+      {
+        error: "Failed to fetch missing episodes",
+        reason: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
+  }
+});

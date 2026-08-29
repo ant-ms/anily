@@ -161,6 +161,7 @@ model Episode {
   mediaTorrentHash     String?     // qBittorrent torrent hash
   mediaSize            BigInt?     // file size in bytes once available
   mediaSelectedTorrent Json?       // stored torrent selection info (title, seeders, etc.)
+  mediaLastSearchAt    DateTime?   // last time search was performed
 
   @@unique([animeDetailsId, number])
   @@index([animeDetailsId])

@@ -21,7 +21,7 @@
     <span>{profileData.name}</span>
     <Button
         Icon={LogIcon}
-        active={activeTab?.id === "logs" || activeTab?.id === "stats"}
+        active={activeTab?.id === "logs" || activeTab?.id === "stats" || activeTab?.id === "missing"}
         onclick={() => {
             activeTab = {
                 id: "stats",

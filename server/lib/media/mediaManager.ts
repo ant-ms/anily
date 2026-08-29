@@ -310,20 +310,30 @@ export function getMediaUrl(mediaPath: string): string {
 /**
  * Auto-download newly released episodes for all anime with AnimeDetails.
  * Called by scheduler. Skips already downloading/downloaded episodes.
- * Uses a 1-hour offset after airing time to ensure rip groups have uploaded.
+ *
+ * Rate limiting & backoff strategy:
+ * - 1h to 2h after broadcast: try every 15 minutes.
+ * - > 2h after broadcast: only try once per day (24h backoff).
+ * - > 8 days after broadcast: stop trying automatically (surfaced in "Missing Episodes" log).
  */
 export async function autoDownloadNewEpisodes(): Promise<{
   downloaded: number;
   skipped: number;
 }> {
-  // 1-hour offset: only process episodes that aired at least 1 hour ago
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+  const eightDaysAgo = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // Find episodes that aired >= 1h ago, have no media yet, and belong to an anime with details
+  // Find episodes that aired >= 1h ago and <= 8 days ago, with mediaStatus NONE
   const episodes = await prisma.episode.findMany({
     where: {
       mediaStatus: MediaStatus.NONE,
-      airingAt: { lte: oneHourAgo },
+      airingAt: {
+        lte: oneHourAgo,
+        gte: eightDaysAgo, // Stop automated searching after 8 days
+      },
       animeDetails: {
         baseAnime: { animeDetails: { isNot: null } },
       },
@@ -336,17 +346,34 @@ export async function autoDownloadNewEpisodes(): Promise<{
     orderBy: { airingAt: "asc" },
   });
 
-  log.info({ count: episodes.length }, "Checking episodes for auto-download (1h offset)");
+  log.info({ count: episodes.length }, "Checking candidate episodes for auto-download");
 
   let downloaded = 0;
   let skipped = 0;
 
   for (const episode of episodes) {
+    // If episode aired > 2h ago and was searched within the last 24h, backoff to once per day
+    if (
+      episode.airingAt &&
+      episode.airingAt < twoHoursAgo &&
+      episode.mediaLastSearchAt &&
+      episode.mediaLastSearchAt > twentyFourHoursAgo
+    ) {
+      skipped++;
+      continue;
+    }
+
     const baseAnime = episode.animeDetails.baseAnime;
     const animeName =
       baseAnime.titleEnglish ?? baseAnime.titleRomanji ?? baseAnime.titleNative ?? "Unknown";
 
     try {
+      // Record last search timestamp
+      await prisma.episode.update({
+        where: { id: episode.id },
+        data: { mediaLastSearchAt: now },
+      });
+
       const { results, recommendation } = await getEpisodeTorrentOptions(episode.id);
 
       if (results.length === 0) {

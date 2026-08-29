@@ -5,8 +5,11 @@
     import type ProfileData from "../../types/ProfileData";
     import { watch } from "runed";
     import type SidebarCardData from "../../types/SidebarCardData";
-    import { apiBaseUrl, sidebarDataRefreshSeed } from "../context.svelte";
+    import { apiBaseUrl, sidebarDataRefreshSeed, selectedAnimeAnilistId } from "../context.svelte";
     import SidebarCard from "./SidebarCard.svelte";
+    import ChartBarIcon from "phosphor-svelte/lib/ChartBarIcon";
+    import ListDashesIcon from "phosphor-svelte/lib/ListDashesIcon";
+    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
 
     let {
         activeTab = $bindable(),
@@ -24,13 +27,13 @@
             const tabChanged = !previous || previous[0] !== tab;
             if (tabChanged) {
                 visibleCardData = [];
-                // If switching to a non-anime tab like settings or logs, clear selected anime
-                if (tab && (tab.id === "settings" || tab.id === "logs")) {
+                // If switching to a non-anime tab like settings, stats, logs, or missing, clear selected anime
+                if (tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "stats" || tab.id === "missing")) {
                     selectedAnimeAnilistId.set(undefined);
                 }
             }
 
-            if (tab?.id === "settings" || tab?.id === "logs") {
+            if (tab?.id === "settings" || tab?.id === "logs" || tab?.id === "stats" || tab?.id === "missing") {
                 return;
             }
 
@@ -50,21 +53,31 @@
 <div id="sidebar">
     <SidebarTabs bind:activeTab />
     <div class="sidebar-content">
-        {#if activeTab?.id === "logs" || activeTab?.id === "stats"}
+        {#if activeTab?.id === "logs" || activeTab?.id === "stats" || activeTab?.id === "missing"}
             <div class="logs-sidebar-nav">
                 <button
                     class="nav-item"
                     class:active={activeTab?.id === "stats"}
                     onclick={() => (activeTab = { id: "stats", name: "Statistics" })}
                 >
-                    <span>📊 Statistics</span>
+                    <ChartBarIcon size="1.2rem" />
+                    <span>Statistics</span>
                 </button>
                 <button
                     class="nav-item"
                     class:active={activeTab?.id === "logs"}
                     onclick={() => (activeTab = { id: "logs", name: "Logs" })}
                 >
-                    <span>📜 Import Logs</span>
+                    <ListDashesIcon size="1.2rem" />
+                    <span>Import Logs</span>
+                </button>
+                <button
+                    class="nav-item"
+                    class:active={activeTab?.id === "missing"}
+                    onclick={() => (activeTab = { id: "missing", name: "Missing Episodes" })}
+                >
+                    <WarningCircleIcon size="1.2rem" />
+                    <span>Missing Episodes</span>
                 </button>
             </div>
         {:else if activeTab?.id !== "settings"}

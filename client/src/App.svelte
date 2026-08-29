@@ -5,6 +5,7 @@
     import LoginPage from "./pages/LoginPage.svelte";
     import LogsPage from "./pages/LogsPage.svelte";
     import StatsPage from "./pages/StatsPage.svelte";
+    import MissingEpisodesPage from "./pages/MissingEpisodesPage.svelte";
     import SettingsPage from "./pages/SettingsPage.svelte";
     import HomePage from "./pages/HomePage.svelte";
     import type ProfileData from "./types/ProfileData";
@@ -26,6 +27,8 @@
                 <StatsPage />
             {:else if activeTab?.id === "logs"}
                 <LogsPage />
+            {:else if activeTab?.id === "missing"}
+                <MissingEpisodesPage />
             {:else if selectedAnimeAnilistId.current}
                 <AnimeDetailsPage />
             {:else}
