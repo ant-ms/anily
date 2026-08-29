@@ -48,7 +48,7 @@ export async function searchTorrents(query: string): Promise<TorrentResult[]> {
 
   try {
     const response = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(12_000),
     });
 
     if (!response.ok) {

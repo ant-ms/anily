@@ -93,20 +93,24 @@ export async function getEpisodeTorrentOptions(episodeId: number): Promise<{
     }
   }
 
+  // Search all query variations in parallel with Jackett
+  log.info({ queries, episodeId }, "Searching Jackett in parallel");
+  const queryPromises = queries.map((q) => searchTorrents(q));
+  const settled = await Promise.allSettled(queryPromises);
+
   let results: TorrentResult[] = [];
   const seen = new Set<string>();
 
-  for (const query of queries) {
-    log.info({ query, episodeId }, "Searching for torrents");
-    const queryResults = await searchTorrents(query);
-    for (const r of queryResults) {
-      const key = r.link || r.title;
-      if (!seen.has(key)) {
-        results.push(r);
-        seen.add(key);
+  for (const res of settled) {
+    if (res.status === "fulfilled") {
+      for (const r of res.value) {
+        const key = r.link || r.title;
+        if (!seen.has(key)) {
+          results.push(r);
+          seen.add(key);
+        }
       }
     }
-    if (results.length >= 15) break;
   }
 
   results.sort((a, b) => b.seeders - a.seeders);
@@ -142,17 +146,16 @@ export async function startEpisodeDownload(
 
   const anilistId = episode.animeDetails.baseAnime.anilistId;
   const savePath = `/downloads/${anilistId}/ep${episode.number}`;
-  // Initial mediaPath uses savePath-relative form; updated to real filename after download
-  const mediaPath = `${anilistId}/ep${episode.number}`;
+
+  log.info({ episodeId, savePath, sequential }, "Adding torrent to qBittorrent");
 
   const hash = await qbit.addTorrent(torrent.link, savePath, { sequential });
 
   // Try to inspect the torrent files right away to get the exact video filename
   let exactMediaPath = `${anilistId}/ep${episode.number}`;
   try {
-    // Give qBittorrent a moment to parse metadata
-    for (let i = 0; i < 6; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+    for (let i = 0; i < 4; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
       const files = await qbit.getTorrentFiles(hash);
       if (files && files.length > 0) {
         const videoFiles = files.filter((f) => {

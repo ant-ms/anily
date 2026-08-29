@@ -74,6 +74,7 @@ Return ONLY valid JSON (no markdown):
 If no good match or all results seem wrong (wrong anime, wrong episode, implausible), return {"index": -1, "confidence": "low", "reason": "..."}`;
 
   const messages: OpenRouterMessage[] = [{ role: "user", content: prompt }];
+  const model = process.env.OPENROUTER_MODEL || "z-ai/glm-5.3-flash";
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -83,7 +84,7 @@ If no good match or all results seem wrong (wrong anime, wrong episode, implausi
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "z-ai/glm-5.3-flash",
+        model,
         messages,
         response_format: { type: "json_object" },
       }),
