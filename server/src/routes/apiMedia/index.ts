@@ -189,6 +189,55 @@ export const apiMediaDownloadSeasonPostRoute = app.post(
   },
 );
 
+// DELETE /api/media/delete/:episodeId
+// Delete downloaded media, remove torrent from qBittorrent, and reset episode mediaStatus to NONE
+export const apiMediaDeleteDeleteRoute = app.delete(
+  "/api/media/delete/:episodeId",
+  episodeIdParamValidator,
+  async (c) => {
+    const { episodeId } = c.req.valid("param");
+    try {
+      const episode = await prisma.episode.findUnique({ where: { id: episodeId } });
+
+      if (!episode) {
+        return c.json({ error: "Episode not found" }, 404);
+      }
+
+      // If a torrent hash exists in qBittorrent, delete torrent and its local files
+      if (episode.mediaTorrentHash) {
+        try {
+          await qbit.deleteTorrent(episode.mediaTorrentHash, true);
+        } catch (error) {
+          log.warn({ error, hash: episode.mediaTorrentHash }, "Failed to delete torrent in qBittorrent");
+        }
+      }
+
+      // Reset episode record in database
+      await prisma.episode.update({
+        where: { id: episodeId },
+        data: {
+          mediaStatus: MediaStatus.NONE,
+          mediaPath: null,
+          mediaTorrentHash: null,
+          mediaSize: null,
+          mediaSelectedTorrent: null,
+        },
+      });
+
+      return c.json({ success: true, mediaStatus: "NONE" });
+    } catch (error) {
+      log.error({ error, episodeId }, "Failed to delete media for episode");
+      return c.json(
+        {
+          error: "Failed to delete media",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
+    }
+  },
+);
+
 // GET /api/media/status/:episodeId
 // Get download status for a single episode, including live qBittorrent progress
 export const apiMediaStatusGetRoute = app.get(

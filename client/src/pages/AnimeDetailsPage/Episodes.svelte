@@ -23,6 +23,7 @@
     import ImageIcon from "phosphor-svelte/lib/ImageIcon";
     import CopySimpleIcon from "phosphor-svelte/lib/CopySimpleIcon";
     import ArrowSquareOutIcon from "phosphor-svelte/lib/ArrowSquareOutIcon";
+    import TrashIcon from "phosphor-svelte/lib/TrashIcon";
 
     let {
         updateSeed,
@@ -259,6 +260,23 @@
         }
     };
 
+    const handleDeleteMedia = async (episode: EpisodeData) => {
+        try {
+            const url = new URL(
+                `/api/media/delete/${episode.id}`,
+                apiBaseUrl.current,
+            );
+            const res = await fetch(url.toString(), {
+                method: "DELETE",
+                credentials: "include",
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        } catch (e) {
+            console.error("Failed to delete media", e);
+        }
+        await refreshEpisodes();
+    };
+
     /** Stream: POST /api/media/stream/{id} → get URL → open in player immediately. If AI is unsure, open manual modal */
     const handleStream = async (episode: EpisodeData) => {
         try {
@@ -391,6 +409,13 @@
                         disabled={episode.mediaStatus !== "AVAILABLE"}
                         onclick={() => handleOpenPlayer(episode)}
                     />
+                    {#if episode.mediaStatus !== "NONE"}
+                        <Button
+                            Icon={TrashIcon}
+                            style="ghost"
+                            onclick={() => handleDeleteMedia(episode)}
+                        />
+                    {/if}
                     <Button Icon={episode.watched ? CheckIcon : EyeIcon} active={episode.watched} disabled={isFuture(episode.airingAt)} onclick={() => toggleWatch(episode)} />
                 </div>
             </div>
