@@ -55,14 +55,41 @@ export async function getEpisodeTorrentOptions(episodeId: number): Promise<{
   const epStr = episode.number !== null ? String(episode.number) : null;
   const epPadded = episode.number !== null ? String(episode.number).padStart(2, "0") : null;
 
-  const queries: string[] = [buildSearchQuery(animeName, episode.number)];
-  if (epPadded && epPadded !== epStr) {
-    queries.push(buildSearchQuery(animeName, null) + ` ${epPadded}`);
-  }
-  if (baseAnime.titleRomanji && baseAnime.titleRomanji !== animeName) {
-    queries.push(buildSearchQuery(baseAnime.titleRomanji, episode.number));
-    if (epPadded && epPadded !== epStr) {
-      queries.push(buildSearchQuery(baseAnime.titleRomanji, null) + ` ${epPadded}`);
+  // Extract Season number if in title (e.g. "Season 4" -> 4, "3rd Season" -> 3)
+  const seasonMatch = (animeName + " " + (baseAnime.titleRomanji ?? "")).match(/(?:Season|S)\s*(\d+)/i) || (animeName + " " + (baseAnime.titleRomanji ?? "")).match(/(\d+)(?:st|nd|rd|th)\s*Season/i);
+  const seasonNum = seasonMatch ? parseInt(seasonMatch[1], 10) : null;
+
+  // Base title without season suffix for SxxExx format (e.g. "Tensei Shitara Slime Datta Ken")
+  const cleanBaseTitle = (title: string) =>
+    title
+      .replace(/(?:Season|\bS)\s*\d+/gi, "")
+      .replace(/\d+(?:st|nd|rd|th)\s*Season/gi, "")
+      .replace(/[^a-zA-Z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const titlesToTry = new Set<string>();
+  if (animeName) titlesToTry.add(animeName);
+  if (baseAnime.titleRomanji) titlesToTry.add(baseAnime.titleRomanji);
+
+  const queries: string[] = [];
+
+  for (const t of titlesToTry) {
+    const cleanT = t.replace(/[^a-zA-Z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    if (episode.number !== null) {
+      queries.push(`${cleanT} ${epPadded ?? episode.number}`);
+      if (epPadded && epPadded !== epStr) {
+        queries.push(`${cleanT} ${episode.number}`);
+      }
+    } else {
+      queries.push(cleanT);
+    }
+
+    // Add SxxExx format if season number exists (e.g. "Tensei Shitara Slime Datta Ken S04E01")
+    if (seasonNum !== null && epPadded) {
+      const baseClean = cleanBaseTitle(t);
+      const sPadded = String(seasonNum).padStart(2, "0");
+      queries.push(`${baseClean} S${sPadded}E${epPadded}`);
     }
   }
 
@@ -79,8 +106,7 @@ export async function getEpisodeTorrentOptions(episodeId: number): Promise<{
         seen.add(key);
       }
     }
-    // If we found ample results, stop querying further variations
-    if (results.length >= 10) break;
+    if (results.length >= 15) break;
   }
 
   results.sort((a, b) => b.seeders - a.seeders);
