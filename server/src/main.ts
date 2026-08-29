@@ -17,6 +17,31 @@ import "$src/routes/apiSearch";
 import "$src/routes/apiSidebar";
 import "$src/routes/apiSyncJobs";
 import "$src/routes/apiMedia";
+import { prisma } from "$src/prisma";
+
+// Ensure database schema columns exist
+const ensureSchema = async () => {
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaPath" TEXT;
+      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaSelectedTorrent" JSONB;
+      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaSize" BIGINT;
+      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaTorrentHash" TEXT;
+      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaLastSearchAt" TIMESTAMP(3);
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MediaStatus') THEN
+          CREATE TYPE "MediaStatus" AS ENUM ('NONE', 'QUEUED', 'DOWNLOADING', 'AVAILABLE');
+        END IF;
+      END $$;
+      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaStatus" "MediaStatus" NOT NULL DEFAULT 'NONE';
+      CREATE INDEX IF NOT EXISTS "Episode_mediaTorrentHash_idx" ON "Episode"("mediaTorrentHash");
+    `);
+    logger.info("Database schema verified");
+  } catch (err) {
+    logger.warn({ err }, "Schema migration check skipped or failed");
+  }
+};
+ensureSchema().catch(() => {});
 
 setupAuthHandlers(app);
 setupLoggerMiddleware(app);
