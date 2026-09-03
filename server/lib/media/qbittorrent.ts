@@ -6,6 +6,9 @@ export interface QBitTorrentInfo {
   state: string;
   progress: number;
   size: number;
+  completed?: number;
+  added_on?: number;
+  time_active?: number;
   save_path: string;
   content_path: string;
   num_seeds: number;
@@ -220,6 +223,25 @@ class QBittorrentClient {
 
     if (!response.ok) {
       throw new Error(`setFilePriority failed: HTTP ${response.status}`);
+    }
+  }
+
+  async setFilePriorities(hash: string, fileIndices: number[], priority: number): Promise<void> {
+    if (fileIndices.length === 0) return;
+    const form = new URLSearchParams({
+      hash,
+      id: fileIndices.join("|"),
+      priority: String(priority),
+    });
+
+    const response = await this.request("/api/v2/torrents/filePrio", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`setFilePriorities failed: HTTP ${response.status}`);
     }
   }
 

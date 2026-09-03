@@ -13,7 +13,7 @@ import { qbit } from "$lib/media/qbittorrent";
 import { searchTorrents } from "$lib/media/jackett";
 import { rankTorrents } from "$lib/media/torrentAI";
 import { anilistParamValidator } from "$src/validators/anilistId";
-import { MediaStatus } from "../../../generated/prisma/client";
+import { MediaStatus, Prisma } from "../../../generated/prisma/client";
 
 const log = logger.child({ module: "apiMedia" });
 
@@ -263,7 +263,7 @@ export const apiMediaDeleteDeleteRoute = app.delete(
           mediaPath: null,
           mediaTorrentHash: null,
           mediaSize: null,
-          mediaSelectedTorrent: null,
+          mediaSelectedTorrent: Prisma.DbNull,
         },
       });
 
@@ -433,24 +433,37 @@ export const apiMediaStatsGetRoute = app.get("/api/media/stats", async (c) => {
       let totalUploadedBytes = BigInt(0);
       let uploadSpeed = 0;
 
+      const seenTorrentHashes = new Set<string>();
+
       for (const item of grouping.items) {
         bookmarkedAnilistIds.add(item.anilistId);
         const eps = item.animeDetails?.episodes ?? [];
         episodeCount += eps.length;
 
         for (const ep of eps) {
-          if (ep.mediaSize) totalBytes += ep.mediaSize;
           if (ep.mediaStatus === MediaStatus.AVAILABLE) downloadedCount++;
 
           if (ep.mediaTorrentHash) {
-            const t = qbitMap.get(ep.mediaTorrentHash.toLowerCase());
-            if (t) {
-              if (t.state === "uploading" || t.state === "stalledUP" || t.state === "queuedUP") {
-                uploadingCount++;
+            const hLower = ep.mediaTorrentHash.toLowerCase();
+            if (!seenTorrentHashes.has(hLower)) {
+              seenTorrentHashes.add(hLower);
+              const t = qbitMap.get(hLower);
+              if (t) {
+                // Use actual completed/downloaded bytes from disk
+                const bytesOnDisk = t.completed ?? t.size ?? 0;
+                totalBytes += BigInt(bytesOnDisk);
+
+                if (t.state === "uploading" || t.state === "stalledUP" || t.state === "queuedUP") {
+                  uploadingCount++;
+                }
+                if (t.uploaded) totalUploadedBytes += BigInt(t.uploaded);
+                if (t.upspeed) uploadSpeed += t.upspeed;
+              } else if (ep.mediaSize) {
+                totalBytes += ep.mediaSize;
               }
-              if (t.uploaded) totalUploadedBytes += BigInt(t.uploaded);
-              if (t.upspeed) uploadSpeed += t.upspeed;
             }
+          } else if (ep.mediaSize) {
+            totalBytes += ep.mediaSize;
           }
         }
       }

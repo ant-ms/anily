@@ -93,8 +93,38 @@ export async function getEpisodeTorrentOptions(episodeId: number): Promise<{
     }
   }
 
+  // Check if anime is completely finished airing
+  // An anime has finished airing if all its episodes have an airingAt date in the past
+  const totalEpisodes = await prisma.episode.count({ where: { animeDetailsId: episode.animeDetailsId } });
+
+  const futureEpisodesCount = await prisma.episode.count({
+    where: {
+      animeDetailsId: episode.animeDetailsId,
+      OR: [
+        { airingAt: null },
+        { airingAt: { gt: new Date() } },
+      ],
+    },
+  });
+
+  const isCompletedAnime = futureEpisodesCount === 0 && totalEpisodes > 1;
+
+  // If completed, add batch search queries ("Anime Name Batch", "Anime Name 01-12", "Anime Name S01")
+  if (isCompletedAnime) {
+    for (const t of titlesToTry) {
+      const cleanT = t.replace(/[^a-zA-Z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+      queries.push(`${cleanT} Batch`);
+      queries.push(`${cleanT} 01 ${String(totalEpisodes).padStart(2, "0")}`);
+      if (seasonNum !== null) {
+        const baseClean = cleanBaseTitle(t);
+        queries.push(`${baseClean} S${String(seasonNum).padStart(2, "0")}`);
+        queries.push(`${baseClean} Season ${seasonNum} Batch`);
+      }
+    }
+  }
+
   // Search all query variations in parallel with Jackett
-  log.info({ queries, episodeId }, "Searching Jackett in parallel");
+  log.info({ queries, episodeId, isCompletedAnime }, "Searching Jackett in parallel");
   const queryPromises = queries.map((q) => searchTorrents(q));
   const settled = await Promise.allSettled(queryPromises);
 
@@ -114,13 +144,136 @@ export async function getEpisodeTorrentOptions(episodeId: number): Promise<{
   }
 
   results.sort((a, b) => b.seeders - a.seeders);
-  const recommendation = await rankTorrents(animeName, episode.number, results);
+  const recommendation = await rankTorrents(animeName, episode.number, results, {
+    excludeLinks: episode.mediaFailedTorrents,
+    isCompletedAnime,
+    totalEpisodes,
+  });
 
   return {
     episode: { id: episode.id, number: episode.number, animeTitle: animeName, anilistId },
     results,
     recommendation,
   };
+}
+
+/**
+ * Start downloading/streaming an episode with a chosen torrent.
+ */
+/**
+ * Match a specific episode number to a video file in a torrent's file list.
+ * Supports patterns like "E01", " 01 ", " - 01 ", "EP01", "[01]", etc.
+ */
+export function findEpisodeFileInTorrent(
+  files: Array<{ index: number; name: string; size: number }>,
+  episodeNumber: number,
+): { index: number; name: string; size: number } | null {
+  const videoFiles = files.filter((f) => {
+    const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
+    return VIDEO_EXTENSIONS.has(ext);
+  });
+
+  if (videoFiles.length === 0) return null;
+
+  // If there's only 1 video file in the entire torrent, it's a single episode torrent
+  if (videoFiles.length === 1) {
+    return videoFiles[0];
+  }
+
+  const epStr = String(episodeNumber);
+  const epPadded = epStr.padStart(2, "0");
+
+  // Regex patterns ordered by specificity
+  const patterns = [
+    new RegExp(`(?:[eE]|ep|episode)[_\\.\\-\\s]*0*${epStr}(?:[^0-9]|$)`, "i"),
+    new RegExp(`[\\[\\s_\\-\\.]0*${epPadded}(?:[\\]\\s_\\-\\.]|v\\d)`, "i"),
+    new RegExp(`-\\s*0*${epStr}\\s*[\\[\\(]`, "i"),
+    new RegExp(`\\b0*${epPadded}\\b`),
+  ];
+
+  for (const pattern of patterns) {
+    const matched = videoFiles.find((f) => {
+      // Exclude obvious extras, NCED, NCOP, OP, ED, trailers, samples
+      const lower = f.name.toLowerCase();
+      if (
+        lower.includes("ncop") ||
+        lower.includes("nced") ||
+        lower.includes("sample") ||
+        lower.includes("trailer") ||
+        lower.includes("menu") ||
+        lower.includes("preview")
+      ) {
+        return false;
+      }
+      return pattern.test(f.name);
+    });
+    if (matched) return matched;
+  }
+
+  return null;
+}
+
+/**
+ * Configure file priorities in qBittorrent for an episode (or batch of episodes).
+ * Sets desired video files to priority (normal/high) and all other files to 0 (Do Not Download).
+ */
+export async function applySelectiveFilePriorities(
+  hash: string,
+  targetEpisodeNumbers: number[],
+): Promise<Map<number, { fileIndex: number; fileName: string; fileSize: number }>> {
+  const files = await qbit.getTorrentFiles(hash);
+  if (!files || files.length === 0) return new Map();
+
+  const episodeFileMap = new Map<number, { fileIndex: number; fileName: string; fileSize: number }>();
+  const enabledIndices: number[] = [];
+  const disabledIndices: number[] = [];
+
+  for (const epNum of targetEpisodeNumbers) {
+    const matched = findEpisodeFileInTorrent(files, epNum);
+    if (matched) {
+      episodeFileMap.set(epNum, {
+        fileIndex: matched.index,
+        fileName: matched.name,
+        fileSize: matched.size,
+      });
+    }
+  }
+
+  const desiredIndices = new Set(Array.from(episodeFileMap.values()).map((v) => v.fileIndex));
+
+  // If we couldn't match specific episodes (e.g. single video torrent), keep the largest video
+  if (desiredIndices.size === 0) {
+    const videoFiles = files.filter((f) => {
+      const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
+      return VIDEO_EXTENSIONS.has(ext);
+    });
+    const mainFile = videoFiles.length > 0
+      ? videoFiles.reduce((a, b) => (a.size > b.size ? a : b))
+      : files.reduce((a, b) => (a.size > b.size ? a : b));
+
+    if (mainFile) desiredIndices.add(mainFile.index);
+  }
+
+  for (const f of files) {
+    if (desiredIndices.has(f.index)) {
+      enabledIndices.push(f.index);
+    } else {
+      disabledIndices.push(f.index);
+    }
+  }
+
+  try {
+    if (disabledIndices.length > 0) {
+      await qbit.setFilePriorities(hash, disabledIndices, 0); // Do Not Download
+    }
+    if (enabledIndices.length > 0) {
+      await qbit.setFilePriorities(hash, enabledIndices, 1); // Normal Download
+    }
+  } catch (err) {
+    log.warn({ err, hash }, "Failed to apply selective file priorities");
+  }
+
+  return episodeFileMap;
 }
 
 /**
@@ -135,7 +288,10 @@ export async function startEpisodeDownload(
     where: { id: episodeId },
     include: {
       animeDetails: {
-        include: { baseAnime: true },
+        include: {
+          baseAnime: true,
+          episodes: true,
+        },
       },
     },
   });
@@ -145,34 +301,62 @@ export async function startEpisodeDownload(
   }
 
   const anilistId = episode.animeDetails.baseAnime.anilistId;
-  const savePath = `/downloads/${anilistId}/ep${episode.number}`;
+  const savePath = `/downloads/${anilistId}`;
 
   log.info({ episodeId, savePath, sequential }, "Adding torrent to qBittorrent");
 
   const hash = await qbit.addTorrent(torrent.link, savePath, { sequential });
 
-  // Try to inspect the torrent files right away to get the exact video filename
+  // Poll up to 10 times for qBittorrent to fetch metadata & file names
   let exactMediaPath = `${anilistId}/ep${episode.number}`;
   let foundVideo = false;
 
   try {
-    // Poll up to 10 times (every 400ms = 4s total) for qBittorrent to fetch metadata & file names
     for (let i = 0; i < 10; i++) {
       await new Promise((resolve) => setTimeout(resolve, 400));
       const files = await qbit.getTorrentFiles(hash);
       if (files && files.length > 0) {
-        const videoFiles = files.filter((f) => {
-          const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
-          return VIDEO_EXTENSIONS.has(ext);
-        });
-        const mainFile =
-          videoFiles.length > 0
-            ? videoFiles.reduce((a, b) => (a.size > b.size ? a : b))
-            : files.reduce((a, b) => (a.size > b.size ? a : b));
+        // Apply selective file priority so only desired files download
+        // If this is a batch release containing other episodes for this anime, link sibling episodes too!
+        const siblingEpisodes = episode.animeDetails.episodes.filter(
+          (e) => e.mediaStatus === MediaStatus.NONE || e.id === episodeId,
+        );
+        const epNumbers = siblingEpisodes.map((e) => e.number);
 
-        if (mainFile && mainFile.name) {
-          exactMediaPath = `${anilistId}/ep${episode.number}/${mainFile.name}`;
+        const epMap = await applySelectiveFilePriorities(hash, epNumbers);
+        const myEpFile = epMap.get(episode.number);
+
+        if (myEpFile) {
+          exactMediaPath = `${anilistId}/${myEpFile.fileName}`;
           foundVideo = true;
+
+          // If other episodes from this anime were also in this batch, link them!
+          for (const sibling of siblingEpisodes) {
+            if (sibling.id === episodeId) continue;
+            const siblingFile = epMap.get(sibling.number);
+            if (siblingFile) {
+              await prisma.episode.update({
+                where: { id: sibling.id },
+                data: {
+                  mediaStatus: MediaStatus.QUEUED,
+                  mediaTorrentHash: hash,
+                  mediaPath: `${anilistId}/${siblingFile.fileName}`,
+                  mediaSize: BigInt(siblingFile.fileSize),
+                  mediaSelectedTorrent: {
+                    title: torrent.title,
+                    link: torrent.link,
+                    size: torrent.size,
+                    seeders: torrent.seeders,
+                    source: torrent.source,
+                    publishDate: torrent.publishDate,
+                    category: torrent.category,
+                    infoHash: torrent.infoHash,
+                  },
+                },
+              });
+              log.info({ siblingId: sibling.id, siblingEpisode: sibling.number }, "Linked batch episode to torrent");
+            }
+          }
           break;
         }
       }
@@ -181,12 +365,12 @@ export async function startEpisodeDownload(
     log.warn({ error, hash }, "Failed to get immediate file name from qBittorrent");
   }
 
-  // Fallback: If metadata took too long, infer a sanitized filename from the torrent title with .mkv extension
+  // Fallback: If metadata took too long, infer a sanitized filename with .mkv extension
   if (!foundVideo) {
     const safeTitle = (torrent.title || `episode_${episode.number}`).replace(/[/\\?%*:|"<>]/g, "_").trim();
     const hasExt = Array.from(VIDEO_EXTENSIONS).some((ext) => safeTitle.toLowerCase().endsWith(ext));
     const inferredFilename = hasExt ? safeTitle : `${safeTitle}.mkv`;
-    exactMediaPath = `${anilistId}/ep${episode.number}/${inferredFilename}`;
+    exactMediaPath = `${anilistId}/${inferredFilename}`;
   }
 
   await prisma.episode.update({
@@ -215,6 +399,7 @@ export async function startEpisodeDownload(
 
 /**
  * Poll all QUEUED/DOWNLOADING episodes and update their status in DB.
+ * Handles stalled torrents, metadata timeouts, selective file prioritization, and auto-failovers.
  */
 export async function syncDownloadStatuses(): Promise<void> {
   const episodes = await prisma.episode.findMany({
@@ -222,53 +407,98 @@ export async function syncDownloadStatuses(): Promise<void> {
       mediaStatus: { in: [MediaStatus.QUEUED, MediaStatus.DOWNLOADING] },
       mediaTorrentHash: { not: null },
     },
+    include: {
+      animeDetails: {
+        include: {
+          episodes: true,
+        },
+      },
+    },
   });
 
   if (episodes.length === 0) return;
 
   log.info({ count: episodes.length }, "Syncing download statuses");
 
+  // Cache torrent info per hash to avoid duplicate calls for shared batch torrents
+  const torrentInfoCache = new Map<string, any>();
+
   for (const episode of episodes) {
     if (!episode.mediaTorrentHash) continue;
+    const hash = episode.mediaTorrentHash;
 
     try {
-      const info = await qbit.getTorrentInfo(episode.mediaTorrentHash);
+      let info = torrentInfoCache.get(hash);
+      if (!info) {
+        info = await qbit.getTorrentInfo(hash);
+        if (info) torrentInfoCache.set(hash, info);
+      }
 
       if (!info) {
-        log.warn({ episodeId: episode.id, hash: episode.mediaTorrentHash }, "Torrent info not found");
+        log.warn({ episodeId: episode.id, hash }, "Torrent info not found in qBittorrent");
         continue;
       }
 
       const state = info.state;
 
-      if (state === "uploading" || state === "stalledUP" || state === "pausedUP" || state === "checkingUP") {
-        // Download complete — find the video file
-        const files = await qbit.getTorrentFiles(episode.mediaTorrentHash);
+      // 1. FAILOVER CHECK: Torrent stuck in metadata download or stalled with 0 progress
+      const addedOnSec = info.added_on ?? 0;
+      const ageSeconds = addedOnSec > 0 ? Math.floor(Date.now() / 1000) - addedOnSec : 0;
 
-        // Pick largest file that looks like a video
-        const videoFiles = files.filter((f) => {
-          const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
-          return VIDEO_EXTENSIONS.has(ext);
+      const isStuckMeta = (state === "metaDL" || state === "allocating") && ageSeconds > 20 * 60; // > 20 minutes in metaDL
+      const isStalledZero = (state === "stalledDL" || state === "downloading") && info.progress === 0 && info.num_seeds === 0 && ageSeconds > 2 * 60 * 60; // > 2h at 0% with 0 seeds
+
+      if (isStuckMeta || isStalledZero) {
+        log.warn(
+          { episodeId: episode.id, hash, state, ageSeconds, isStuckMeta, isStalledZero },
+          "Torrent stalled/unresponsive. Triggering auto-failover and blacklisting.",
+        );
+
+        // Delete dead torrent and files from qBittorrent
+        try {
+          await qbit.deleteTorrent(hash, true);
+        } catch (delErr) {
+          log.warn({ delErr, hash }, "Failed to delete stalled torrent from qBittorrent");
+        }
+
+        // Add this torrent link or title to blacklisted failed torrents
+        const selectedTorrent = episode.mediaSelectedTorrent as any;
+        const failedIdentifier = selectedTorrent?.link || selectedTorrent?.title || hash;
+
+        const updatedFailed = Array.from(new Set([...episode.mediaFailedTorrents, failedIdentifier]));
+
+        await prisma.episode.update({
+          where: { id: episode.id },
+          data: {
+            mediaStatus: MediaStatus.NONE,
+            mediaTorrentHash: null,
+            mediaPath: null,
+            mediaSize: null,
+            mediaFailedTorrents: updatedFailed,
+          },
         });
+        continue;
+      }
 
-        const mainFile =
-          videoFiles.length > 0
-            ? videoFiles.reduce((a, b) => (a.size > b.size ? a : b))
-            : files.reduce((a, b) => (a.size > b.size ? a : b));
+      // 2. CHECK COMPLETION / AVAILABLE
+      if (state === "uploading" || state === "stalledUP" || state === "pausedUP" || state === "checkingUP") {
+        const files = await qbit.getTorrentFiles(hash);
+        const matched = findEpisodeFileInTorrent(files, episode.number);
 
-        // Compute path relative to /downloads
-        // save_path is e.g. "/downloads/21234/ep12/"
-        const savePathRelative = info.save_path.replace(/^\/downloads\/?/, "");
-        const cleanSave = savePathRelative.replace(/\/$/, "");
-        // mainFile.name may include subdirectory inside the torrent
-        const mediaPath = cleanSave ? `${cleanSave}/${mainFile.name}` : mainFile.name;
+        const mainFile = matched ?? (
+          files.filter((f) => VIDEO_EXTENSIONS.has(f.name.toLowerCase().slice(f.name.lastIndexOf("."))))
+            .reduce((a, b) => (a.size > b.size ? a : b), files[0])
+        );
+
+        const savePathRelative = info.save_path.replace(/^\/downloads\/?/, "").replace(/\/$/, "");
+        const mediaPath = savePathRelative && mainFile?.name ? `${savePathRelative}/${mainFile.name}` : (mainFile?.name ?? episode.mediaPath);
 
         await prisma.episode.update({
           where: { id: episode.id },
           data: {
             mediaStatus: MediaStatus.AVAILABLE,
             mediaPath,
-            mediaSize: BigInt(mainFile.size),
+            mediaSize: mainFile ? BigInt(mainFile.size) : episode.mediaSize,
           },
         });
 
@@ -280,6 +510,24 @@ export async function syncDownloadStatuses(): Promise<void> {
         state === "checkingDL" ||
         state === "moving"
       ) {
+        // If metadata just resolved, ensure selective priority is applied
+        const files = await qbit.getTorrentFiles(hash);
+        if (files && files.length > 1) {
+          const matched = findEpisodeFileInTorrent(files, episode.number);
+          if (matched && matched.name && !episode.mediaPath?.includes(matched.name)) {
+            const savePathRelative = info.save_path.replace(/^\/downloads\/?/, "").replace(/\/$/, "");
+            const mediaPath = savePathRelative ? `${savePathRelative}/${matched.name}` : matched.name;
+            await prisma.episode.update({
+              where: { id: episode.id },
+              data: {
+                mediaStatus: MediaStatus.DOWNLOADING,
+                mediaPath,
+                mediaSize: BigInt(matched.size),
+              },
+            });
+          }
+        }
+
         if (episode.mediaStatus !== MediaStatus.DOWNLOADING) {
           await prisma.episode.update({
             where: { id: episode.id },
@@ -288,7 +536,7 @@ export async function syncDownloadStatuses(): Promise<void> {
         }
       } else if (state === "error" || state === "missingFiles") {
         log.warn(
-          { episodeId: episode.id, hash: episode.mediaTorrentHash, state },
+          { episodeId: episode.id, hash, state },
           "Torrent in error state",
         );
       }

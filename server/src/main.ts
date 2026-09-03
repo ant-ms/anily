@@ -28,6 +28,7 @@ const ensureSchema = async () => {
       ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaSize" BIGINT;
       ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaTorrentHash" TEXT;
       ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaLastSearchAt" TIMESTAMP(3);
+      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaFailedTorrents" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MediaStatus') THEN
           CREATE TYPE "MediaStatus" AS ENUM ('NONE', 'QUEUED', 'DOWNLOADING', 'AVAILABLE');

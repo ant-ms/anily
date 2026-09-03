@@ -32,6 +32,11 @@ export async function rankTorrents(
   animeName: string,
   episodeNumber: number | null,
   results: TorrentResult[],
+  options?: {
+    excludeLinks?: string[];
+    isCompletedAnime?: boolean;
+    totalEpisodes?: number;
+  },
 ): Promise<TorrentAIResult> {
   const apiKey = process.env.OPENROUTER_KEY;
 
@@ -40,36 +45,43 @@ export async function rankTorrents(
     return { index: -1, confidence: "low", reason: "OpenRouter API key not configured" };
   }
 
-  if (results.length === 0) {
+  const excludeSet = new Set(options?.excludeLinks ?? []);
+  const validResults = results.filter((r) => !excludeSet.has(r.link) && !excludeSet.has(r.title));
+
+  if (validResults.length === 0) {
     return { index: -1, confidence: "low", reason: "No torrent results to rank" };
   }
 
-  const candidates = results.map((r, i) => ({
+  const candidates = validResults.map((r, i) => ({
     index: i,
+    original_index: results.indexOf(r),
     title: r.title,
     size_mb: Math.round(r.size / 1024 / 1024),
     seeders: r.seeders,
     source: r.source,
   }));
 
+  const isBatchAllowed = options?.isCompletedAnime;
   const prompt = `You are selecting the best torrent for an anime episode.
 
 Anime: ${animeName}
-Episode: ${episodeNumber ?? "Movie/Special"}
+Episode: ${episodeNumber ?? "Movie/Special"}${options?.totalEpisodes ? ` (Total Episodes: ${options.totalEpisodes})` : ""}
+${isBatchAllowed ? "NOTE: This anime has completely finished airing. Entire season BATCH torrents (e.g., '01-12', 'Batch', 'Complete', 'Season 1') ARE ALLOWED and WELCOMED if they contain this episode and have good seeders!" : "NOTE: Prefer single episode torrents matching this episode number."}
 
 Candidates (JSON):
 ${JSON.stringify(candidates, null, 2)}
 
 Selection rules (in priority order):
-1. Dual audio (English + Japanese) — strongly preferred, look for "Dual Audio", "[Dual]", "[EN+JA]", "DUAL"
-2. Japanese audio + English subtitles — good fallback, look for "[JA+EN sub]", SubsPlease, Erai-raws releases
-3. Known quality groups preferred: SubsPlease, Erai-raws, Judas, NyaaSI-trusted
-4. Reasonable file size: 200MB-4GB for 1080p, 100MB-2GB for 720p. Flag suspiciously small files (<80MB) or huge (>8GB)
-5. Seeder count: higher is better, but don't sacrifice quality for seeders
-6. Prefer 1080p over 720p over lower
+1. Correct show and episode coverage: must be for '${animeName}'. ${isBatchAllowed ? "Can be either the specific episode OR a full season batch containing this episode." : "Must specifically match episode " + (episodeNumber ?? "Special") + "."}
+2. Dual audio (English + Japanese) — strongly preferred, look for "Dual Audio", "[Dual]", "[EN+JA]", "DUAL"
+3. Japanese audio + English subtitles — good fallback, look for "[JA+EN sub]", SubsPlease, Erai-raws releases
+4. Known quality groups preferred: SubsPlease, Erai-raws, Judas, NyaaSI-trusted, LostYears, Beatrice-Raws
+5. Reasonable file size: For single episodes: 200MB-4GB. For whole season batches: 3GB-45GB depending on episode count. Suspiciously tiny files (<60MB) are fake.
+6. Seeder count: higher is better, active seeders are crucial.
+7. Prefer 1080p over 720p over lower
 
 Return ONLY valid JSON (no markdown):
-{"index": <number 0-based matching array>, "confidence": "high"|"medium"|"low", "reason": "brief explanation"}
+{"index": <number from 0-based 'index' in array>, "confidence": "high"|"medium"|"low", "reason": "brief explanation"}
 
 If no good match or all results seem wrong (wrong anime, wrong episode, implausible), return {"index": -1, "confidence": "low", "reason": "..."}`;
 
@@ -118,13 +130,21 @@ If no good match or all results seem wrong (wrong anime, wrong episode, implausi
       return { index: -1, confidence: "low", reason: "AI returned unexpected structure" };
     }
 
-    // Clamp index to valid range
-    if (parsed.index !== -1 && (parsed.index < 0 || parsed.index >= results.length)) {
-      log.warn({ index: parsed.index, count: results.length }, "AI returned out-of-range index");
+    if (parsed.index === -1) {
+      return parsed;
+    }
+
+    // Clamp index to candidate range and map back to original results index
+    if (parsed.index < 0 || parsed.index >= candidates.length) {
+      log.warn({ index: parsed.index, count: candidates.length }, "AI returned out-of-range index");
       return { index: -1, confidence: "low", reason: "AI returned out-of-range index" };
     }
 
-    return parsed;
+    return {
+      index: candidates[parsed.index].original_index,
+      confidence: parsed.confidence,
+      reason: parsed.reason,
+    };
   } catch (error) {
     log.warn({ error }, "Error calling OpenRouter for torrent ranking");
     return { index: -1, confidence: "low", reason: "AI request error" };

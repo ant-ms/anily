@@ -162,6 +162,7 @@ model Episode {
   mediaSize            BigInt?     // file size in bytes once available
   mediaSelectedTorrent Json?       // stored torrent selection info (title, seeders, etc.)
   mediaLastSearchAt    DateTime?   // last time search was performed
+  mediaFailedTorrents  String[]    @default([]) // blacklisted torrent links/titles that stalled or failed
 
   @@unique([animeDetailsId, number])
   @@index([animeDetailsId])
