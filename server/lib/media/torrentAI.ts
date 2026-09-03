@@ -23,6 +23,37 @@ interface OpenRouterResponse {
 const log = logger.child({ module: "torrentAI" });
 
 /**
+ * Constructs request headers for OpenRouter API calls with App Attribution support.
+ * @see https://openrouter.ai/docs/app-attribution
+ */
+export function getOpenRouterHeaders(apiKey?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "HTTP-Referer":
+      process.env.OPENROUTER_HTTP_REFERER ||
+      process.env.APP_URL ||
+      process.env.OIDC_AUTH_EXTERNAL_URL ||
+      "https://anily.ant.ms",
+    "X-OpenRouter-Title": process.env.OPENROUTER_TITLE || "Anily",
+  };
+
+  const key = apiKey || process.env.OPENROUTER_KEY || process.env.OPENROUTER_API_KEY;
+  if (key) {
+    headers.Authorization = `Bearer ${key}`;
+  }
+
+  if (process.env.OPENROUTER_CATEGORIES) {
+    headers["X-OpenRouter-Categories"] = process.env.OPENROUTER_CATEGORIES;
+  }
+
+  if (process.env.OPENROUTER_APP_VISIBILITY) {
+    headers["X-OpenRouter-App-Visibility"] = process.env.OPENROUTER_APP_VISIBILITY;
+  }
+
+  return headers;
+}
+
+/**
  * Rank torrents using AI (OpenRouter). Returns recommended index and reason.
  * @param animeName  e.g. "Frieren: Beyond Journey's End"
  * @param episodeNumber e.g. 12, or null for movie/special
@@ -38,7 +69,7 @@ export async function rankTorrents(
     totalEpisodes?: number;
   },
 ): Promise<TorrentAIResult> {
-  const apiKey = process.env.OPENROUTER_KEY;
+  const apiKey = process.env.OPENROUTER_KEY || process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
     log.warn("OPENROUTER_KEY not set, skipping AI ranking");
@@ -91,10 +122,7 @@ If no good match or all results seem wrong (wrong anime, wrong episode, implausi
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: getOpenRouterHeaders(apiKey),
       body: JSON.stringify({
         model,
         messages,
