@@ -55,7 +55,7 @@
             <header class="mobile-topbar">
                 <button
                     type="button"
-                    class="topbar-btn"
+                    class="topbar-btn menu-btn"
                     onclick={() => isMobileNavOpen.set(!isMobileNavOpen.current)}
                     aria-label="Toggle navigation"
                 >
@@ -156,41 +156,8 @@
         display: none;
     }
 
-    @media (max-width: 768px) {
-        main {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-            height: 100dvh;
-            position: relative;
-        }
-
-        .sidebar-wrapper {
-            display: block;
-            position: fixed;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            z-index: 50;
-            transform: translateX(-100%);
-            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: none;
-
-            &.open {
-                transform: translateX(0);
-                box-shadow: 4px 0 24px rgba(0, 0, 0, 0.7);
-            }
-        }
-
-        .mobile-backdrop {
-            display: block;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(2px);
-            z-index: 45;
-        }
-
+    /* Top bar visible on foldables, tablets, and mobile (<= 1024px) */
+    @media (max-width: 1024px) {
         .mobile-topbar {
             display: flex;
             align-items: center;
@@ -227,6 +194,11 @@
                 }
             }
 
+            /* On foldables / tablets (min-width: 769px), hide the collapse nav button */
+            .menu-btn {
+                display: none;
+            }
+
             .topbar-title {
                 font-size: 15px;
                 font-weight: 600;
@@ -236,13 +208,61 @@
                 text-overflow: ellipsis;
                 padding: 0 8px;
                 flex: 1;
-                text-align: center;
             }
 
             .topbar-actions {
                 display: flex;
                 align-items: center;
                 gap: 6px;
+                margin-left: auto;
+            }
+        }
+    }
+
+    /* Mobile drawer for left navigation sidebar on phones (<= 768px) */
+    @media (max-width: 768px) {
+        main {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            position: relative;
+        }
+
+        .sidebar-wrapper {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 50;
+            transform: translateX(-100%);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: none;
+
+            &.open {
+                transform: translateX(0);
+                box-shadow: 4px 0 24px rgba(0, 0, 0, 0.7);
+            }
+        }
+
+        .mobile-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(2px);
+            z-index: 45;
+        }
+
+        .mobile-topbar {
+            /* On mobile, show the menu button to toggle sidebar */
+            .menu-btn {
+                display: flex;
+            }
+
+            .topbar-title {
+                text-align: center;
             }
         }
     }

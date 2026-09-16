@@ -7,7 +7,6 @@
         apiBaseUrl,
         selectedAnimeAnilistId,
         sidebarDataRefreshSeed,
-        isSeasonsSidebarOpen,
     } from "../../lib/context.svelte";
     import type EpisodeData from "../../types/Episode";
     import {
@@ -21,7 +20,6 @@
     import EyeIcon from "phosphor-svelte/lib/EyeIcon";
     import ImageIcon from "phosphor-svelte/lib/ImageIcon";
     import CaretDownIcon from "phosphor-svelte/lib/CaretDownIcon";
-    import TreeStructureIcon from "phosphor-svelte/lib/TreeStructureIcon";
 
     let {
         updateSeed,
@@ -297,26 +295,17 @@
             </div>
         {/each}
     {:else}
-        <div class="toolbar" transition:fade={{ duration: 200 }}>
-            <Button
-                Icon={TreeStructureIcon}
-                active={isSeasonsSidebarOpen.current}
-                style="ghost"
-                onclick={() =>
-                    isSeasonsSidebarOpen.set(!isSeasonsSidebarOpen.current)}
-            >
-                <span class="seasons-btn-label">Seasons</span>
-            </Button>
-            <div class="spacer"></div>
-            {#if episodes.length > 0}
+        {#if episodes.length > 0}
+            <div class="toolbar" transition:fade={{ duration: 200 }}>
+                <div class="spacer"></div>
                 <Button
                     Icon={allReleasedWatched ? CheckIcon : EyeIcon}
                     active={allReleasedWatched}
                     style="ghost"
                     onclick={toggleAllWatch}
                 />
-            {/if}
-        </div>
+            </div>
+        {/if}
         {#each episodes as episode (episode.number)}
             <div class="episode-card" transition:fade={{ duration: 200 }}>
                 <div class="number"><span>{episode.number}</span></div>
@@ -445,10 +434,6 @@
             gap: 0.5rem;
             align-items: center;
             flex-shrink: 0;
-
-            .seasons-btn-label {
-                font-size: 13px;
-            }
 
             .spacer {
                 flex-grow: 1;

@@ -220,12 +220,14 @@
             disabled={currentPage >= pageCount - 1}
             onclick={() => navigate(1)}
         />
-        <Button
-            Icon={XIcon}
-            style="ghost"
-            onclick={() => isSeasonsSidebarOpen.set(false)}
-            title="Close seasons"
-        />
+        <div class="close-btn-wrapper">
+            <Button
+                Icon={XIcon}
+                style="ghost"
+                onclick={() => isSeasonsSidebarOpen.set(false)}
+                title="Close seasons"
+            />
+        </div>
     </div>
 
     <div class="tree">
@@ -262,6 +264,14 @@
 
             .spacer {
                 flex-grow: 1;
+            }
+
+            .close-btn-wrapper {
+                display: none;
+
+                @media (max-width: 1024px) {
+                    display: block;
+                }
             }
         }
 

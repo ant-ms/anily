@@ -69,15 +69,11 @@
 <style lang="scss">
     #anime-details-page {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr auto;
         height: 100%;
         min-height: 0;
         position: relative;
         overflow: hidden;
-
-        &.seasons-open {
-            grid-template-columns: 1fr auto;
-        }
 
         .left {
             display: flex;
@@ -88,11 +84,7 @@
         }
 
         .right {
-            display: none;
-
-            &.open {
-                display: block;
-            }
+            display: block;
         }
 
         .seasons-backdrop {
