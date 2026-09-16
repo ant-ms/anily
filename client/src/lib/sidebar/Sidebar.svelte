@@ -5,11 +5,15 @@
     import type ProfileData from "../../types/ProfileData";
     import { watch } from "runed";
     import type SidebarCardData from "../../types/SidebarCardData";
-    import { apiBaseUrl, sidebarDataRefreshSeed, selectedAnimeAnilistId } from "../context.svelte";
+    import {
+        apiBaseUrl,
+        sidebarDataRefreshSeed,
+        selectedAnimeAnilistId,
+        isMobileNavOpen,
+    } from "../context.svelte";
     import SidebarCard from "./SidebarCard.svelte";
-    import ChartBarIcon from "phosphor-svelte/lib/ChartBarIcon";
     import ListDashesIcon from "phosphor-svelte/lib/ListDashesIcon";
-    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
+    import XIcon from "phosphor-svelte/lib/XIcon";
 
     let {
         activeTab = $bindable(),
@@ -48,36 +52,39 @@
                 });
         },
     );
+
+    function handleNavClick(tab: Tab) {
+        activeTab = tab;
+        if (typeof window !== "undefined" && window.innerWidth <= 768) {
+            isMobileNavOpen.set(false);
+        }
+    }
 </script>
 
 <div id="sidebar">
-    <SidebarTabs bind:activeTab />
+    <div class="sidebar-header-row">
+        <div class="tabs-container">
+            <SidebarTabs bind:activeTab />
+        </div>
+        <button
+            type="button"
+            class="sidebar-close-btn"
+            onclick={() => isMobileNavOpen.set(false)}
+            aria-label="Close navigation"
+        >
+            <XIcon size="1.25rem" />
+        </button>
+    </div>
+
     <div class="sidebar-content">
-        {#if activeTab?.id === "logs" || activeTab?.id === "stats" || activeTab?.id === "missing"}
+        {#if activeTab?.id === "logs"}
             <div class="logs-sidebar-nav">
                 <button
-                    class="nav-item"
-                    class:active={activeTab?.id === "stats"}
-                    onclick={() => (activeTab = { id: "stats", name: "Statistics" })}
-                >
-                    <ChartBarIcon size="1.2rem" />
-                    <span>Statistics</span>
-                </button>
-                <button
-                    class="nav-item"
-                    class:active={activeTab?.id === "logs"}
-                    onclick={() => (activeTab = { id: "logs", name: "Logs" })}
+                    class="nav-item active"
+                    onclick={() => handleNavClick({ id: "logs", name: "Logs" })}
                 >
                     <ListDashesIcon size="1.2rem" />
                     <span>Import Logs</span>
-                </button>
-                <button
-                    class="nav-item"
-                    class:active={activeTab?.id === "missing"}
-                    onclick={() => (activeTab = { id: "missing", name: "Missing Episodes" })}
-                >
-                    <WarningCircleIcon size="1.2rem" />
-                    <span>Missing Episodes</span>
                 </button>
             </div>
         {:else if activeTab?.id !== "settings"}
@@ -95,6 +102,8 @@
     #sidebar {
         width: 370px;
         height: 100vh;
+        height: 100dvh;
+        max-height: 100dvh;
         min-height: 0;
         display: flex;
         flex-direction: column;
@@ -102,8 +111,50 @@
         border-right: 1px solid #2e2c29;
         overflow: hidden;
 
+        @media (max-width: 1024px) {
+            width: 280px;
+        }
+
+        @media (max-width: 768px) {
+            width: min(320px, 85vw);
+            height: 100%;
+            border-right: 1px solid #3a3733;
+        }
+
+        .sidebar-header-row {
+            display: flex;
+            align-items: stretch;
+            flex-shrink: 0;
+            border-bottom: 1px solid #2e2c29;
+
+            .tabs-container {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .sidebar-close-btn {
+                display: none;
+                align-items: center;
+                justify-content: center;
+                padding: 0 12px;
+                color: #888;
+                cursor: pointer;
+                transition: color 0.15s, background 0.15s;
+
+                &:hover {
+                    color: #fff;
+                    background: hsl(20, 17.6%, 14%);
+                }
+
+                @media (max-width: 768px) {
+                    display: flex;
+                }
+            }
+        }
+
         .sidebar-content {
-            flex-grow: 1;
+            flex: 1 1 0px;
+            min-height: 0;
             overflow-y: auto;
             scrollbar-width: none;
 

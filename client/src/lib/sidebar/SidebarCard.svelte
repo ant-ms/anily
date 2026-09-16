@@ -1,6 +1,6 @@
 <script lang="ts">
     import type SidebarCardData from "../../types/SidebarCardData";
-    import { selectedAnimeAnilistId } from "../context.svelte";
+    import { selectedAnimeAnilistId, isMobileNavOpen } from "../context.svelte";
     import ProgressDonut from "./ProgressDonut.svelte";
 
     let {
@@ -27,6 +27,9 @@
             selectedAnimeAnilistId.set(undefined);
         } else {
             selectedAnimeAnilistId.set(data.displayAnilistId);
+        }
+        if (typeof window !== "undefined" && window.innerWidth <= 768) {
+            isMobileNavOpen.set(false);
         }
     }}
     class="sidebar-card"
@@ -115,6 +118,20 @@
         &.active {
             background: #ffd52c14;
             border-left: 3px solid #ffd52c;
+        }
+
+        @media (max-width: 1024px) {
+            padding: 6px;
+            gap: 0.4rem;
+
+            img {
+                width: 52px;
+                height: 72px;
+            }
+
+            .right span {
+                font-size: 13px;
+            }
         }
     }
 </style>

@@ -43,6 +43,7 @@
 
 <style lang="scss">
     .tabs {
-        border-bottom: 1px solid #2e2c29;
+        flex-shrink: 0;
+        width: 100%;
     }
 </style>

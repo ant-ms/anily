@@ -193,6 +193,11 @@
         gap: 16px;
         color: #e8e4df;
 
+        @media (max-width: 768px) {
+            padding: 12px 14px;
+            gap: 12px;
+        }
+
         header {
             display: flex;
             align-items: center;

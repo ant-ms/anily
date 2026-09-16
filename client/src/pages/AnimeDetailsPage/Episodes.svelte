@@ -7,6 +7,7 @@
         apiBaseUrl,
         selectedAnimeAnilistId,
         sidebarDataRefreshSeed,
+        isSeasonsSidebarOpen,
     } from "../../lib/context.svelte";
     import type EpisodeData from "../../types/Episode";
     import {
@@ -20,6 +21,7 @@
     import EyeIcon from "phosphor-svelte/lib/EyeIcon";
     import ImageIcon from "phosphor-svelte/lib/ImageIcon";
     import CaretDownIcon from "phosphor-svelte/lib/CaretDownIcon";
+    import TreeStructureIcon from "phosphor-svelte/lib/TreeStructureIcon";
 
     let {
         updateSeed,
@@ -295,17 +297,26 @@
             </div>
         {/each}
     {:else}
-        {#if episodes.length > 0}
-            <div class="toolbar" transition:fade={{ duration: 200 }}>
-                <div class="spacer"></div>
+        <div class="toolbar" transition:fade={{ duration: 200 }}>
+            <Button
+                Icon={TreeStructureIcon}
+                active={isSeasonsSidebarOpen.current}
+                style="ghost"
+                onclick={() =>
+                    isSeasonsSidebarOpen.set(!isSeasonsSidebarOpen.current)}
+            >
+                <span class="seasons-btn-label">Seasons</span>
+            </Button>
+            <div class="spacer"></div>
+            {#if episodes.length > 0}
                 <Button
                     Icon={allReleasedWatched ? CheckIcon : EyeIcon}
                     active={allReleasedWatched}
                     style="ghost"
                     onclick={toggleAllWatch}
                 />
-            </div>
-        {/if}
+            {/if}
+        </div>
         {#each episodes as episode (episode.number)}
             <div class="episode-card" transition:fade={{ duration: 200 }}>
                 <div class="number"><span>{episode.number}</span></div>
@@ -418,14 +429,26 @@
     .episodes {
         display: flex;
         flex-direction: column;
-        gap: 1rem;
-        overflow: auto;
-        padding: 1rem;
+        gap: 0.75rem;
+        overflow-y: auto;
+        padding: 0.85rem 1.25rem;
+        flex: 1 1 0;
+        min-height: 0;
+
+        @media (max-width: 768px) {
+            padding: 0.65rem 0.75rem;
+            gap: 0.6rem;
+        }
 
         .toolbar {
             display: flex;
             gap: 0.5rem;
             align-items: center;
+            flex-shrink: 0;
+
+            .seasons-btn-label {
+                font-size: 13px;
+            }
 
             .spacer {
                 flex-grow: 1;
@@ -434,8 +457,12 @@
 
         .episode-card {
             display: flex;
-            gap: 1rem;
+            gap: 0.85rem;
             align-items: center;
+
+            @media (max-width: 768px) {
+                gap: 0.5rem;
+            }
 
             .number {
                 background-color: #1d1a17;
@@ -446,6 +473,13 @@
                 border-radius: 5px;
                 justify-content: center;
                 align-items: center;
+                flex-shrink: 0;
+
+                @media (max-width: 640px) {
+                    height: 28px;
+                    width: 28px;
+                    font-size: 12px;
+                }
 
                 span {
                     margin-top: 2px;
@@ -455,11 +489,16 @@
 
             .thumbnail-container {
                 position: relative;
-                width: 160px;
-                height: 90px;
+                width: 140px;
+                height: 79px;
                 border-radius: 4px;
                 overflow: hidden;
                 flex-shrink: 0;
+
+                @media (max-width: 768px) {
+                    width: 110px;
+                    height: 62px;
+                }
 
                 .placeholder {
                     position: absolute;
@@ -488,17 +527,24 @@
                 display: flex;
                 flex-direction: column;
                 gap: 0.25rem;
+                min-width: 0;
 
                 .title-1 {
                     font-size: 14px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 .title-2 {
-                    font-size: 14px;
+                    font-size: 13px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 .date {
-                    font-size: 13px;
+                    font-size: 12px;
                     color: #999;
                 }
 
@@ -517,6 +563,11 @@
                 display: flex;
                 gap: 0.5rem;
                 align-items: center;
+                flex-shrink: 0;
+
+                @media (max-width: 640px) {
+                    gap: 0.25rem;
+                }
             }
         }
     }
@@ -548,6 +599,10 @@
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+
+                @media (max-width: 640px) {
+                    display: none;
+                }
             }
 
             .dropdown-trigger {

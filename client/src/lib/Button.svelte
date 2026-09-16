@@ -10,6 +10,7 @@
         active = false,
         disabled = false,
         loading = false,
+        title = undefined,
     }: {
         children?: Snippet;
         Icon?: Component<IconComponentProps, {}, "">;
@@ -18,6 +19,7 @@
         onclick?: () => void | Promise<void>;
         disabled?: boolean;
         loading?: boolean;
+        title?: string;
     } = $props();
 
     let internalLoading = $state(false);
@@ -38,6 +40,7 @@
 </script>
 
 <button
+    {title}
     onclick={handleClick}
     class:active
     disabled={disabled || isBusy}

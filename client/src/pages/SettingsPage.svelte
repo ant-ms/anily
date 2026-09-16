@@ -31,6 +31,11 @@
         flex-direction: column;
         gap: 2rem;
 
+        @media (max-width: 768px) {
+            padding: 1.25rem 1rem;
+            gap: 1.5rem;
+        }
+
         h2 {
             font-size: 18px;
             font-weight: 600;

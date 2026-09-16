@@ -101,6 +101,18 @@
         gap: 0.35rem;
 
         height: 100vh;
+        height: 100dvh;
+        max-height: 100dvh;
+
+        @media (max-width: 640px) {
+            margin-left: 1rem;
+            margin-right: 1rem;
+
+            .backend-url-wrapper input {
+                width: 100%;
+                max-width: 280px;
+            }
+        }
 
         .title {
             font-size: 2rem;

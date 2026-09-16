@@ -5,7 +5,7 @@
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
     import type { Tab } from "../tab-switcher/tab-switcher-types";
     import type ProfileData from "../../types/ProfileData";
-    import { apiBaseUrl } from "../context.svelte";
+    import { apiBaseUrl, isMobileNavOpen } from "../context.svelte";
 
     let {
         activeTab = $bindable(),
@@ -14,28 +14,35 @@
         activeTab?: Tab;
         profileData: ProfileData;
     } = $props();
+
+    function selectTab(tab: Tab) {
+        activeTab = tab;
+        if (typeof window !== "undefined" && window.innerWidth <= 768) {
+            isMobileNavOpen.set(false);
+        }
+    }
 </script>
 
 <div id="sidebar-user">
     <img src={profileData.pictureUrl} alt="" />
-    <span>{profileData.name}</span>
+    <span title={profileData.name}>{profileData.name}</span>
     <Button
         Icon={LogIcon}
         active={activeTab?.id === "logs"}
         onclick={() => {
-            activeTab = {
+            selectTab({
                 id: "logs",
                 name: "Import Jobs",
-            };
+            });
         }}
     />
     <Button
         Icon={GearIcon}
         active={activeTab?.id === "settings"}
         onclick={() => {
-            activeTab = {
+            selectTab({
                 id: "settings",
-            };
+            });
         }}
     />
     <Button
@@ -51,15 +58,28 @@
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 12px;
+        padding: 10px 12px;
+        padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+        flex-shrink: 0;
+        background: #1d1a17;
+        border-top: 1px solid #2e2c29;
+        min-width: 0;
 
         img {
             height: 2rem;
+            width: 2rem;
             border-radius: 100%;
+            flex-shrink: 0;
+            object-fit: cover;
         }
 
         span {
-            flex-grow: 1;
+            flex: 1 1 0;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 14px;
         }
     }
 </style>

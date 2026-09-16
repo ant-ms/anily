@@ -5,11 +5,13 @@
     import PushPinSlashIcon from "phosphor-svelte/lib/PushPinSlashIcon";
     import CaretLeftIcon from "phosphor-svelte/lib/CaretLeftIcon";
     import CaretRightIcon from "phosphor-svelte/lib/CaretRightIcon";
+    import XIcon from "phosphor-svelte/lib/XIcon";
 
     import {
         apiBaseUrl,
         selectedAnimeAnilistId,
         sidebarDataRefreshSeed,
+        isSeasonsSidebarOpen,
     } from "../../lib/context.svelte";
     import type AnimeDetailsData from "../../types/AnimeDetails";
     import Button from "../../lib/Button.svelte";
@@ -218,6 +220,12 @@
             disabled={currentPage >= pageCount - 1}
             onclick={() => navigate(1)}
         />
+        <Button
+            Icon={XIcon}
+            style="ghost"
+            onclick={() => isSeasonsSidebarOpen.set(false)}
+            title="Close seasons"
+        />
     </div>
 
     <div class="tree">
@@ -237,6 +245,8 @@
     .chains {
         display: grid;
         height: 100vh;
+        height: 100dvh;
+        max-height: 100dvh;
         grid-template-rows: auto 1fr;
         grid-template-columns: minmax(250px, auto);
         border-left: 1px solid #2e2c29;
@@ -260,10 +270,11 @@
             align-items: flex-start;
             justify-self: center;
             gap: 2rem;
-            padding: 4px;
+            padding: 8px 12px;
+            padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
             width: max-content;
             overflow-y: auto;
-            overflow-x: hidden;
+            overflow-x: auto;
         }
     }
 </style>

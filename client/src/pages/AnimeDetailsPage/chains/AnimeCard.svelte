@@ -1,5 +1,8 @@
 <script lang="ts">
-    import { selectedAnimeAnilistId } from "../../../lib/context.svelte";
+    import {
+        selectedAnimeAnilistId,
+        isSeasonsSidebarOpen,
+    } from "../../../lib/context.svelte";
     import type { CommonDetails } from "../../../types/AnimeGroupings";
     import ProgressDonut from "../../../lib/sidebar/ProgressDonut.svelte";
     import { titleOf, shortTitleOf } from "./titleOf";
@@ -12,7 +15,12 @@
     class="card"
     class:selected={node.anilistId === selectedAnimeAnilistId.current}
     title={titleOf(node)}
-    onclick={() => selectedAnimeAnilistId.set(node.anilistId)}
+    onclick={() => {
+        selectedAnimeAnilistId.set(node.anilistId);
+        if (typeof window !== "undefined" && window.innerWidth <= 1024) {
+            isSeasonsSidebarOpen.set(false);
+        }
+    }}
 >
     <div class="thumbnail-wrapper">
         {#if node.thumbnailUrl}
