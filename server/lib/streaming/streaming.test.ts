@@ -140,7 +140,7 @@ describe("Streaming Providers", () => {
       expect(res.headers.get("content-type")).toContain("mpegurl");
       const body = await res.text();
       expect(body).toContain("#EXTM3U");
-      expect(body).toContain("/api/stream/proxy?url=");
+      expect(body).toContain("/api/stream/proxy/");
     }, 25000);
 
     it("apiStream proxy rewrites m3u8 playlists for HiAnime", async () => {
@@ -158,7 +158,49 @@ describe("Streaming Providers", () => {
       expect(res.headers.get("content-type")).toContain("mpegurl");
       const body = await res.text();
       expect(body).toContain("#EXTM3U");
-      expect(body).toContain("/api/stream/proxy?url=");
+      expect(body).toContain("/api/stream/proxy/");
+    }, 25000);
+
+    it("apiStream proxy handles master.m3u8 and child playlists with file extensions", async () => {
+      const { app } = await import("$src/app");
+      await import("$src/routes/apiStream");
+
+      const masterUrl = "https://hls2.aniwatchtv.uk/v/scxqicy/huanbc9tmy/nyvrcjopy8/xaprjusg9l2rwy/master.m3u8";
+      const referer = "https://zokoanime.video/";
+
+      // 1. Request master playlist via proxy
+      const proxyUrl = `/api/stream/proxy?url=${encodeURIComponent(masterUrl)}&ref=${encodeURIComponent(referer)}`;
+      const res = await app.request(proxyUrl);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("mpegurl");
+      const body = await res.text();
+      expect(body).toContain("#EXTM3U");
+      // Should rewrite sub-playlists with filename extension (.m3u8) in path
+      expect(body).toContain("/api/stream/proxy/index.m3u8?url=");
+
+      // 2. Extract first child playlist URL
+      const childLine = body.split("\n").find((l) => l.includes("/api/stream/proxy/index.m3u8?url="));
+      expect(childLine).toBeDefined();
+
+      // 3. Request child playlist via proxy
+      const childRes = await app.request(childLine!.trim());
+      expect(childRes.status).toBe(200);
+      expect(childRes.headers.get("content-type")).toContain("mpegurl");
+      const childBody = await childRes.text();
+      expect(childBody).toContain("#EXTM3U");
+      // Should rewrite segment lines with filename extension (.ts) in path
+      expect(childBody).toMatch(/\/api\/stream\/proxy\/seg_\d+\.ts\?url=/);
+
+      // 4. Test OPTIONS request for CORS preflight
+      const optionsRes = await app.request("/api/stream/proxy", { method: "OPTIONS" });
+      expect(optionsRes.status).toBe(204);
+      expect(optionsRes.headers.get("access-control-allow-origin")).toBe("*");
+
+      // 5. Test HEAD request on master playlist
+      const headRes = await app.request(proxyUrl, { method: "HEAD" });
+      expect(headRes.status).toBe(200);
+      expect(headRes.headers.get("content-type")).toContain("mpegurl");
     }, 25000);
   });
 });

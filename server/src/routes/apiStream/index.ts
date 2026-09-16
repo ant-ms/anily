@@ -4,10 +4,21 @@ import { logger } from "$src/logger";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { registry } from "$lib/streaming/registry";
-import { handleStreamProxy } from "$lib/streaming/proxy";
+import { handleStreamProxy, extractFilename } from "$lib/streaming/proxy";
 import type { StreamLanguage } from "$lib/streaming/types";
+import type { Context } from "hono";
 
 const log = logger.child({ module: "apiStream" });
+
+export function getPublicOrigin(c: Context): string {
+  const forwardedProto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = (c.req.header("x-forwarded-host") || c.req.header("host"))?.split(",")[0]?.trim();
+  if (forwardedHost) {
+    const proto = forwardedProto || "http";
+    return `${proto}://${forwardedHost}`;
+  }
+  return new URL(c.req.url).origin;
+}
 
 const episodeIdParamValidator = zValidator(
   "param",
@@ -97,10 +108,15 @@ export const apiStreamPlayGetRoute = app.get(
         return c.json({ error: "No stream available from selected provider" }, 404);
       }
 
-      const origin = new URL(c.req.url).origin;
-      const streamUrl = `${origin}/api/stream/proxy?url=${encodeURIComponent(
+      const origin = getPublicOrigin(c);
+      const ext = streamSource.container === "hls" ? "master.m3u8" : "video.mp4";
+      const filename = extractFilename(streamSource.url) || ext;
+      const refParam = streamSource.headers?.Referer
+        ? `&ref=${encodeURIComponent(streamSource.headers.Referer)}`
+        : "";
+      const streamUrl = `${origin}/api/stream/proxy/${filename}?url=${encodeURIComponent(
         streamSource.url,
-      )}&ref=${encodeURIComponent(streamSource.headers?.Referer || "")}`;
+      )}${refParam}`;
 
       return c.json({
         streamUrl,
@@ -120,8 +136,14 @@ export const apiStreamPlayGetRoute = app.get(
   },
 );
 
-// GET /api/stream/proxy
 // Proxy video chunks / HLS playlists via server to bypass CORS and anti-hotlinking
-export const apiStreamProxyGetRoute = app.get("/api/stream/proxy", async (c) => {
+// Support GET, HEAD, and OPTIONS across both base and filename paths
+export const apiStreamProxyRoute = app.all("/api/stream/proxy", async (c) => {
   return await handleStreamProxy(c);
 });
+
+export const apiStreamProxyWildcardRoute = app.all("/api/stream/proxy/*", async (c) => {
+  return await handleStreamProxy(c);
+});
+
+export const apiStreamProxyGetRoute = apiStreamProxyRoute;
