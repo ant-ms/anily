@@ -1,36 +1,12 @@
-export type MediaStatus = 'NONE' | 'QUEUED' | 'DOWNLOADING' | 'AVAILABLE';
+export type StreamLanguage = 'sub' | 'dub';
 
-export interface TorrentResult {
-  title: string;
-  link: string;
-  size: number;       // bytes
-  seeders: number;
-  peers: number;
-  source: string;
-  publishDate: string;
-  category: string;
-  infoHash?: string;
-}
-
-export interface TorrentAIResult {
-  index: number;          // -1 = no recommendation
-  confidence: 'high' | 'medium' | 'low';
-  reason: string;
-}
-
-export interface EpisodeTorrentSearch {
-  episode: {
-    id: number;
-    number: number;
-    animeTitle: string;
-    anilistId: number;
-  };
-  results: TorrentResult[];
-  recommendation: TorrentAIResult;
-}
-
-export interface SeasonTorrentSearch {
-  episodes: EpisodeTorrentSearch[];
+export interface AvailableService {
+  providerId: string;
+  providerName: string;
+  serverName: string;
+  serverId: string;
+  language: StreamLanguage;
+  identifier: string;
 }
 
 export type MediaPlayer = 'mpv' | 'iina' | 'vlc' | 'copy';
@@ -44,7 +20,6 @@ export function buildPlayerUrl(mediaUrl: string, player: MediaPlayer): string {
       return `vlc://${mediaUrl}`;
     case 'mpv':
       // mpv doesn't have a standard URL scheme, return the raw URL
-      // User should use mpv <url> in terminal
       return mediaUrl;
     case 'copy':
       return mediaUrl;

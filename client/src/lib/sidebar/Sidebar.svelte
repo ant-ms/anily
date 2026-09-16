@@ -27,13 +27,13 @@
             const tabChanged = !previous || previous[0] !== tab;
             if (tabChanged) {
                 visibleCardData = [];
-                // If switching to a non-anime tab like settings, stats, logs, or missing, clear selected anime
-                if (tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "stats" || tab.id === "missing")) {
+                // If switching to a non-anime tab like settings or logs, clear selected anime
+                if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs")) {
                     selectedAnimeAnilistId.set(undefined);
                 }
             }
 
-            if (tab?.id === "settings" || tab?.id === "logs" || tab?.id === "stats" || tab?.id === "missing") {
+            if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs")) {
                 return;
             }
 

@@ -3,8 +3,6 @@
     import { watch } from "runed";
     import Button from "../../lib/Button.svelte";
     import Skeleton from "../../lib/Skeleton.svelte";
-    import TorrentSelectionModal from "../../lib/TorrentSelectionModal.svelte";
-    import SeasonDownloadModal from "../../lib/SeasonDownloadModal.svelte";
     import {
         apiBaseUrl,
         selectedAnimeAnilistId,
@@ -15,15 +13,13 @@
         getStoredPlayer,
         buildPlayerUrl,
         type MediaPlayer,
+        type AvailableService,
     } from "../../types/Media";
     import PlayIcon from "phosphor-svelte/lib/PlayIcon";
     import CheckIcon from "phosphor-svelte/lib/CheckIcon";
     import EyeIcon from "phosphor-svelte/lib/EyeIcon";
-    import DownloadIcon from "phosphor-svelte/lib/DownloadIcon";
     import ImageIcon from "phosphor-svelte/lib/ImageIcon";
-    import CopySimpleIcon from "phosphor-svelte/lib/CopySimpleIcon";
-    import ArrowSquareOutIcon from "phosphor-svelte/lib/ArrowSquareOutIcon";
-    import TrashIcon from "phosphor-svelte/lib/TrashIcon";
+    import CaretDownIcon from "phosphor-svelte/lib/CaretDownIcon";
 
     let {
         updateSeed,
@@ -40,19 +36,15 @@
     );
     let loading = $state(true);
 
-    // Torrent / media modal state
-    let torrentModalEpisode: EpisodeData | null = $state(null);
-    let seasonModalOpen = $state(false);
     let player: MediaPlayer = $state(getStoredPlayer());
 
-    // Polling interval handle
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
-
-    function hasActiveDownloads(): boolean {
-        return episodes.some(
-            (e) => e.mediaStatus === "QUEUED" || e.mediaStatus === "DOWNLOADING",
-        );
-    }
+    // Streaming & dropdown state
+    let checkingEpisodeId: number | null = $state(null);
+    let resolvingEpisodeId: number | null = $state(null);
+    let dropdownOpenEpisodeId: number | null = $state(null);
+    let servicesCache: Record<number, AvailableService[]> = $state({});
+    let selectedServices: Record<number, AvailableService> = $state({});
+    let statusMessage: { episodeId: number; text: string; isError?: boolean } | null = $state(null);
 
     async function refreshEpisodes() {
         const anilistId = selectedAnimeAnilistId.current;
@@ -65,30 +57,15 @@
         episodes = Array.isArray(data) ? data : [];
     }
 
-    function startPollingIfNeeded() {
-        if (hasActiveDownloads() && !pollInterval) {
-            pollInterval = setInterval(async () => {
-                await refreshEpisodes();
-                if (!hasActiveDownloads()) stopPolling();
-            }, 10_000);
-        }
-    }
-
-    function stopPolling() {
-        if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
-        }
-    }
-
     watch(
         () => [selectedAnimeAnilistId.current, updateSeed],
         () => {
             const anilistId = selectedAnimeAnilistId.current;
             if (anilistId === undefined) return;
 
-            stopPolling();
             loading = true;
+            dropdownOpenEpisodeId = null;
+            statusMessage = null;
 
             const url = new URL(
                 `/api/episodes/${anilistId}`,
@@ -100,7 +77,6 @@
                     if (selectedAnimeAnilistId.current !== anilistId) return;
                     episodes = Array.isArray(data) ? data : [];
                     loading = false;
-                    startPollingIfNeeded();
                 });
         },
     );
@@ -178,161 +154,130 @@
         }
     };
 
-    // ── Torrent / download handlers ────────────────────────────────────────────
+    // ── Streaming & provider resolution ──────────────────────────────────────
 
-    function openTorrentModal(episode: EpisodeData) {
-        torrentModalEpisode = episode;
-    }
-
-    async function handleTorrentConfirm(detail: {
-        episodeId: number;
-        torrentIndex: number;
-        torrent?: any;
-    }) {
-        torrentModalEpisode = null;
-        const url = new URL(
-            `/api/media/download`,
-            apiBaseUrl.current,
-        );
-        try {
-            const res = await fetch(url.toString(), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    episodeId: detail.episodeId,
-                    torrentIndex: detail.torrentIndex,
-                    torrent: detail.torrent,
-                }),
-                credentials: "include",
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        } catch (e) {
-            console.error("Failed to start download", e);
+    async function checkServices(episode: EpisodeData): Promise<AvailableService[]> {
+        if (servicesCache[episode.id]) {
+            return servicesCache[episode.id];
         }
-        await refreshEpisodes();
-        startPollingIfNeeded();
-    }
 
-    function handleTorrentCancel() {
-        torrentModalEpisode = null;
-    }
-
-    async function handleDownloadSeason() {
-        if (!selectedAnimeAnilistId.current) return;
+        checkingEpisodeId = episode.id;
         try {
-            const url = new URL(
-                `/api/media/download-season/${selectedAnimeAnilistId.current}`,
-                apiBaseUrl.current,
-            );
-            const res = await fetch(url.toString(), {
-                method: "POST",
-                credentials: "include",
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        } catch (e) {
-            console.error("Failed to start season background download", e);
-        }
-        await refreshEpisodes();
-        startPollingIfNeeded();
-    }
-
-    // ── Media URL / player helpers ─────────────────────────────────────────────
-
-    async function fetchMediaUrl(episodeId: number): Promise<string | null> {
-        try {
-            const url = new URL(
-                `/api/media/status/${episodeId}`,
-                apiBaseUrl.current,
-            );
+            const url = new URL(`/api/stream/services/${episode.id}`, apiBaseUrl.current);
             const res = await fetch(url.toString(), { credentials: "include" });
-            if (!res.ok) return null;
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return data.mediaUrl ?? null;
-        } catch {
-            return null;
+            const services: AvailableService[] = Array.isArray(data.services) ? data.services : [];
+            servicesCache[episode.id] = services;
+            return services;
+        } catch (err) {
+            console.error("Failed to check streaming services", err);
+            statusMessage = { episodeId: episode.id, text: "Failed to check services", isError: true };
+            return [];
+        } finally {
+            checkingEpisodeId = null;
         }
     }
 
-    const handleCopyUrl = async (episode: EpisodeData) => {
-        const mediaUrl = await fetchMediaUrl(episode.id);
-        if (mediaUrl) {
-            await navigator.clipboard.writeText(mediaUrl);
+    async function handlePlayButtonClick(episode: EpisodeData) {
+        // If the dropdown is already open for this episode, toggle it closed
+        if (dropdownOpenEpisodeId === episode.id) {
+            dropdownOpenEpisodeId = null;
+            return;
         }
-    };
 
-    const handleOpenPlayer = async (episode: EpisodeData) => {
-        const mediaUrl = await fetchMediaUrl(episode.id);
-        if (!mediaUrl) return;
-        const playerUrl = buildPlayerUrl(mediaUrl, player);
-        if (player === "copy" || player === "mpv") {
-            await navigator.clipboard.writeText(playerUrl);
-        } else {
-            window.location.href = playerUrl;
+        // If a service was already picked for this episode, play directly
+        if (selectedServices[episode.id]) {
+            await playService(episode, selectedServices[episode.id]);
+            return;
         }
-    };
 
-    const handleDeleteMedia = async (episode: EpisodeData) => {
+        // Check which services have this episode
+        const services = await checkServices(episode);
+        dropdownOpenEpisodeId = episode.id;
+
+        if (services.length === 0) {
+            statusMessage = {
+                episodeId: episode.id,
+                text: "No streaming services available for this episode",
+                isError: true,
+            };
+        }
+    }
+
+    async function toggleDropdown(episode: EpisodeData, e: MouseEvent) {
+        e.stopPropagation();
+        if (dropdownOpenEpisodeId === episode.id) {
+            dropdownOpenEpisodeId = null;
+            return;
+        }
+
+        await checkServices(episode);
+        dropdownOpenEpisodeId = episode.id;
+    }
+
+    async function playService(episode: EpisodeData, service: AvailableService) {
+        selectedServices[episode.id] = service;
+        dropdownOpenEpisodeId = null;
+        resolvingEpisodeId = episode.id;
+        statusMessage = null;
+
         try {
-            const url = new URL(
-                `/api/media/delete/${episode.id}`,
-                apiBaseUrl.current,
-            );
-            const res = await fetch(url.toString(), {
-                method: "DELETE",
-                credentials: "include",
+            const params = new URLSearchParams({
+                providerId: service.providerId,
+                identifier: service.identifier,
+                language: service.language,
+                server: service.serverId,
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        } catch (e) {
-            console.error("Failed to delete media", e);
-        }
-        await refreshEpisodes();
-    };
+            const url = new URL(`/api/stream/play/${episode.id}?${params.toString()}`, apiBaseUrl.current);
+            const res = await fetch(url.toString(), { credentials: "include" });
 
-    /** Stream: POST /api/media/stream/{id} → get URL → open in player immediately. If AI is unsure, open manual modal */
-    const handleStream = async (episode: EpisodeData) => {
-        try {
-            const url = new URL(
-                `/api/media/stream/${episode.id}`,
-                apiBaseUrl.current,
-            );
-            const res = await fetch(url.toString(), {
-                method: "POST",
-                credentials: "include",
-            });
-
-            if (res.status === 422 || !res.ok) {
-                // If AI is unsure or no confident match found, fallback to manual selection modal
-                openTorrentModal(episode);
-                return;
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
             }
 
             const data = await res.json();
-            const mediaUrl = data.url ?? data.mediaUrl;
-            if (mediaUrl) {
-                const playerUrl = buildPlayerUrl(mediaUrl, player);
-                if (player === "copy" || player === "mpv") {
-                    await navigator.clipboard.writeText(playerUrl);
-                } else {
-                    window.location.href = playerUrl;
-                }
-            }
-        } catch (e) {
-            console.error("Failed to stream episode, opening manual selection", e);
-            openTorrentModal(episode);
-        }
-        await refreshEpisodes();
-        startPollingIfNeeded();
-    };
+            const streamUrl = data.streamUrl;
 
-    function statusDotClass(episode: EpisodeData): string {
-        switch (episode.mediaStatus) {
-            case "QUEUED": return "dot-queued";
-            case "DOWNLOADING": return "dot-downloading";
-            case "AVAILABLE": return "dot-available";
-            default: return "";
+            if (!streamUrl) {
+                throw new Error("No stream URL returned");
+            }
+
+            const playerUrl = buildPlayerUrl(streamUrl, player);
+
+            if (player === "copy" || player === "mpv") {
+                await navigator.clipboard.writeText(playerUrl);
+                statusMessage = {
+                    episodeId: episode.id,
+                    text: player === "mpv" ? "Stream URL copied! Run in mpv" : "Stream URL copied to clipboard!",
+                };
+                setTimeout(() => {
+                    if (statusMessage?.episodeId === episode.id) statusMessage = null;
+                }, 4000);
+            } else {
+                window.location.href = playerUrl;
+            }
+        } catch (err) {
+            console.error("Failed to play service stream", err);
+            statusMessage = {
+                episodeId: episode.id,
+                text: "Failed to load stream from provider",
+                isError: true,
+            };
+        } finally {
+            resolvingEpisodeId = null;
+        }
+    }
+
+    function handleWindowClick(e: MouseEvent) {
+        const target = e.target as HTMLElement;
+        if (!target.closest(".stream-action-group")) {
+            dropdownOpenEpisodeId = null;
         }
     }
 </script>
+
+<svelte:window onclick={handleWindowClick} />
 
 <div class="episodes">
     {#if loading}
@@ -386,65 +331,88 @@
                     <span class="date"
                         >{formatAiringDate(episode.airingAt)}</span
                     >
+                    {#if statusMessage && statusMessage.episodeId === episode.id}
+                        <span class="status-feedback" class:error={statusMessage.isError}>
+                            {statusMessage.text}
+                        </span>
+                    {/if}
                 </div>
                 <div class="actions">
-                    {#if episode.mediaStatus !== "NONE"}
-                        <span class="status-dot {statusDotClass(episode)}" title={episode.mediaStatus}></span>
-                    {/if}
                     <Button
-                        Icon={DownloadIcon}
-                        style="ghost"
-                        disabled={isFuture(episode.airingAt) || episode.mediaStatus === "AVAILABLE" || episode.mediaStatus === "DOWNLOADING" || episode.mediaStatus === "QUEUED"}
-                        onclick={() => openTorrentModal(episode)}
-                    />
-                    <Button
-                        Icon={CopySimpleIcon}
-                        style="ghost"
-                        disabled={episode.mediaStatus !== "AVAILABLE" && episode.mediaStatus !== "QUEUED" && episode.mediaStatus !== "DOWNLOADING"}
-                        onclick={() => handleCopyUrl(episode)}
-                    />
-                    {#if episode.mediaStatus !== "NONE"}
-                        <Button
-                            Icon={TrashIcon}
-                            style="ghost"
-                            onclick={() => handleDeleteMedia(episode)}
-                        />
-                    {/if}
-                    <Button Icon={episode.watched ? CheckIcon : EyeIcon} active={episode.watched} disabled={isFuture(episode.airingAt)} onclick={() => toggleWatch(episode)} />
-                    <Button
-                        Icon={PlayIcon}
+                        Icon={episode.watched ? CheckIcon : EyeIcon}
+                        active={episode.watched}
                         disabled={isFuture(episode.airingAt)}
-                        onclick={() => {
-                            if (episode.mediaStatus === "AVAILABLE") {
-                                return handleOpenPlayer(episode);
-                            } else {
-                                return handleStream(episode);
-                            }
-                        }}
+                        onclick={() => toggleWatch(episode)}
                     />
+
+                    <!-- Stream via service split / dropdown action -->
+                    <div class="stream-action-group">
+                        <div class="stream-btn-wrapper">
+                            <Button
+                                Icon={PlayIcon}
+                                disabled={isFuture(episode.airingAt)}
+                                loading={checkingEpisodeId === episode.id || resolvingEpisodeId === episode.id}
+                                onclick={() => handlePlayButtonClick(episode)}
+                            >
+                                {#if selectedServices[episode.id]}
+                                    <span class="selected-provider-label">
+                                        {selectedServices[episode.id].providerName}
+                                    </span>
+                                {/if}
+                            </Button>
+                            <button
+                                type="button"
+                                class="dropdown-trigger"
+                                disabled={isFuture(episode.airingAt) || checkingEpisodeId === episode.id}
+                                onclick={(e) => toggleDropdown(episode, e)}
+                                title="Select streaming provider"
+                            >
+                                <CaretDownIcon size="0.85rem" />
+                            </button>
+                        </div>
+
+                        {#if dropdownOpenEpisodeId === episode.id}
+                            <div class="services-dropdown" transition:fade={{ duration: 120 }}>
+                                <div class="dropdown-header">
+                                    <span>Stream Provider</span>
+                                </div>
+                                {#if checkingEpisodeId === episode.id}
+                                    <div class="dropdown-loading">
+                                        Checking available services…
+                                    </div>
+                                {:else if (servicesCache[episode.id] || []).length === 0}
+                                    <div class="dropdown-empty">
+                                        No services found for this episode
+                                    </div>
+                                {:else}
+                                    <div class="services-list">
+                                        {#each servicesCache[episode.id] as service}
+                                            {@const isSelected = selectedServices[episode.id]?.providerId === service.providerId && selectedServices[episode.id]?.serverId === service.serverId && selectedServices[episode.id]?.language === service.language}
+                                            <button
+                                                type="button"
+                                                class="service-item"
+                                                class:selected={isSelected}
+                                                onclick={() => playService(episode, service)}
+                                            >
+                                                <div class="service-meta">
+                                                    <span class="provider-name">{service.providerName}</span>
+                                                    <span class="server-name">· {service.serverName}</span>
+                                                </div>
+                                                <span class="lang-tag {service.language}">
+                                                    {service.language.toUpperCase()}
+                                                </span>
+                                            </button>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </div>
+                        {/if}
+                    </div>
                 </div>
             </div>
         {/each}
     {/if}
 </div>
-
-<TorrentSelectionModal
-    show={torrentModalEpisode !== null}
-    episodeId={torrentModalEpisode?.id ?? 0}
-    episodeTitle={torrentModalEpisode
-        ? (() => {
-            const seasonMatch = animeName.match(/(?:Season|S)\s*(\d+)/i) || animeName.match(/(\d+)(?:st|nd|rd|th)\s*Season/i);
-            const seasonNum = seasonMatch ? parseInt(seasonMatch[1], 10) : 1;
-            const sPadded = String(seasonNum).padStart(2, "0");
-            const ePadded = String(torrentModalEpisode.number).padStart(2, "0");
-            const cleanTitle = animeName.replace(/(?:Season|\bS)\s*\d+/gi, "").replace(/\d+(?:st|nd|rd|th)\s*Season/gi, "").trim();
-            const epTitle = torrentModalEpisode.titleEnglish ? ` — ${torrentModalEpisode.titleEnglish}` : "";
-            return `${cleanTitle} S${sPadded}E${ePadded}${epTitle}`;
-        })()
-        : ""}
-    onconfirm={handleTorrentConfirm}
-    oncancel={handleTorrentCancel}
-/>
 
 <style lang="scss">
     .episodes {
@@ -517,7 +485,6 @@
 
             .titles {
                 flex-grow: 1;
-
                 display: flex;
                 flex-direction: column;
                 gap: 0.25rem;
@@ -534,6 +501,16 @@
                     font-size: 13px;
                     color: #999;
                 }
+
+                .status-feedback {
+                    font-size: 12px;
+                    color: #ffd52c;
+                    margin-top: 2px;
+
+                    &.error {
+                        color: #e57373;
+                    }
+                }
             }
 
             .actions {
@@ -544,28 +521,166 @@
         }
     }
 
-    .status-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        flex-shrink: 0;
+    .stream-action-group {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
 
-        &.dot-queued {
-            background: #d4a843;
+        .stream-btn-wrapper {
+            display: flex;
+            align-items: center;
+            background: hsl(20, 17.6%, 8.5%);
+            border: 1px solid hsl(36, 5.7%, 20%);
+            border-radius: 6px;
+            overflow: hidden;
+
+            :global(button.style-normal) {
+                border: none;
+                border-radius: 0;
+                background: transparent;
+            }
+
+            .selected-provider-label {
+                font-size: 12px;
+                color: #ffd52c;
+                margin-left: 2px;
+                max-width: 90px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .dropdown-trigger {
+                background: transparent;
+                border: none;
+                border-left: 1px solid hsl(36, 5.7%, 18%);
+                color: #bbb;
+                padding: 7px 6px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.15s, color 0.15s;
+
+                &:hover:not(:disabled) {
+                    background: hsl(20, 17.6%, 16%);
+                    color: #ffd52c;
+                }
+
+                &:disabled {
+                    opacity: 0.4;
+                    cursor: not-allowed;
+                }
+            }
         }
 
-        &.dot-downloading {
-            background: #4a9fd4;
-            animation: pulse 1.4s ease-in-out infinite;
-        }
+        .services-dropdown {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 6px);
+            z-index: 100;
+            min-width: 210px;
+            background: hsl(20, 17.6%, 11%);
+            border: 1px solid hsl(36, 5.7%, 22%);
+            border-radius: 7px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
 
-        &.dot-available {
-            background: #6fbf6f;
-        }
-    }
+            .dropdown-header {
+                padding: 4px 8px;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #857f78;
+                border-bottom: 1px solid hsl(36, 5.7%, 18%);
+                margin-bottom: 2px;
+            }
 
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
+            .dropdown-loading,
+            .dropdown-empty {
+                padding: 10px 8px;
+                font-size: 12px;
+                color: #999;
+                text-align: center;
+            }
+
+            .dropdown-empty {
+                color: #e57373;
+            }
+
+            .services-list {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                max-height: 200px;
+                overflow-y: auto;
+            }
+
+            .service-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 6px 8px;
+                background: transparent;
+                border: 1px solid transparent;
+                border-radius: 5px;
+                color: #e8e4df;
+                font-size: 13px;
+                cursor: pointer;
+                text-align: left;
+                transition: background 0.15s, border-color 0.15s;
+
+                &:hover {
+                    background: hsl(20, 17.6%, 17%);
+                    border-color: hsl(36, 5.7%, 26%);
+                }
+
+                &.selected {
+                    background: hsl(44, 80%, 15%);
+                    border-color: #ffd52c55;
+                    color: #ffd52c;
+                }
+
+                .service-meta {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    overflow: hidden;
+
+                    .provider-name {
+                        font-weight: 500;
+                    }
+
+                    .server-name {
+                        font-size: 12px;
+                        color: #999;
+                    }
+                }
+
+                .lang-tag {
+                    font-size: 10px;
+                    font-weight: 700;
+                    padding: 2px 5px;
+                    border-radius: 4px;
+                    text-transform: uppercase;
+                    flex-shrink: 0;
+
+                    &.sub {
+                        background: #1b3d54;
+                        color: #79c0ff;
+                    }
+
+                    &.dub {
+                        background: #3e2723;
+                        color: #ffb74d;
+                    }
+                }
+            }
+        }
     }
 </style>
