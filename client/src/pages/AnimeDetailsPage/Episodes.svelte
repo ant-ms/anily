@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { fade } from "svelte/transition";
     import { watch } from "runed";
     import Button from "../../lib/Button.svelte";
@@ -16,10 +17,10 @@
         type AvailableService,
     } from "../../types/Media";
     import PlayIcon from "phosphor-svelte/lib/PlayIcon";
+    import ClipboardIcon from "phosphor-svelte/lib/ClipboardIcon";
     import CheckIcon from "phosphor-svelte/lib/CheckIcon";
     import EyeIcon from "phosphor-svelte/lib/EyeIcon";
     import ImageIcon from "phosphor-svelte/lib/ImageIcon";
-    import CaretDownIcon from "phosphor-svelte/lib/CaretDownIcon";
 
     let {
         updateSeed,
@@ -37,6 +38,18 @@
     let loading = $state(true);
 
     let player: MediaPlayer = $state(getStoredPlayer());
+
+    onMount(() => {
+        const updatePlayer = () => {
+            player = getStoredPlayer();
+        };
+        window.addEventListener("focus", updatePlayer);
+        window.addEventListener("storage", updatePlayer);
+        return () => {
+            window.removeEventListener("focus", updatePlayer);
+            window.removeEventListener("storage", updatePlayer);
+        };
+    });
 
     // Streaming & dropdown state
     let checkingEpisodeId: number | null = $state(null);
@@ -156,6 +169,23 @@
 
     // ── Streaming & provider resolution ──────────────────────────────────────
 
+    function isHdService(service: AvailableService): boolean {
+        return (
+            /\b(hd|1080p|720p)\b/i.test(service.serverName) ||
+            /\b(hd|1080p|720p)\b/i.test(service.providerName)
+        );
+    }
+
+    function sortServicesWithHdFirst(services: AvailableService[]): AvailableService[] {
+        return [...services].sort((a, b) => {
+            const aHd = isHdService(a);
+            const bHd = isHdService(b);
+            if (aHd && !bHd) return -1;
+            if (!aHd && bHd) return 1;
+            return 0;
+        });
+    }
+
     async function checkServices(episode: EpisodeData): Promise<AvailableService[]> {
         if (servicesCache[episode.id]) {
             return servicesCache[episode.id];
@@ -167,7 +197,8 @@
             const res = await fetch(url.toString(), { credentials: "include" });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            const services: AvailableService[] = Array.isArray(data.services) ? data.services : [];
+            const rawServices: AvailableService[] = Array.isArray(data.services) ? data.services : [];
+            const services = sortServicesWithHdFirst(rawServices);
             servicesCache[episode.id] = services;
             return services;
         } catch (err) {
@@ -180,19 +211,12 @@
     }
 
     async function handlePlayButtonClick(episode: EpisodeData) {
-        // If the dropdown is already open for this episode, toggle it closed
+        // Toggle the provider dropdown
         if (dropdownOpenEpisodeId === episode.id) {
             dropdownOpenEpisodeId = null;
             return;
         }
 
-        // If a service was already picked for this episode, play directly
-        if (selectedServices[episode.id]) {
-            await playService(episode, selectedServices[episode.id]);
-            return;
-        }
-
-        // Check which services have this episode
         const services = await checkServices(episode);
         dropdownOpenEpisodeId = episode.id;
 
@@ -203,17 +227,6 @@
                 isError: true,
             };
         }
-    }
-
-    async function toggleDropdown(episode: EpisodeData, e: MouseEvent) {
-        e.stopPropagation();
-        if (dropdownOpenEpisodeId === episode.id) {
-            dropdownOpenEpisodeId = null;
-            return;
-        }
-
-        await checkServices(episode);
-        dropdownOpenEpisodeId = episode.id;
     }
 
     async function playService(episode: EpisodeData, service: AvailableService) {
@@ -345,31 +358,22 @@
                         onclick={() => toggleWatch(episode)}
                     />
 
-                    <!-- Stream via service split / dropdown action -->
+                    <!-- Stream via service dropdown action -->
                     <div class="stream-action-group">
-                        <div class="stream-btn-wrapper">
-                            <Button
-                                Icon={PlayIcon}
-                                disabled={isFuture(episode.airingAt)}
-                                loading={checkingEpisodeId === episode.id || resolvingEpisodeId === episode.id}
-                                onclick={() => handlePlayButtonClick(episode)}
-                            >
-                                {#if selectedServices[episode.id]}
-                                    <span class="selected-provider-label">
-                                        {selectedServices[episode.id].providerName}
-                                    </span>
-                                {/if}
-                            </Button>
-                            <button
-                                type="button"
-                                class="dropdown-trigger"
-                                disabled={isFuture(episode.airingAt) || checkingEpisodeId === episode.id}
-                                onclick={(e) => toggleDropdown(episode, e)}
-                                title="Select streaming provider"
-                            >
-                                <CaretDownIcon size="0.85rem" />
-                            </button>
-                        </div>
+                        <Button
+                            Icon={player === "copy" ? ClipboardIcon : PlayIcon}
+                            active={dropdownOpenEpisodeId === episode.id}
+                            disabled={isFuture(episode.airingAt)}
+                            loading={checkingEpisodeId === episode.id || resolvingEpisodeId === episode.id}
+                            onclick={() => handlePlayButtonClick(episode)}
+                            title={player === "copy" ? "Select streaming provider to copy URL" : "Select streaming provider"}
+                        >
+                            {#if selectedServices[episode.id]}
+                                <span class="selected-provider-label">
+                                    {selectedServices[episode.id].providerName}
+                                </span>
+                            {/if}
+                        </Button>
 
                         {#if dropdownOpenEpisodeId === episode.id}
                             <div class="services-dropdown" transition:fade={{ duration: 120 }}>
@@ -398,9 +402,14 @@
                                                     <span class="provider-name">{service.providerName}</span>
                                                     <span class="server-name">· {service.serverName}</span>
                                                 </div>
-                                                <span class="lang-tag {service.language}">
-                                                    {service.language.toUpperCase()}
-                                                </span>
+                                                <div class="service-tags">
+                                                    {#if isHdService(service)}
+                                                        <span class="hd-tag">HD</span>
+                                                    {/if}
+                                                    <span class="lang-tag {service.language}">
+                                                        {service.language.toUpperCase()}
+                                                    </span>
+                                                </div>
                                             </button>
                                         {/each}
                                     </div>
@@ -562,55 +571,17 @@
         display: inline-flex;
         align-items: center;
 
-        .stream-btn-wrapper {
-            display: flex;
-            align-items: center;
-            background: hsl(20, 17.6%, 8.5%);
-            border: 1px solid hsl(36, 5.7%, 20%);
-            border-radius: 6px;
+        .selected-provider-label {
+            font-size: 12px;
+            color: #ffd52c;
+            margin-left: 2px;
+            max-width: 90px;
             overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
 
-            :global(button.style-normal) {
-                border: none;
-                border-radius: 0;
-                background: transparent;
-            }
-
-            .selected-provider-label {
-                font-size: 12px;
-                color: #ffd52c;
-                margin-left: 2px;
-                max-width: 90px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-
-                @media (max-width: 640px) {
-                    display: none;
-                }
-            }
-
-            .dropdown-trigger {
-                background: transparent;
-                border: none;
-                border-left: 1px solid hsl(36, 5.7%, 18%);
-                color: #bbb;
-                padding: 7px 6px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.15s, color 0.15s;
-
-                &:hover:not(:disabled) {
-                    background: hsl(20, 17.6%, 16%);
-                    color: #ffd52c;
-                }
-
-                &:disabled {
-                    opacity: 0.4;
-                    cursor: not-allowed;
-                }
+            @media (max-width: 640px) {
+                display: none;
             }
         }
 
@@ -700,6 +671,24 @@
                         font-size: 12px;
                         color: #999;
                     }
+                }
+
+                .service-tags {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    flex-shrink: 0;
+                }
+
+                .hd-tag {
+                    font-size: 9px;
+                    font-weight: 700;
+                    padding: 1px 4px;
+                    border-radius: 3px;
+                    background: hsl(44, 80%, 18%);
+                    color: #ffd52c;
+                    border: 1px solid #ffd52c55;
+                    letter-spacing: 0.03em;
                 }
 
                 .lang-tag {

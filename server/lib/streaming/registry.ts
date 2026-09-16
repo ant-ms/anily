@@ -106,6 +106,14 @@ export class ProviderRegistry {
         }
       }),
     );
+    // Prioritize HD servers first, preserving relative provider order
+    results.sort((a, b) => {
+      const aHd = /\b(hd|1080p|720p)\b/i.test(a.serverName) || /\b(hd|1080p|720p)\b/i.test(a.providerName);
+      const bHd = /\b(hd|1080p|720p)\b/i.test(b.serverName) || /\b(hd|1080p|720p)\b/i.test(b.providerName);
+      if (aHd && !bHd) return -1;
+      if (!aHd && bHd) return 1;
+      return 0;
+    });
 
     return results;
   }
