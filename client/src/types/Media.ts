@@ -16,8 +16,13 @@ export function buildPlayerUrl(mediaUrl: string, player: MediaPlayer): string {
   switch (player) {
     case 'iina':
       return `iina://open?url=${encodeURIComponent(mediaUrl)}`;
-    case 'vlc':
-      return `vlc://${mediaUrl}`;
+    case 'vlc': {
+      // VLC's custom URL scheme handler prepends its own protocol (https://).
+      // If mediaUrl has http:// or https://, VLC creates malformed URLs like https://http://...
+      // Stripping the protocol prefix prevents this issue.
+      const strippedUrl = mediaUrl.replace(/^https?:\/\//, '');
+      return `vlc://${strippedUrl}`;
+    }
     case 'mpv':
       // mpv doesn't have a standard URL scheme, return the raw URL
       return mediaUrl;
