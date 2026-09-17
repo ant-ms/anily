@@ -4,6 +4,7 @@ import { getAuth } from "@hono/oidc-auth";
 import packageJson from "../package.json";
 import { logger } from "./logger";
 import { keepAnilistDataUpdated } from "./syncs/keepAnilistDataUpdated";
+import { syncAiringEpisodes } from "./syncs/syncAiringEpisodes";
 import "dotenv/config";
 import { app } from "./app";
 
@@ -75,6 +76,8 @@ serve(
 
     if (process.env.ANILY_DISABLE_SCHEDULES !== "true") {
       setInterval(keepAnilistDataUpdated, 5 * 60 * 1000);
+      // Sync airing anime episodes from TheTVDB and AnimeSchedule every 60 minutes
+      setInterval(syncAiringEpisodes, 60 * 60 * 1000);
     }
   },
 );
