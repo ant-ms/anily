@@ -17,3 +17,32 @@ docker-build:
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" | base64)\"}}}" > /kaniko/.docker/config.json
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+android-build:
+  stage: build
+  image: cimg/android:2026.08-node
+  variables:
+    GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+    GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}-android"
+    paths:
+      - .gradle/
+      - .pnpm-store/
+  before_script:
+    - sudo npm install -g pnpm@10.29.2
+    - pnpm config set store-dir "$CI_PROJECT_DIR/.pnpm-store"
+  script:
+    - cd client
+    - pnpm install --frozen-lockfile
+    - pnpm build
+    - npx cap sync android
+    - cd android
+    - bash ./gradlew assembleDebug
+  artifacts:
+    name: "anily-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - client/android/app/build/outputs/apk/debug/app-debug.apk
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

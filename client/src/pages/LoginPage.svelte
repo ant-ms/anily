@@ -1,10 +1,14 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import Button from "../lib/Button.svelte";
     import TextInput from "../lib/TextInput.svelte";
     import SignInIcon from "phosphor-svelte/lib/SignInIcon";
     import { PersistedState } from "runed";
     import type ProfileData from "../types/ProfileData";
     import { apiBaseUrl } from "../lib/context.svelte";
+    import { Browser } from "@capacitor/browser";
+    import { App } from "@capacitor/app";
+    import { Capacitor, CapacitorCookies } from "@capacitor/core";
 
     let {
         profileData: profileData = $bindable(),
@@ -13,56 +17,165 @@
     } = $props();
 
     const enteredUrl = new PersistedState("backendUrl", "https://");
-    let entedUrlValid: boolean = $derived(URL.canParse(enteredUrl.current));
+    const cleanEnteredUrl: string = $derived(
+        enteredUrl.current ? enteredUrl.current.trim().replace(/\/+$/, "") : ""
+    );
+    let entedUrlValid: boolean = $derived(
+        Boolean(cleanEnteredUrl && URL.canParse(cleanEnteredUrl))
+    );
 
     let enteredUrlReachable: boolean = $state(false);
     $effect(() => {
         enteredUrlReachable = false;
         if (!entedUrlValid) return;
 
-        fetch(`${enteredUrl.current}/info`)
+        const targetUrl = `${cleanEnteredUrl}/info`;
+        fetch(targetUrl)
             .then((response) => {
-                if (response.status != 200) throw new Error();
+                if (response.status != 200) throw new Error(`HTTP ${response.status}`);
                 return response.json();
             })
             .then((content) => {
-                if (content.project != "anily") throw new Error();
+                if (content.project != "anily") throw new Error("Not anily project");
                 enteredUrlReachable = true;
             })
-            .catch(() => {});
+            .catch((err) => {
+                console.error("Reachability check failed:", targetUrl, err);
+            });
     });
 
     let enteredUrlAuthenticated: boolean = $state(false);
-    let needAuthentication: boolean = $state(false);
-    $effect(() => {
+    let needAuthentication: boolean = $derived(
+        enteredUrlReachable && !enteredUrlAuthenticated
+    );
+    let authCheckTrigger = $state(0);
+
+    const checkAuth = () => {
         enteredUrlAuthenticated = false;
         if (!entedUrlValid) return;
 
-        fetch(`${enteredUrl.current}/api/me`, {
+        const targetUrl = `${cleanEnteredUrl}/api/me`;
+        fetch(targetUrl, {
             credentials: "include",
             redirect: "manual",
         })
             .then(async (response) => {
-                if (response.type == "opaqueredirect") {
-                    needAuthentication = true;
+                if (
+                    response.type === "opaqueredirect" ||
+                    response.status === 401 ||
+                    response.status === 302 ||
+                    response.status === 307
+                ) {
+                    enteredUrlAuthenticated = false;
                     return;
                 }
 
-                if (response.status != 200) return;
-
-                enteredUrlAuthenticated = true;
-                const content = await response.json();
-                apiBaseUrl.set(new URL(enteredUrl.current));
-                if (!content.name) {
-                    console.error("no name", content);
+                if (response.status !== 200) {
+                    enteredUrlAuthenticated = false;
+                    return;
                 }
+
+                const contentType = response.headers.get("content-type") || "";
+                if (!contentType.includes("application/json")) {
+                    console.log("Non-JSON response from /api/me (e.g. redirect to login page):", contentType);
+                    enteredUrlAuthenticated = false;
+                    return;
+                }
+
+                let content: any;
+                try {
+                    content = await response.json();
+                } catch {
+                    enteredUrlAuthenticated = false;
+                    return;
+                }
+
+                if (!content || typeof content !== "object") {
+                    enteredUrlAuthenticated = false;
+                    return;
+                }
+
+                const displayName =
+                    content.name ||
+                    content.preferred_username ||
+                    content.email ||
+                    content.sub;
+
+                if (!displayName) {
+                    console.log("No valid user name or claims in /api/me payload:", content);
+                    enteredUrlAuthenticated = false;
+                    return;
+                }
+
+                apiBaseUrl.set(new URL(cleanEnteredUrl));
                 profileData = {
-                    name: content.name?.split(" ")[0],
-                    pictureUrl: content.picture,
+                    name: typeof displayName === "string" ? displayName.split(" ")[0] : "User",
+                    pictureUrl: content.picture || "",
                 };
+                enteredUrlAuthenticated = true;
             })
-            .catch(() => {});
+            .catch((err) => {
+                console.error("Auth check failed:", targetUrl, err);
+                enteredUrlAuthenticated = false;
+            });
+    };
+
+    $effect(() => {
+        // Track dependencies
+        void entedUrlValid;
+        void cleanEnteredUrl;
+        void authCheckTrigger;
+        checkAuth();
     });
+
+    onMount(() => {
+        let handlePromise: Promise<any> | undefined;
+
+        if (Capacitor.isNativePlatform()) {
+            handlePromise = App.addListener("appUrlOpen", async (data) => {
+                console.log("App opened via deep link:", data.url);
+                try {
+                    await Browser.close();
+                } catch {}
+
+                if (data.url && (data.url.startsWith("ms.ant.anily://auth") || data.url.includes("://auth"))) {
+                    try {
+                        const parsed = new URL(data.url);
+                        const session = parsed.searchParams.get("session");
+                        if (session) {
+                            localStorage.setItem("authToken", session);
+                            try {
+                                await CapacitorCookies.setCookie({
+                                    url: cleanEnteredUrl,
+                                    key: "oidc-auth",
+                                    value: session,
+                                });
+                            } catch (e) {
+                                console.warn("Failed setting cookie via CapacitorCookies:", e);
+                            }
+                            authCheckTrigger++;
+                        }
+                    } catch (e) {
+                        console.error("Failed parsing auth deep link URL:", e);
+                    }
+                }
+            });
+        }
+
+        return () => {
+            handlePromise?.then((h) => h.remove());
+        };
+    });
+
+    const handleLogin = async () => {
+        if (Capacitor.isNativePlatform()) {
+            const loginUrl = `${cleanEnteredUrl}/api/login?mobile=1`;
+            await Browser.open({ url: loginUrl });
+        } else {
+            const redirectParam = encodeURIComponent(window.location.origin);
+            window.location.href = `${cleanEnteredUrl}/api/login?redirect=${redirectParam}`;
+        }
+    };
 </script>
 
 <div id="login-page">
@@ -78,9 +191,7 @@
         <Button
             Icon={SignInIcon}
             disabled={!needAuthentication}
-            onclick={() => {
-                window.location.href = `${enteredUrl.current}/api/login`;
-            }}>Login</Button
+            onclick={handleLogin}>Login</Button
         >
     </div>
     <div class="checkbox-list">

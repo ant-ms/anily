@@ -1,6 +1,5 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { getAuth } from "@hono/oidc-auth";
 import packageJson from "../package.json";
 import { logger } from "./logger";
 import { keepAnilistDataUpdated } from "./syncs/keepAnilistDataUpdated";
@@ -65,10 +64,6 @@ app.get("/info", (c) => {
     version: packageJson.version,
   });
 });
-
-// authenticated routes
-app.get("/api/login", (c) => c.redirect("/"));
-app.get("/api/me", async (c) => c.json(await getAuth(c)));
 
 // frontend
 app.use("/*", serveStatic({ root: "./public" }));

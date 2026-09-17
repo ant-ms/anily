@@ -32,6 +32,12 @@
     import ThumbsUpIcon from "phosphor-svelte/lib/ThumbsUpIcon";
     import ThumbsDownIcon from "phosphor-svelte/lib/ThumbsDownIcon";
     import MinusIcon from "phosphor-svelte/lib/MinusIcon";
+    import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
+    import CheckCircleIcon from "phosphor-svelte/lib/CheckCircleIcon";
+    import TrashSimpleIcon from "phosphor-svelte/lib/TrashSimpleIcon";
+    import { AnilyNative, isNative } from "../../lib/native/anilyNative";
+    import { syncQueue } from "../../lib/sync/syncQueue.svelte";
+    import { downloadManager } from "../../lib/download/downloadManager.svelte";
     import type AnimeDetailsData from "../../types/AnimeDetails";
     import type { Rating } from "../../types/AnimeDetails";
 
@@ -83,6 +89,7 @@
         );
         if (selectedAnimeAnilistId.current !== anilistId) return;
         episodes = Array.isArray(data) ? data : [];
+        episodes.forEach((e) => downloadManager.checkEpisode(e.id, e.number));
     }
 
     let currentRating: Rating = $state("NEUTRAL");
@@ -168,6 +175,7 @@
                 .then((data) => {
                     if (selectedAnimeAnilistId.current !== anilistId) return;
                     episodes = Array.isArray(data) ? data : [];
+                    episodes.forEach((e) => downloadManager.checkEpisode(e.id, e.number));
                     loading = false;
                 })
                 .catch((err) => {
@@ -195,27 +203,7 @@
     const toggleWatch = async (episode: EpisodeData) => {
         const newStatus = !episode.watched;
         episode.watched = newStatus;
-
-        try {
-            const url = new URL(
-                `/api/episodes/${episode.id}/watch`,
-                apiBaseUrl.current,
-            );
-            const response = await fetch(url.toString(), {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ watched: newStatus }),
-                credentials: "include",
-            });
-            if (!response.ok) {
-                throw new Error("Failed to update watch status");
-            }
-            sidebarDataRefreshSeed.set((sidebarDataRefreshSeed.current ?? 0) + 1);
-        } catch (error) {
-            console.error(error);
-            episode.watched = !newStatus;
-            snackbar.error("Failed to update episode watch status");
-        }
+        await syncQueue.recordWatchStatus(episode.id, newStatus);
     };
 
     const toggleAllWatch = async () => {
@@ -223,33 +211,11 @@
         if (anilistId === undefined) return;
 
         const newStatus = !allReleasedWatched;
-
-        const previousStatuses = episodes.map((e) => e.watched);
-        episodes.forEach((e) => {
-            if (!isFuture(e.airingAt)) {
-                e.watched = newStatus;
+        for (const episode of episodes) {
+            if (!isFuture(episode.airingAt)) {
+                episode.watched = newStatus;
+                await syncQueue.recordWatchStatus(episode.id, newStatus);
             }
-        });
-
-        try {
-            const url = new URL(
-                `/api/episodes/${anilistId}/watch-all`,
-                apiBaseUrl.current,
-            );
-            const response = await fetch(url.toString(), {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ watched: newStatus }),
-                credentials: "include",
-            });
-            if (!response.ok) {
-                throw new Error("Failed to update all episodes watch status");
-            }
-            sidebarDataRefreshSeed.set((sidebarDataRefreshSeed.current ?? 0) + 1);
-        } catch (error) {
-            console.error(error);
-            episodes.forEach((e, i) => (e.watched = previousStatuses[i]));
-            snackbar.error("Failed to update watch status for all episodes");
         }
     };
 
@@ -282,6 +248,11 @@
     async function handlePlay(episode: EpisodeData) {
         if (dropdownOpenEpisodeId === episode.id) {
             dropdownOpenEpisodeId = null;
+        }
+
+        if (isNative && downloadManager.states[episode.id]?.status === "completed") {
+            await downloadManager.playOffline(episode.id, episode.number);
+            return;
         }
 
         autoPlayingEpisodeId = episode.id;
@@ -349,17 +320,24 @@
                 throw new Error("No stream URL returned");
             }
 
-            const playerUrl = buildPlayerUrl(streamUrl, player);
-
-            if (player === "copy" || player === "mpv") {
-                await navigator.clipboard.writeText(playerUrl);
-                const message =
-                    player === "mpv"
-                        ? "Stream URL copied! Run in mpv"
-                        : "Stream URL copied to clipboard!";
-                snackbar.success(message);
+            if (isNative) {
+                await AnilyNative.openExternalPlayer({
+                    url: streamUrl,
+                    mimeType: data.container === "hls" ? "application/x-mpegURL" : "video/*",
+                });
             } else {
-                window.location.href = playerUrl;
+                const playerUrl = buildPlayerUrl(streamUrl, player);
+
+                if (player === "copy" || player === "mpv") {
+                    await navigator.clipboard.writeText(playerUrl);
+                    const message =
+                        player === "mpv"
+                            ? "Stream URL copied! Run in mpv"
+                            : "Stream URL copied to clipboard!";
+                    snackbar.success(message);
+                } else {
+                    window.location.href = playerUrl;
+                }
             }
         } catch (err) {
             console.error("Failed to play service stream", err);
@@ -482,6 +460,33 @@
                         disabled={isFuture(episode.airingAt)}
                         onclick={() => toggleWatch(episode)}
                     />
+
+                    <!-- Offline Download action -->
+                    {#if !isFuture(episode.airingAt)}
+                        {@const dlState = downloadManager.states[episode.id]}
+                        {#if dlState?.status === "completed"}
+                            <Button
+                                Icon={CheckCircleIcon}
+                                active={true}
+                                title="Downloaded offline. Click to delete"
+                                onclick={() => downloadManager.deleteDownload(episode.id, episode.number)}
+                            />
+                        {:else if dlState?.status === "downloading"}
+                            <Button
+                                disabled={true}
+                                loading={true}
+                                title={`Downloading: ${dlState.progress}%`}
+                            >
+                                <span class="download-progress-text">{dlState.progress}%</span>
+                            </Button>
+                        {:else}
+                            <Button
+                                Icon={DownloadSimpleIcon}
+                                title="Download episode for offline viewing"
+                                onclick={() => downloadManager.startDownload(episode.id, episode.number, animeName, getStoredLanguagePreference())}
+                            />
+                        {/if}
+                    {/if}
 
                     <!-- Stream via service split action -->
                     <div class="stream-action-group">
@@ -857,5 +862,12 @@
                 }
             }
         }
+    }
+
+    .download-progress-text {
+        font-size: 11px;
+        margin-left: 2px;
+        font-weight: 600;
+        color: #ffd52c;
     }
 </style>

@@ -11,10 +11,9 @@
 - [ ] Quick Switch like seach instead of homescreen search
 - [ ] Automatic and manual update triggers for episode releases and anime updates
 - [ ] More robust and integrated job system (with dashboard, cron schedules, etc)
-- [ ] Downloads through transmission (migrate ani-ant, maybe with Anitomy for parsing torrent names)
-- [ ] External clients (settings global and per-device)
+- [x] External clients (settings global and per-device)
 - [ ] Release calendar view (maybe with an explore feature to find new ones)
-- [ ] Frontend mobile support & PWA/Tauri
+- [x] Frontend mobile support & PWA/Tauri
 
 ---
 

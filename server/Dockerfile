@@ -30,6 +30,8 @@ ENV NODE_ENV=production
 
 RUN corepack enable && corepack prepare pnpm@10.29.2 --activate
 
+RUN apk add --no-cache ffmpeg
+
 WORKDIR /app
 
 COPY server/package.json server/pnpm-lock.yaml ./

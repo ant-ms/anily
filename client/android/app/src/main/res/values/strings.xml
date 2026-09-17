@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Anily</string>
+    <string name="title_activity_main">Anily</string>
+    <string name="package_name">ms.ant.anily</string>
+    <string name="custom_url_scheme">ms.ant.anily</string>
+</resources>
