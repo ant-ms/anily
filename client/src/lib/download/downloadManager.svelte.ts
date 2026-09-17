@@ -4,6 +4,7 @@ import { snackbar } from "../snackbar.svelte";
 
 export interface DownloadState {
   episodeId: number;
+  anilistId?: number;
   filename: string;
   downloadId?: string;
   status: "idle" | "downloading" | "completed" | "failed";
@@ -13,9 +14,11 @@ export interface DownloadState {
 }
 
 const ACTIVE_DOWNLOADS_KEY = "anily:active_downloads";
+const DOWNLOADED_ANIME_IDS_KEY = "anily:downloaded_anime_ids";
 
 class DownloadManager {
   public states: Record<number, DownloadState> = $state({});
+  public downloadedAnilistIds: number[] = $state([]);
   private pollInterval: any = null;
 
   constructor() {
@@ -36,6 +39,13 @@ class DownloadManager {
       }
     } catch {}
 
+    try {
+      const rawIds = localStorage.getItem(DOWNLOADED_ANIME_IDS_KEY);
+      if (rawIds) {
+        this.downloadedAnilistIds = JSON.parse(rawIds);
+      }
+    } catch {}
+
     if (isNative) {
       this.checkAllActiveDownloads();
     }
@@ -45,9 +55,31 @@ class DownloadManager {
     try {
       localStorage.setItem(ACTIVE_DOWNLOADS_KEY, JSON.stringify(this.states));
     } catch {}
+    try {
+      localStorage.setItem(
+        DOWNLOADED_ANIME_IDS_KEY,
+        JSON.stringify(this.downloadedAnilistIds),
+      );
+    } catch {}
   }
 
-  public async checkEpisode(episodeId: number, episodeNumber?: number): Promise<boolean> {
+  public addDownloadedAnimeId(anilistId: number) {
+    if (!this.downloadedAnilistIds.includes(anilistId)) {
+      this.downloadedAnilistIds = [...this.downloadedAnilistIds, anilistId];
+      this.persist();
+    }
+  }
+
+  public hasDownloads(allAnilistIds: number[]): boolean {
+    if (!allAnilistIds || allAnilistIds.length === 0) return false;
+    return allAnilistIds.some((id) => this.downloadedAnilistIds.includes(id));
+  }
+
+  public async checkEpisode(
+    episodeId: number,
+    episodeNumber?: number,
+    anilistId?: number,
+  ): Promise<boolean> {
     const filename = this.getFilename(episodeId, episodeNumber);
 
     if (isNative) {
@@ -56,12 +88,16 @@ class DownloadManager {
         if (check.exists) {
           this.states[episodeId] = {
             episodeId,
+            anilistId: anilistId ?? this.states[episodeId]?.anilistId,
             filename,
             status: "completed",
             progress: 100,
             totalBytes: check.size,
             bytesDownloaded: check.size,
           };
+          if (anilistId) {
+            this.addDownloadedAnimeId(anilistId);
+          }
           this.persist();
           return true;
         } else if (this.states[episodeId]?.status === "completed") {
@@ -76,11 +112,102 @@ class DownloadManager {
     return false;
   }
 
+  public async precacheGroupMetadata(anilistId?: number) {
+    if (!anilistId || !apiBaseUrl.current) return;
+
+    const token = localStorage.getItem("authToken");
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    try {
+      const groupUrl = new URL(
+        `/api/grouping?baseAnilistId=${anilistId}`,
+        apiBaseUrl.current,
+      );
+      const groupRes = await fetch(groupUrl.toString(), {
+        headers,
+        credentials: "include",
+      });
+
+      if (groupRes.ok) {
+        const groupData = await groupRes.json();
+        try {
+          localStorage.setItem(
+            `anily:cache:grouping:${anilistId}`,
+            JSON.stringify(groupData),
+          );
+        } catch {}
+
+        const animeIds = new Set<number>([anilistId]);
+        const extractNodeIds = (node: any) => {
+          if (node?.anilistId) animeIds.add(node.anilistId);
+          if (Array.isArray(node?.children)) {
+            node.children.forEach(extractNodeIds);
+          }
+        };
+
+        if (Array.isArray(groupData?.chains)) {
+          groupData.chains.forEach(extractNodeIds);
+        }
+        if (Array.isArray(groupData?.notInChain)) {
+          groupData.notInChain.forEach((item: any) => {
+            if (item?.anilistId) animeIds.add(item.anilistId);
+          });
+        }
+
+        for (const id of animeIds) {
+          try {
+            localStorage.setItem(
+              `anily:cache:grouping:${id}`,
+              JSON.stringify(groupData),
+            );
+          } catch {}
+          this.addDownloadedAnimeId(id);
+
+          try {
+            const dUrl = new URL(`/api/details/${id}`, apiBaseUrl.current);
+            const dRes = await fetch(dUrl.toString(), {
+              headers,
+              credentials: "include",
+            });
+            if (dRes.ok) {
+              const dData = await dRes.json();
+              localStorage.setItem(
+                `anily:cache:details:${id}`,
+                JSON.stringify(dData),
+              );
+            }
+          } catch {}
+
+          try {
+            const eUrl = new URL(`/api/episodes/${id}`, apiBaseUrl.current);
+            const eRes = await fetch(eUrl.toString(), {
+              headers,
+              credentials: "include",
+            });
+            if (eRes.ok) {
+              const eData = await eRes.json();
+              localStorage.setItem(
+                `anily:cache:episodes:${id}`,
+                JSON.stringify(eData),
+              );
+            }
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to pre-cache group metadata:", err);
+    }
+  }
+
   public async startDownload(
     episodeId: number,
     episodeNumber: number,
     animeName: string,
     lang: "sub" | "dub" = "sub",
+    anilistId?: number,
   ) {
     if (!apiBaseUrl.current) {
       snackbar.error("Backend URL not configured");
@@ -88,13 +215,18 @@ class DownloadManager {
     }
 
     const filename = this.getFilename(episodeId, episodeNumber);
-    const downloadUrl = new URL(
+    const downloadUrlObj = new URL(
       `/api/stream/download/${episodeId}?language=${lang}`,
       apiBaseUrl.current,
-    ).toString();
+    );
+
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      downloadUrlObj.searchParams.set("token", token);
+    }
+    const downloadUrl = downloadUrlObj.toString();
 
     if (!isNative) {
-      // Web fallback: trigger browser download
       const a = document.createElement("a");
       a.href = downloadUrl;
       a.download = filename;
@@ -108,6 +240,7 @@ class DownloadManager {
     try {
       this.states[episodeId] = {
         episodeId,
+        anilistId,
         filename,
         status: "downloading",
         progress: 0,
@@ -116,10 +249,10 @@ class DownloadManager {
       };
       this.persist();
 
-      const token = localStorage.getItem("authToken");
       const headers: Record<string, string> = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
+        headers["Cookie"] = `oidc-auth=${token}`;
       }
 
       const result = await AnilyNative.downloadEpisode({
@@ -135,10 +268,16 @@ class DownloadManager {
 
       snackbar.success(`Downloading Episode ${episodeNumber}...`);
       this.startPolling();
+
+      // Pre-cache metadata for the entire anime group
+      if (anilistId) {
+        this.precacheGroupMetadata(anilistId);
+      }
     } catch (err) {
       console.error("Download failed to start:", err);
       this.states[episodeId] = {
         episodeId,
+        anilistId,
         filename,
         status: "failed",
         progress: 0,
@@ -170,7 +309,11 @@ class DownloadManager {
     }
   }
 
-  public async deleteDownload(episodeId: number, episodeNumber?: number) {
+  public async deleteDownload(
+    episodeId: number,
+    episodeNumber?: number,
+    anilistId?: number,
+  ) {
     const filename = this.getFilename(episodeId, episodeNumber);
 
     if (isNative) {
@@ -181,7 +324,20 @@ class DownloadManager {
       }
     }
 
+    const currentAnilistId = anilistId ?? this.states[episodeId]?.anilistId;
     delete this.states[episodeId];
+
+    if (currentAnilistId) {
+      const hasOther = Object.values(this.states).some(
+        (s) => s.status === "completed" && s.anilistId === currentAnilistId,
+      );
+      if (!hasOther) {
+        this.downloadedAnilistIds = this.downloadedAnilistIds.filter(
+          (id) => id !== currentAnilistId,
+        );
+      }
+    }
+
     this.persist();
     snackbar.success("Deleted downloaded episode");
   }
@@ -213,6 +369,7 @@ class DownloadManager {
         try {
           const status = await AnilyNative.getDownloadStatus({
             downloadId: state.downloadId,
+            filename: state.filename,
           });
 
           if (status.status === "SUCCESSFUL") {
@@ -220,10 +377,13 @@ class DownloadManager {
             state.progress = 100;
             state.bytesDownloaded = status.bytesDownloaded;
             state.totalBytes = status.totalBytes;
+            if (state.anilistId) {
+              this.addDownloadedAnimeId(state.anilistId);
+            }
             snackbar.success(`Episode download completed!`);
           } else if (status.status === "FAILED") {
             state.status = "failed";
-            snackbar.error("Episode download failed");
+            snackbar.error(String(status.reason || "Episode download failed"));
           } else if (status.status === "RUNNING" || status.status === "PENDING") {
             state.bytesDownloaded = status.bytesDownloaded;
             state.totalBytes = status.totalBytes;

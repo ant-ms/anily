@@ -59,14 +59,30 @@
                 }
             }
 
+            const cacheKey = `anily:cache:grouping:${selectedAnimeAnilistId.current}`;
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    animeGroupings = parsed;
+                    currentPage = findPageForAnime(parsed, selectedAnimeAnilistId.current) ?? 0;
+                }
+            } catch {}
+
+            if (!apiBaseUrl.current) return;
+
             const url = new URL(
                 `/api/grouping?baseAnilistId=${selectedAnimeAnilistId.current}`,
                 apiBaseUrl.current,
             );
             fetch(url.toString(), { credentials: "include" })
-                .then((results) => results.json())
-                .then((data: AnimeGroupingsData) => {
+                .then((results) => (results.ok ? results.json() : null))
+                .then((data: AnimeGroupingsData | null) => {
+                    if (!data) return;
                     animeGroupings = data;
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify(data));
+                    } catch {}
                     // Open the page containing the anime that's being viewed
                     // instead of resetting back to the first chain.
                     currentPage =
@@ -74,7 +90,8 @@
                             data,
                             selectedAnimeAnilistId.current,
                         ) ?? 0;
-                });
+                })
+                .catch((err) => console.warn("Failed to fetch grouping online:", err));
         },
     );
 
@@ -289,6 +306,7 @@
             gap: 0.5rem;
             align-items: flex-end;
             margin: 0.5rem;
+            padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
 
             .spacer {
                 flex-grow: 1;

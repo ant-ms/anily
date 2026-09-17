@@ -9,6 +9,8 @@
     import { defaultDestinations } from "./destinations";
     import Avatar from "../Avatar.svelte";
     import MenuItem from "../MenuItem.svelte";
+    import CloudSlashIcon from "phosphor-svelte/lib/CloudSlashIcon";
+    import { networkState } from "../network.svelte";
 
     let {
         activeTab = $bindable(),
@@ -59,6 +61,13 @@
 
     <!-- Trailing Section (User Profile & Popup Menu) -->
     <div class="rail-trailing">
+        {#if !networkState.isOnline}
+            <div class="rail-offline-indicator" title="Offline Mode: only downloaded anime are available">
+                <CloudSlashIcon size={18} weight="bold" />
+                <span class="offline-pill-text">Offline</span>
+            </div>
+        {/if}
+
         <!-- Profile Avatar & Popover -->
         <div class="profile-container">
             <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -130,7 +139,10 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 20px 0 16px 0;
+        padding-top: calc(20px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+        padding-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+        padding-right: 0;
+        padding-bottom: 16px;
         box-sizing: border-box;
         user-select: none;
         position: relative;
@@ -153,6 +165,25 @@
             gap: 12px;
             width: 100%;
             padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+
+            .rail-offline-indicator {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2px;
+                padding: 6px 8px;
+                border-radius: 8px;
+                background: rgba(245, 158, 11, 0.15);
+                border: 1px solid rgba(245, 158, 11, 0.35);
+                color: #f59e0b;
+
+                .offline-pill-text {
+                    font-size: 10px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+            }
         }
 
         /* Profile avatar button & popover */

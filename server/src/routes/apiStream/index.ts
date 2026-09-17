@@ -107,6 +107,8 @@ export const apiStreamDownloadGetRoute = app.get(
       identifier: z.string().optional(),
       language: z.enum(["sub", "dub"]).default("sub"),
       server: z.string().optional(),
+      token: z.string().optional(),
+      session: z.string().optional(),
     }),
   ),
   async (c) => {

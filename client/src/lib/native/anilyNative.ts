@@ -17,7 +17,8 @@ export interface AnilyNativePlugin {
   }): Promise<{ downloadId: string; filename: string }>;
 
   getDownloadStatus(options: {
-    downloadId: string;
+    downloadId?: string;
+    filename?: string;
   }): Promise<{
     status:
       | "PENDING"
@@ -29,7 +30,7 @@ export interface AnilyNativePlugin {
       | "NOT_FOUND";
     bytesDownloaded: number;
     totalBytes: number;
-    reason?: number;
+    reason?: string | number;
   }>;
 
   cancelDownload(options: {

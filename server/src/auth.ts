@@ -50,8 +50,9 @@ export const setupAuthHandlers = (app: Hono) => {
   });
   app.use("*", async (c, next) => {
     const authHeader = c.req.header("Authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.substring(7);
+    const queryToken = c.req.query("token") || c.req.query("session");
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : queryToken;
+    if (token) {
       const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
       const existingCookie = c.req.header("cookie");
       const cookieVal = `${cookieName}=${token}`;

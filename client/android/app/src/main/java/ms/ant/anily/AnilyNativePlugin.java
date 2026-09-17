@@ -13,6 +13,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.util.Iterator;
 
 @CapacitorPlugin(name = "AnilyNative")
@@ -68,6 +70,20 @@ public class AnilyNativePlugin extends Plugin {
         }
     }
 
+    private static class DownloadTask {
+        String id;
+        String filename;
+        volatile String status = "PENDING"; // "PENDING", "RUNNING", "SUCCESSFUL", "FAILED"
+        volatile long bytesDownloaded = 0;
+        volatile long totalBytes = 0;
+        volatile String errorMessage = null;
+        java.util.concurrent.Future<?> future;
+        java.net.HttpURLConnection connection;
+    }
+
+    private final java.util.Map<String, DownloadTask> activeDownloads = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ExecutorService downloadExecutor = java.util.concurrent.Executors.newFixedThreadPool(2);
+
     @PluginMethod
     public void downloadEpisode(PluginCall call) {
         String url = call.getString("url");
@@ -83,116 +99,175 @@ public class AnilyNativePlugin extends Plugin {
 
         try {
             Context context = getContext();
-            DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+            String downloadId = java.util.UUID.randomUUID().toString();
+            DownloadTask task = new DownloadTask();
+            task.id = downloadId;
+            task.filename = filename;
+            task.status = "RUNNING";
+            activeDownloads.put(downloadId, task);
 
-            if (downloadManager == null) {
-                call.reject("DownloadManager not available on this device");
-                return;
-            }
+            task.future = downloadExecutor.submit(() -> {
+                File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+                File tmpFile = new File(moviesDir, filename + ".download");
+                File finalFile = new File(moviesDir, filename);
 
-            Uri downloadUri = Uri.parse(url);
-            DownloadManager.Request request = new DownloadManager.Request(downloadUri);
+                java.net.HttpURLConnection conn = null;
+                try {
+                    String currentUrl = url;
+                    int redirects = 0;
+                    while (redirects < 5) {
+                        java.net.URL requestUrl = new java.net.URL(currentUrl);
+                        conn = (java.net.HttpURLConnection) requestUrl.openConnection();
+                        conn.setInstanceFollowRedirects(false);
+                        conn.setConnectTimeout(30000);
+                        conn.setReadTimeout(60000);
+                        conn.setRequestProperty("User-Agent", "Anily-Android/1.0");
 
-            request.setTitle(animeTitle);
-            request.setDescription(title);
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_MOVIES, filename);
+                        if (headers != null) {
+                            Iterator<String> keys = headers.keys();
+                            while (keys.hasNext()) {
+                                String key = keys.next();
+                                String val = headers.getString(key);
+                                if (val != null) {
+                                    conn.setRequestProperty(key, val);
+                                }
+                            }
+                        }
 
-            if (headers != null) {
-                Iterator<String> keys = headers.keys();
-                while (keys.hasNext()) {
-                    String key = keys.next();
-                    String val = headers.getString(key);
-                    if (val != null) {
-                        request.addRequestHeader(key, val);
+                        try {
+                            String webCookies = android.webkit.CookieManager.getInstance().getCookie(currentUrl);
+                            if (webCookies != null && !webCookies.isEmpty()) {
+                                String existingCookie = conn.getRequestProperty("Cookie");
+                                conn.setRequestProperty("Cookie", existingCookie != null ? existingCookie + "; " + webCookies : webCookies);
+                            }
+                        } catch (Exception ignored) {}
+
+                        task.connection = conn;
+                        conn.connect();
+
+                        int code = conn.getResponseCode();
+                        if (code == java.net.HttpURLConnection.HTTP_MOVED_PERM || code == java.net.HttpURLConnection.HTTP_MOVED_TEMP || code == 307 || code == 308) {
+                            String loc = conn.getHeaderField("Location");
+                            if (loc != null) {
+                                currentUrl = new java.net.URL(requestUrl, loc).toString();
+                                conn.disconnect();
+                                redirects++;
+                                continue;
+                            }
+                        }
+                        break;
+                    }
+
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode != java.net.HttpURLConnection.HTTP_OK && responseCode != java.net.HttpURLConnection.HTTP_PARTIAL) {
+                        task.status = "FAILED";
+                        task.errorMessage = "Server returned HTTP " + responseCode;
+                        if (tmpFile.exists()) tmpFile.delete();
+                        return;
+                    }
+
+                    String contentType = conn.getContentType();
+                    if (contentType != null) {
+                        String lowerType = contentType.toLowerCase();
+                        if (lowerType.contains("text/html") || lowerType.contains("application/json")) {
+                            task.status = "FAILED";
+                            task.errorMessage = "Server returned HTML/JSON instead of video. Authentication may be invalid or stream unavailable.";
+                            if (tmpFile.exists()) tmpFile.delete();
+                            return;
+                        }
+                    }
+
+                    long contentLength = conn.getContentLengthLong();
+                    task.totalBytes = contentLength > 0 ? contentLength : 0;
+
+                    try (java.io.InputStream in = conn.getInputStream();
+                         FileOutputStream out = new FileOutputStream(tmpFile)) {
+                        byte[] buffer = new byte[16384];
+                        int bytesRead;
+                        while ((bytesRead = in.read(buffer)) != -1) {
+                            if (Thread.currentThread().isInterrupted()) {
+                                task.status = "FAILED";
+                                task.errorMessage = "Download cancelled";
+                                tmpFile.delete();
+                                return;
+                            }
+                            out.write(buffer, 0, bytesRead);
+                            task.bytesDownloaded += bytesRead;
+                        }
+                        out.flush();
+                    }
+
+                    if (finalFile.exists()) {
+                        finalFile.delete();
+                    }
+                    if (tmpFile.renameTo(finalFile)) {
+                        task.status = "SUCCESSFUL";
+                    } else {
+                        task.status = "FAILED";
+                        task.errorMessage = "Failed to finalize downloaded file";
+                        tmpFile.delete();
+                    }
+                } catch (Exception e) {
+                    task.status = "FAILED";
+                    task.errorMessage = e.getMessage();
+                    if (tmpFile.exists()) tmpFile.delete();
+                } finally {
+                    if (conn != null) {
+                        try { conn.disconnect(); } catch (Exception ignored) {}
                     }
                 }
-            }
-
-            long downloadId = downloadManager.enqueue(request);
+            });
 
             JSObject ret = new JSObject();
-            ret.put("downloadId", String.valueOf(downloadId));
+            ret.put("downloadId", downloadId);
             ret.put("filename", filename);
             call.resolve(ret);
         } catch (Exception e) {
-            call.reject("Failed to enqueue download: " + e.getMessage(), e);
+            call.reject("Failed to start download: " + e.getMessage(), e);
         }
     }
 
     @PluginMethod
     public void getDownloadStatus(PluginCall call) {
         String downloadIdStr = call.getString("downloadId");
-        if (downloadIdStr == null) {
-            call.reject("downloadId is required");
+        String filename = call.getString("filename");
+        if (downloadIdStr == null && filename == null) {
+            call.reject("downloadId or filename is required");
             return;
         }
 
-        try {
-            long downloadId = Long.parseLong(downloadIdStr);
-            Context context = getContext();
-            DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        DownloadTask task = downloadIdStr != null ? activeDownloads.get(downloadIdStr) : null;
+        if (task != null) {
+            JSObject ret = new JSObject();
+            ret.put("status", task.status);
+            ret.put("bytesDownloaded", task.bytesDownloaded);
+            ret.put("totalBytes", task.totalBytes);
+            if (task.errorMessage != null) {
+                ret.put("reason", task.errorMessage);
+            }
+            call.resolve(ret);
+            return;
+        }
 
-            if (downloadManager == null) {
-                call.reject("DownloadManager not available");
+        Context context = getContext();
+        File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+        if (filename != null) {
+            File file = new File(moviesDir, filename);
+            if (file.exists()) {
+                JSObject ret = new JSObject();
+                ret.put("status", "SUCCESSFUL");
+                ret.put("bytesDownloaded", file.length());
+                ret.put("totalBytes", file.length());
+                call.resolve(ret);
                 return;
             }
-
-            DownloadManager.Query query = new DownloadManager.Query();
-            query.setFilterById(downloadId);
-
-            try (Cursor cursor = downloadManager.query(query)) {
-                if (cursor != null && cursor.moveToFirst()) {
-                    int statusIdx = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);
-                    int bytesDownloadedIdx = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
-                    int totalBytesIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
-                    int reasonIdx = cursor.getColumnIndex(DownloadManager.COLUMN_REASON);
-
-                    int status = cursor.getInt(statusIdx);
-                    long bytesDownloaded = cursor.getLong(bytesDownloadedIdx);
-                    long totalBytes = cursor.getLong(totalBytesIdx);
-                    int reason = cursor.getInt(reasonIdx);
-
-                    String statusStr;
-                    switch (status) {
-                        case DownloadManager.STATUS_PENDING:
-                            statusStr = "PENDING";
-                            break;
-                        case DownloadManager.STATUS_RUNNING:
-                            statusStr = "RUNNING";
-                            break;
-                        case DownloadManager.STATUS_PAUSED:
-                            statusStr = "PAUSED";
-                            break;
-                        case DownloadManager.STATUS_SUCCESSFUL:
-                            statusStr = "SUCCESSFUL";
-                            break;
-                        case DownloadManager.STATUS_FAILED:
-                            statusStr = "FAILED";
-                            break;
-                        default:
-                            statusStr = "UNKNOWN";
-                            break;
-                    }
-
-                    JSObject ret = new JSObject();
-                    ret.put("status", statusStr);
-                    ret.put("bytesDownloaded", bytesDownloaded);
-                    ret.put("totalBytes", totalBytes);
-                    ret.put("reason", reason);
-                    call.resolve(ret);
-                    return;
-                }
-            }
-
-            JSObject notFound = new JSObject();
-            notFound.put("status", "NOT_FOUND");
-            notFound.put("bytesDownloaded", 0);
-            notFound.put("totalBytes", 0);
-            call.resolve(notFound);
-        } catch (Exception e) {
-            call.reject("Failed to query download status: " + e.getMessage(), e);
         }
+
+        JSObject notFound = new JSObject();
+        notFound.put("status", "NOT_FOUND");
+        notFound.put("bytesDownloaded", 0);
+        notFound.put("totalBytes", 0);
+        call.resolve(notFound);
     }
 
     @PluginMethod
@@ -203,21 +278,25 @@ public class AnilyNativePlugin extends Plugin {
             return;
         }
 
-        try {
-            long downloadId = Long.parseLong(downloadIdStr);
-            Context context = getContext();
-            DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
-
-            if (downloadManager != null) {
-                downloadManager.remove(downloadId);
+        DownloadTask task = activeDownloads.remove(downloadIdStr);
+        if (task != null) {
+            if (task.future != null) {
+                task.future.cancel(true);
             }
-
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Failed to cancel download: " + e.getMessage(), e);
+            if (task.connection != null) {
+                try { task.connection.disconnect(); } catch (Exception ignored) {}
+            }
+            Context context = getContext();
+            File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+            File tmpFile = new File(moviesDir, task.filename + ".download");
+            if (tmpFile.exists()) {
+                tmpFile.delete();
+            }
         }
+
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
     }
 
     @PluginMethod

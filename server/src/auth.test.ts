@@ -135,4 +135,17 @@ describe("CORS configuration", () => {
     const data = await res.json();
     expect(data.cookie).toContain("oidc-auth=my-jwt-token-xyz");
   });
+
+  it("translates ?token= or ?session= query param to oidc-auth cookie", async () => {
+    const testApp = new Hono();
+    setupAuthHandlers(testApp);
+    testApp.get("/api/test-token-auth", (c) => {
+      return c.json({ cookie: c.req.header("cookie") });
+    });
+
+    const res = await testApp.request("/api/test-token-auth?token=my-query-token-abc");
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.cookie).toContain("oidc-auth=my-query-token-abc");
+  });
 });

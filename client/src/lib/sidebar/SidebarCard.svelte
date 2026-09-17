@@ -2,6 +2,9 @@
     import type SidebarCardData from "../../types/SidebarCardData";
     import { selectedAnimeAnilistId, isMobileNavOpen } from "../context.svelte";
     import ProgressDonut from "./ProgressDonut.svelte";
+    import { downloadManager } from "../download/downloadManager.svelte";
+    import { networkState } from "../network.svelte";
+    import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
 
     let {
         data,
@@ -14,6 +17,14 @@
         ...(data.titleRomanji ? [data.titleRomanji] : []),
         ...(data.titleNative ? [data.titleNative] : []),
     ]);
+
+    let hasOfflineDownloads = $derived(
+        downloadManager.hasDownloads(data.allAnilistIds)
+    );
+
+    let isOfflineDisabled = $derived(
+        !networkState.isOnline && !hasOfflineDownloads
+    );
 </script>
 
 <!-- TODO: Stay highlighted -->
@@ -23,6 +34,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <a
     onclick={() => {
+        if (isOfflineDisabled) return;
         if (data.allAnilistIds.includes(selectedAnimeAnilistId.current ?? 0)) {
             selectedAnimeAnilistId.set(undefined);
         } else {
@@ -36,8 +48,17 @@
     class:active={data.allAnilistIds.includes(
         selectedAnimeAnilistId.current ?? 0,
     )}
+    class:offline-disabled={isOfflineDisabled}
+    aria-disabled={isOfflineDisabled}
 >
-    <img src={data.thumbnailUrl} alt="" />
+    <div class="thumb-container">
+        <img src={data.thumbnailUrl} alt="" />
+        {#if hasOfflineDownloads}
+            <div class="offline-ready-badge" title="Downloaded offline">
+                <DownloadSimpleIcon size={12} weight="bold" />
+            </div>
+        {/if}
+    </div>
     <div class="right">
         <span>{titles[0]}</span>
         <span>{titles[1]}</span>
@@ -118,6 +139,38 @@
         &.active {
             background: #ffd52c14;
             border-left: 3px solid #ffd52c;
+        }
+
+        &.offline-disabled {
+            opacity: 0.28;
+            filter: grayscale(85%);
+            cursor: not-allowed;
+            pointer-events: none;
+
+            &:hover {
+                background: transparent;
+                border-left: 3px solid transparent;
+            }
+        }
+
+        .thumb-container {
+            position: relative;
+            flex-shrink: 0;
+
+            .offline-ready-badge {
+                position: absolute;
+                bottom: 4px;
+                right: 4px;
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: #ffd52c;
+                color: #121316;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+            }
         }
 
         @media (max-width: 1024px) {

@@ -44,8 +44,10 @@
         right: 0;
         width: 100vw;
         height: 80px;
-        height: calc(80px + env(safe-area-inset-bottom, 0px));
-        padding-bottom: env(safe-area-inset-bottom, 0px);
+        height: calc(80px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+        padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+        padding-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+        padding-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
         background: #181512;
         border-top: 1px solid #2e2c29;
         box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.45);

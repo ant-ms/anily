@@ -215,6 +215,9 @@
         height: 100vh;
         height: 100dvh;
         max-height: 100dvh;
+        padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+        padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+        box-sizing: border-box;
 
         @media (max-width: 640px) {
             margin-left: 1rem;

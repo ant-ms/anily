@@ -174,11 +174,14 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-sizing: content-box;
             height: 52px;
-            padding: 0 16px;
+            padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+            padding-left: calc(16px + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+            padding-right: 16px;
+            padding-bottom: 0;
             flex-shrink: 0;
             border-bottom: 1px solid #2e2c29;
-            box-sizing: border-box;
 
             @media (max-width: 768px) {
                 display: none !important;

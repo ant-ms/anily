@@ -38,6 +38,8 @@
     import { AnilyNative, isNative } from "../../lib/native/anilyNative";
     import { syncQueue } from "../../lib/sync/syncQueue.svelte";
     import { downloadManager } from "../../lib/download/downloadManager.svelte";
+    import BottomSheet from "../../lib/BottomSheet.svelte";
+    import { networkState } from "../../lib/network.svelte";
     import type AnimeDetailsData from "../../types/AnimeDetails";
     import type { Rating } from "../../types/AnimeDetails";
 
@@ -80,6 +82,34 @@
     let servicesCache: Record<number, AvailableService[]> = $state({});
     let selectedServices: Record<number, AvailableService> = $state({});
 
+    let isConfirmDeleteOpen = $state(false);
+    let episodeToDelete: EpisodeData | null = $state(null);
+
+    function promptDeleteDownload(episode: EpisodeData) {
+        if (!networkState.isOnline) {
+            episodeToDelete = episode;
+            isConfirmDeleteOpen = true;
+        } else {
+            downloadManager.deleteDownload(
+                episode.id,
+                episode.number,
+                selectedAnimeAnilistId.current,
+            );
+        }
+    }
+
+    function confirmDelete() {
+        if (episodeToDelete) {
+            downloadManager.deleteDownload(
+                episodeToDelete.id,
+                episodeToDelete.number,
+                selectedAnimeAnilistId.current,
+            );
+            episodeToDelete = null;
+        }
+        isConfirmDeleteOpen = false;
+    }
+
     async function refreshEpisodes() {
         const anilistId = selectedAnimeAnilistId.current;
         if (anilistId === undefined) return;
@@ -91,7 +121,10 @@
                 const parsed = JSON.parse(cached);
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     episodes = parsed;
-                    episodes.forEach((e) => downloadManager.checkEpisode(e.id, e.number));
+                    episodes.forEach((e) =>
+                        downloadManager.checkEpisode(e.id, e.number, anilistId),
+                    );
+                    loading = false;
                 }
             }
         } catch {}
@@ -104,59 +137,48 @@
             const data = await res.json();
             if (selectedAnimeAnilistId.current !== anilistId) return;
             episodes = Array.isArray(data) ? data : [];
-            episodes.forEach((e) => downloadManager.checkEpisode(e.id, e.number));
+            episodes.forEach((e) =>
+                downloadManager.checkEpisode(e.id, e.number, anilistId),
+            );
             try {
                 localStorage.setItem(cacheKey, JSON.stringify(episodes));
             } catch {}
         } catch (err) {
             console.warn("Failed to fetch episodes online, using cached episodes if available:", err);
+            if (episodes.length === 0 && networkState.isOnline) {
+                snackbar.error("Failed to load episodes");
+            }
+        } finally {
+            loading = false;
         }
     }
 
     let currentRating: Rating = $state("NEUTRAL");
     let isUpdatingRating = $state(false);
 
-    watch(
-        () => [selectedAnimeAnilistId.current, updateSeed, animeDetails?.rating],
-        () => {
-            const anilistId = selectedAnimeAnilistId.current;
-            if (anilistId === undefined) return;
-            const detailsRating = animeDetails?.rating;
-            if (detailsRating) {
-                currentRating = detailsRating;
-            } else {
-                fetch(new URL(`/api/rate/${anilistId}`, apiBaseUrl.current).toString(), {
-                    credentials: "include",
-                })
-                    .then((res) => (res.ok ? res.json() : null))
-                    .then((data) => {
-                        if (selectedAnimeAnilistId.current === anilistId && data?.rating) {
-                            currentRating = data.rating;
-                        }
-                    })
-                    .catch(() => {});
-            }
-        },
-    );
+    $effect(() => {
+        if (animeDetails?.rating) {
+            currentRating = animeDetails.rating;
+        }
+    });
 
-    const setRating = async (targetRating: Rating) => {
-        const anilistId = selectedAnimeAnilistId.current;
-        if (anilistId === undefined || isUpdatingRating) return;
-
-        const nextRating =
-            currentRating === targetRating && targetRating !== "NEUTRAL"
-                ? "NEUTRAL"
-                : targetRating;
+    const setRating = async (nextRating: Rating) => {
+        if (isUpdatingRating || currentRating === nextRating) return;
 
         const previousRating = currentRating;
         currentRating = nextRating;
         isUpdatingRating = true;
 
         try {
-            const url = new URL(`/api/rate/${anilistId}`, apiBaseUrl.current);
+            const url = new URL(
+                `/api/details/${selectedAnimeAnilistId.current}/rating`,
+                apiBaseUrl.current,
+            );
             const res = await fetch(url.toString(), {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
                 body: JSON.stringify({ rating: nextRating }),
                 credentials: "include",
             });
@@ -181,29 +203,9 @@
             const anilistId = selectedAnimeAnilistId.current;
             if (anilistId === undefined) return;
 
-            loading = true;
             dropdownOpenEpisodeId = null;
-
-            const url = new URL(
-                `/api/episodes/${anilistId}`,
-                apiBaseUrl.current,
-            );
-            fetch(url.toString(), { credentials: "include" })
-                .then((results) => {
-                    if (!results.ok) throw new Error(`HTTP ${results.status}`);
-                    return results.json();
-                })
-                .then((data) => {
-                    if (selectedAnimeAnilistId.current !== anilistId) return;
-                    episodes = Array.isArray(data) ? data : [];
-                    episodes.forEach((e) => downloadManager.checkEpisode(e.id, e.number));
-                    loading = false;
-                })
-                .catch((err) => {
-                    console.error("Failed to load episodes:", err);
-                    snackbar.error("Failed to load episodes");
-                    loading = false;
-                });
+            loading = episodes.length === 0;
+            refreshEpisodes();
         },
     );
 
@@ -490,7 +492,7 @@
                                 Icon={CheckCircleIcon}
                                 active={true}
                                 title="Downloaded offline. Click to delete"
-                                onclick={() => downloadManager.deleteDownload(episode.id, episode.number)}
+                                onclick={() => promptDeleteDownload(episode)}
                             />
                         {:else if dlState?.status === "downloading"}
                             <Button
@@ -504,7 +506,7 @@
                             <Button
                                 Icon={DownloadSimpleIcon}
                                 title="Download episode for offline viewing"
-                                onclick={() => downloadManager.startDownload(episode.id, episode.number, animeName, getStoredLanguagePreference())}
+                                onclick={() => downloadManager.startDownload(episode.id, episode.number, animeName, getStoredLanguagePreference(), selectedAnimeAnilistId.current)}
                             />
                         {/if}
                     {/if}
@@ -592,6 +594,33 @@
         {/each}
     {/if}
 </div>
+
+<BottomSheet bind:isOpen={isConfirmDeleteOpen} ariaLabel="Confirm Delete Download">
+    <div class="confirm-delete-sheet">
+        <h3 class="sheet-title">Delete offline download?</h3>
+        <p class="sheet-desc">
+            You are currently <strong>offline</strong>. If you delete <strong>Episode {episodeToDelete?.number}</strong>, you will not be able to re-download or watch it until you reconnect to the internet.
+        </p>
+        <div class="sheet-actions">
+            <Button
+                style="ghost"
+                onclick={() => {
+                    isConfirmDeleteOpen = false;
+                    episodeToDelete = null;
+                }}
+            >
+                Cancel
+            </Button>
+            <Button
+                class="btn-danger"
+                Icon={TrashSimpleIcon}
+                onclick={confirmDelete}
+            >
+                Delete Episode
+            </Button>
+        </div>
+    </div>
+</BottomSheet>
 
 <style lang="scss">
     .episodes {
@@ -890,5 +919,48 @@
         margin-left: 2px;
         font-weight: 600;
         color: #ffd52c;
+    }
+
+    .confirm-delete-sheet {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 8px 4px;
+
+        .sheet-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .sheet-desc {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #b0aba4;
+
+            strong {
+                color: #ffffff;
+            }
+        }
+
+        .sheet-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 8px;
+
+            :global(button.btn-danger) {
+                background: #dc2626 !important;
+                border-color: #ef4444 !important;
+                color: #ffffff !important;
+
+                &:hover {
+                    background: #b91c1c !important;
+                }
+            }
+        }
     }
 </style>

@@ -26,6 +26,8 @@
     import TreeStructureIcon from "phosphor-svelte/lib/TreeStructureIcon";
     import CaretLeftIcon from "phosphor-svelte/lib/CaretLeftIcon";
     import TelevisionIcon from "phosphor-svelte/lib/TelevisionIcon";
+    import CloudSlashIcon from "phosphor-svelte/lib/CloudSlashIcon";
+    import { networkState } from "./lib/network.svelte";
 
     const loadCachedProfile = (): ProfileData | undefined => {
         try {
@@ -168,6 +170,12 @@
             </div>
 
             <div class="topbar-actions">
+                {#if !networkState.isOnline}
+                    <div class="mobile-offline-badge" title="Offline Mode: only downloaded anime are available">
+                        <CloudSlashIcon size={14} weight="bold" />
+                        <span>Offline</span>
+                    </div>
+                {/if}
                 {#if selectedAnimeAnilistId.current !== undefined}
                     <IconButton
                         Icon={TreeStructureIcon}
@@ -223,6 +231,12 @@
                         <h2 class="topbar-title">Anime Details</h2>
                     </div>
                     <div class="topbar-actions">
+                        {#if !networkState.isOnline}
+                            <div class="mobile-offline-badge" title="Offline Mode: only downloaded anime are available">
+                                <CloudSlashIcon size={14} weight="bold" />
+                                <span>Offline</span>
+                            </div>
+                        {/if}
                         <IconButton
                             Icon={TreeStructureIcon}
                             active={isSeasonsSidebarOpen.current}
@@ -343,11 +357,14 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-sizing: content-box;
             height: 52px;
-            padding: 0 16px;
+            padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+            padding-left: calc(16px + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+            padding-right: calc(16px + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+            padding-bottom: 0;
             background: #1d1a17;
             border-bottom: 1px solid #2e2c29;
-            box-sizing: border-box;
             flex-shrink: 0;
             z-index: 20;
 
@@ -374,6 +391,21 @@
                 align-items: center;
                 gap: 8px;
                 margin-left: auto;
+
+                .mobile-offline-badge {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    background: rgba(245, 158, 11, 0.15);
+                    border: 1px solid rgba(245, 158, 11, 0.35);
+                    color: #f59e0b;
+                    font-size: 11px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
             }
         }
     }
@@ -414,11 +446,14 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-sizing: content-box;
             height: 52px;
-            padding: 0 16px;
+            padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+            padding-left: calc(16px + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+            padding-right: calc(16px + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+            padding-bottom: 0;
             background: #1d1a17;
             border-bottom: 1px solid #2e2c29;
-            box-sizing: border-box;
             flex-shrink: 0;
             z-index: 20;
 
@@ -454,6 +489,21 @@
                 gap: 8px;
                 margin-left: auto;
                 flex-shrink: 0;
+
+                .mobile-offline-badge {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    background: rgba(245, 158, 11, 0.15);
+                    border: 1px solid rgba(245, 158, 11, 0.35);
+                    color: #f59e0b;
+                    font-size: 11px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
             }
         }
 
@@ -461,7 +511,7 @@
             flex: 1 1 0;
             min-height: 0;
             width: 100vw;
-            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: calc(80px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
             box-sizing: border-box;
             overflow-y: auto;
 
@@ -474,7 +524,7 @@
             flex: 1 1 0;
             min-height: 0;
             width: 100vw;
-            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: calc(80px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
             box-sizing: border-box;
 
             &.mobile-hidden {
