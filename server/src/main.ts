@@ -33,6 +33,14 @@ const ensureSchema = async () => {
       END $$;
       ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaStatus" "MediaStatus" NOT NULL DEFAULT 'NONE';
       CREATE INDEX IF NOT EXISTS "Episode_mediaTorrentHash_idx" ON "Episode"("mediaTorrentHash");
+
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SyncJobType') THEN
+          CREATE TYPE "SyncJobType" AS ENUM ('ANILIST_SYNC', 'EPISODE_METADATA');
+        END IF;
+      END $$;
+      ALTER TABLE "SyncJob" ADD COLUMN IF NOT EXISTS "type" "SyncJobType" NOT NULL DEFAULT 'ANILIST_SYNC';
+      ALTER TABLE "SyncJob" ADD COLUMN IF NOT EXISTS "details" JSONB;
     `);
     logger.info("Database schema verified");
   } catch (err) {

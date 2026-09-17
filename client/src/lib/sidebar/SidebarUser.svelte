@@ -32,7 +32,7 @@
         onclick={() => {
             selectTab({
                 id: "logs",
-                name: "Import Jobs",
+                name: "System Jobs",
             });
         }}
     />

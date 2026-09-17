@@ -1,0 +1,6 @@
+-- CreateEnum
+CREATE TYPE "SyncJobType" AS ENUM ('ANILIST_SYNC', 'EPISODE_METADATA');
+
+-- AlterTable
+ALTER TABLE "SyncJob" ADD COLUMN "type" "SyncJobType" NOT NULL DEFAULT 'ANILIST_SYNC',
+ADD COLUMN "details" JSONB;

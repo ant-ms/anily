@@ -1,11 +1,12 @@
 import { app } from "$src/app";
 import { prisma } from "$src/prisma";
-import { keepAnilistDataUpdated } from "$src/syncs/keepAnilistDataUpdated";
-import { SyncJobTrigger } from "../../../generated/prisma/enums";
+import { SyncJobType } from "../../../generated/prisma/enums";
 
 export const apiSyncJobsGetRoute = app.get("/api/sync-jobs", async (c) => {
   try {
+    const type = c.req.query("type");
     const jobs = await prisma.syncJob.findMany({
+      where: type ? { type: type as SyncJobType } : undefined,
       orderBy: { startedAt: "desc" },
       take: 100,
     });
@@ -20,14 +21,3 @@ export const apiSyncJobsGetRoute = app.get("/api/sync-jobs", async (c) => {
     );
   }
 });
-
-export const apiSyncJobsTriggerPostRoute = app.post(
-  "/api/sync-jobs/trigger",
-  async (c) => {
-    // Fire and forget — run in background
-    keepAnilistDataUpdated(SyncJobTrigger.MANUAL).catch(() => {
-      // errors are already recorded to the DB inside keepAnilistDataUpdated
-    });
-    return c.json({ ok: true });
-  },
-);

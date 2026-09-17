@@ -112,6 +112,11 @@ model AnimeGrouping {
   displayAnimeId Int
 }
 
+enum SyncJobType {
+  ANILIST_SYNC
+  EPISODE_METADATA
+}
+
 enum SyncJobTrigger {
   SCHEDULED
   MANUAL
@@ -131,13 +136,15 @@ enum MediaStatus {
 }
 
 model SyncJob {
-  id          Int            @id @default(autoincrement())
-  trigger     SyncJobTrigger
-  status      SyncJobStatus
-  startedAt   DateTime       @default(now())
-  completedAt DateTime?
+  id           Int            @id @default(autoincrement())
+  type         SyncJobType    @default(ANILIST_SYNC)
+  trigger      SyncJobTrigger
+  status       SyncJobStatus
+  startedAt    DateTime       @default(now())
+  completedAt  DateTime?
   updatesCount Int?
-  error       String?
+  details      Json?
+  error        String?
 }
 
 model Episode {

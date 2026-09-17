@@ -50,18 +50,7 @@
         },
     ];
 
-    const trailingDestinations: Tab[] = [
-        {
-            id: "logs",
-            name: "Logs",
-            Icon: LogIcon,
-        },
-        {
-            id: "settings",
-            name: "Settings",
-            Icon: GearIcon,
-        },
-    ];
+    const isProfileTabActive = $derived(activeTab?.id === "logs" || activeTab?.id === "settings");
 
     function isTabActive(tab: Tab): boolean {
         if (!activeTab) {
@@ -113,32 +102,8 @@
         {/each}
     </div>
 
-    <!-- Trailing Section (Secondary Actions & User Profile) -->
+    <!-- Trailing Section (User Profile & Popup Menu) -->
     <div class="rail-trailing">
-        {#each trailingDestinations as dest}
-            {@const active = isTabActive(dest)}
-            <button
-                type="button"
-                role="tab"
-                class="rail-destination"
-                class:active
-                aria-selected={active}
-                aria-label={dest.name}
-                title={dest.name}
-                onclick={() => handleTabClick(dest)}
-            >
-                <div class="indicator-container">
-                    <div class="active-indicator"></div>
-                    <div class="icon-wrapper">
-                        {#if dest.Icon}
-                            <dest.Icon size="1.5rem" />
-                        {/if}
-                    </div>
-                </div>
-                <span class="destination-label">{dest.name}</span>
-            </button>
-        {/each}
-
         <!-- Profile Avatar & Popover -->
         <div class="profile-container">
             <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -150,7 +115,7 @@
                 <button
                     type="button"
                     class="avatar-btn"
-                    class:active={isProfileMenuOpen}
+                    class:active={isProfileMenuOpen || isProfileTabActive}
                     onclick={() => (isProfileMenuOpen = !isProfileMenuOpen)}
                     aria-label={`User profile for ${profileData.name}`}
                     title={profileData.name}
@@ -170,9 +135,34 @@
                             <span class="popover-name" title={profileData.name}>
                                 {profileData.name}
                             </span>
-                            <span class="popover-sub">Logged in</span>
+                            <span class="popover-sub">Signed in</span>
                         </div>
                         <div class="popover-divider"></div>
+
+                        <button
+                            type="button"
+                            class="popover-btn"
+                            class:active={activeTab?.id === "settings"}
+                            onclick={() => handleTabClick({ id: "settings", name: "Settings" })}
+                            role="menuitem"
+                        >
+                            <GearIcon size="1.2rem" />
+                            <span>Settings</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            class="popover-btn"
+                            class:active={activeTab?.id === "logs"}
+                            onclick={() => handleTabClick({ id: "logs", name: "System Jobs" })}
+                            role="menuitem"
+                        >
+                            <LogIcon size="1.2rem" />
+                            <span>System Jobs</span>
+                        </button>
+
+                        <div class="popover-divider"></div>
+
                         <button
                             type="button"
                             class="popover-btn sign-out"
@@ -387,7 +377,7 @@
                 position: absolute;
                 bottom: 0;
                 left: 54px;
-                width: 200px;
+                width: 210px;
                 background: #231f1c;
                 border: 1px solid #3a3733;
                 border-radius: 12px;
@@ -396,7 +386,7 @@
                 z-index: 50;
                 display: flex;
                 flex-direction: column;
-                gap: 8px;
+                gap: 6px;
                 animation: popover-fade 0.15s cubic-bezier(0.2, 0, 0, 1);
 
                 .popover-user-info {
@@ -421,22 +411,31 @@
                 .popover-divider {
                     height: 1px;
                     background: #33302c;
+                    margin: 2px 0;
                 }
 
                 .popover-btn {
                     display: flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 10px;
                     padding: 8px 10px;
                     border-radius: 8px;
                     font-size: 13px;
                     cursor: pointer;
+                    background: transparent;
+                    border: none;
                     color: #d0c8c0;
                     transition: background 0.15s, color 0.15s;
 
                     &:hover {
                         background: rgba(255, 255, 255, 0.08);
                         color: #ffffff;
+                    }
+
+                    &.active {
+                        background: rgba(255, 213, 44, 0.14);
+                        color: #ffd52c;
+                        font-weight: 500;
                     }
 
                     &.sign-out {

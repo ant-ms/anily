@@ -84,12 +84,12 @@
                     type="button"
                     class="menu-item"
                     class:active={activeTab?.id === "logs"}
-                    onclick={() => navigateTo({ id: "logs", name: "Import Logs" })}
+                    onclick={() => navigateTo({ id: "logs", name: "System Jobs" })}
                 >
                     <div class="item-icon-pill">
                         <LogIcon size="1.35rem" />
                     </div>
-                    <span class="item-label">Import Logs</span>
+                    <span class="item-label">System Jobs</span>
                 </button>
 
                 <button
