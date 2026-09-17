@@ -13,6 +13,7 @@
         sidebarDataRefreshSeed,
         isSeasonsSidebarOpen,
     } from "../../lib/context.svelte";
+    import { snackbar } from "../../lib/snackbar.svelte";
     import type AnimeDetailsData from "../../types/AnimeDetails";
     import Button from "../../lib/Button.svelte";
     import IconButton from "../../lib/IconButton.svelte";
@@ -124,9 +125,15 @@
             fetch(url.toString(), {
                 method: "DELETE",
                 credentials: "include",
-            }).then((_) => {
-                updateSeed = Math.random();
-            });
+            })
+                .then((res) => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    updateSeed = Math.random();
+                })
+                .catch((err) => {
+                    console.error("Failed to remove anime from chain:", err);
+                    snackbar.error("Failed to remove anime from chain");
+                });
         }
 
         // or add it if it doesn't
@@ -134,10 +141,16 @@
             fetch(url.toString(), {
                 method: "POST",
                 credentials: "include",
-            }).then((_) => {
-                updateSeed = Math.random();
-                sidebarDataRefreshSeed.set(Math.random());
-            });
+            })
+                .then((res) => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    updateSeed = Math.random();
+                    sidebarDataRefreshSeed.set(Math.random());
+                })
+                .catch((err) => {
+                    console.error("Failed to add anime to chain:", err);
+                    snackbar.error("Failed to add anime to chain");
+                });
         }
     };
 
@@ -152,10 +165,16 @@
         fetch(url.toString(), {
             method: "POST",
             credentials: "include",
-        }).then((_) => {
-            updateSeed = Math.random();
-            sidebarDataRefreshSeed.set(Math.random());
-        });
+        })
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                updateSeed = Math.random();
+                sidebarDataRefreshSeed.set(Math.random());
+            })
+            .catch((err) => {
+                console.error("Failed to pin display anime:", err);
+                snackbar.error("Failed to pin display anime");
+            });
     };
 
     let refreshing = $state(false);
@@ -183,9 +202,17 @@
                 credentials: "include",
             }),
         ])
-            .then(() => {
+            .then(([res1, res2]) => {
+                if (!res1.ok || !res2.ok) {
+                    throw new Error("Failed to refresh details from AniList");
+                }
                 updateSeed = Math.random();
                 sidebarDataRefreshSeed.set(Math.random());
+                snackbar.success("Refreshed anime details");
+            })
+            .catch((err) => {
+                console.error("Failed to refresh details:", err);
+                snackbar.error("Failed to refresh anime details");
             })
             .finally(() => {
                 refreshing = false;

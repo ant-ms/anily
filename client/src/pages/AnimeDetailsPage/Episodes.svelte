@@ -11,14 +11,20 @@
         selectedAnimeAnilistId,
         sidebarDataRefreshSeed,
     } from "../../lib/context.svelte";
+    import { snackbar } from "../../lib/snackbar.svelte";
     import type EpisodeData from "../../types/Episode";
     import {
         getStoredPlayer,
+        getStoredLanguagePreference,
         buildPlayerUrl,
+        isHdService,
+        sortServicesWithHdFirst,
+        pickBestService,
         type MediaPlayer,
         type AvailableService,
     } from "../../types/Media";
     import PlayIcon from "phosphor-svelte/lib/PlayIcon";
+    import CaretDownIcon from "phosphor-svelte/lib/CaretDownIcon";
     import ClipboardIcon from "phosphor-svelte/lib/ClipboardIcon";
     import CheckIcon from "phosphor-svelte/lib/CheckIcon";
     import EyeIcon from "phosphor-svelte/lib/EyeIcon";
@@ -63,10 +69,10 @@
     // Streaming & dropdown state
     let checkingEpisodeId: number | null = $state(null);
     let resolvingEpisodeId: number | null = $state(null);
+    let autoPlayingEpisodeId: number | null = $state(null);
     let dropdownOpenEpisodeId: number | null = $state(null);
     let servicesCache: Record<number, AvailableService[]> = $state({});
     let selectedServices: Record<number, AvailableService> = $state({});
-    let statusMessage: { episodeId: number; text: string; isError?: boolean } | null = $state(null);
 
     async function refreshEpisodes() {
         const anilistId = selectedAnimeAnilistId.current;
@@ -135,6 +141,7 @@
         } catch (err) {
             console.error("Failed to update rating:", err);
             currentRating = previousRating;
+            snackbar.error("Failed to update rating");
         } finally {
             isUpdatingRating = false;
         }
@@ -148,17 +155,24 @@
 
             loading = true;
             dropdownOpenEpisodeId = null;
-            statusMessage = null;
 
             const url = new URL(
                 `/api/episodes/${anilistId}`,
                 apiBaseUrl.current,
             );
             fetch(url.toString(), { credentials: "include" })
-                .then((results) => results.json())
+                .then((results) => {
+                    if (!results.ok) throw new Error(`HTTP ${results.status}`);
+                    return results.json();
+                })
                 .then((data) => {
                     if (selectedAnimeAnilistId.current !== anilistId) return;
                     episodes = Array.isArray(data) ? data : [];
+                    loading = false;
+                })
+                .catch((err) => {
+                    console.error("Failed to load episodes:", err);
+                    snackbar.error("Failed to load episodes");
                     loading = false;
                 });
         },
@@ -200,6 +214,7 @@
         } catch (error) {
             console.error(error);
             episode.watched = !newStatus;
+            snackbar.error("Failed to update episode watch status");
         }
     };
 
@@ -234,27 +249,11 @@
         } catch (error) {
             console.error(error);
             episodes.forEach((e, i) => (e.watched = previousStatuses[i]));
+            snackbar.error("Failed to update watch status for all episodes");
         }
     };
 
     // ── Streaming & provider resolution ──────────────────────────────────────
-
-    function isHdService(service: AvailableService): boolean {
-        return (
-            /\b(hd|1080p|720p)\b/i.test(service.serverName) ||
-            /\b(hd|1080p|720p)\b/i.test(service.providerName)
-        );
-    }
-
-    function sortServicesWithHdFirst(services: AvailableService[]): AvailableService[] {
-        return [...services].sort((a, b) => {
-            const aHd = isHdService(a);
-            const bHd = isHdService(b);
-            if (aHd && !bHd) return -1;
-            if (!aHd && bHd) return 1;
-            return 0;
-        });
-    }
 
     async function checkServices(episode: EpisodeData): Promise<AvailableService[]> {
         if (servicesCache[episode.id]) {
@@ -273,29 +272,54 @@
             return services;
         } catch (err) {
             console.error("Failed to check streaming services", err);
-            statusMessage = { episodeId: episode.id, text: "Failed to check services", isError: true };
+            snackbar.error("Failed to check streaming services");
             return [];
         } finally {
             checkingEpisodeId = null;
         }
     }
 
-    async function handlePlayButtonClick(episode: EpisodeData) {
+    async function handlePlay(episode: EpisodeData) {
+        if (dropdownOpenEpisodeId === episode.id) {
+            dropdownOpenEpisodeId = null;
+        }
+
+        autoPlayingEpisodeId = episode.id;
+
+        try {
+            const services = await checkServices(episode);
+            if (services.length === 0) {
+                snackbar.error("No streaming services available for this episode");
+                return;
+            }
+
+            const preferredLang = getStoredLanguagePreference();
+            const bestService = pickBestService(services, preferredLang);
+            if (!bestService) {
+                snackbar.error("No suitable stream found for this episode");
+                return;
+            }
+
+            await playService(episode, bestService);
+        } finally {
+            autoPlayingEpisodeId = null;
+        }
+    }
+
+    async function handleToggleDropdown(episode: EpisodeData) {
         // Toggle the provider dropdown
         if (dropdownOpenEpisodeId === episode.id) {
             dropdownOpenEpisodeId = null;
             return;
         }
 
-        const services = await checkServices(episode);
         dropdownOpenEpisodeId = episode.id;
 
-        if (services.length === 0) {
-            statusMessage = {
-                episodeId: episode.id,
-                text: "No streaming services available for this episode",
-                isError: true,
-            };
+        if (!servicesCache[episode.id]) {
+            const services = await checkServices(episode);
+            if (services.length === 0) {
+                snackbar.error("No streaming services available for this episode");
+            }
         }
     }
 
@@ -303,7 +327,6 @@
         selectedServices[episode.id] = service;
         dropdownOpenEpisodeId = null;
         resolvingEpisodeId = episode.id;
-        statusMessage = null;
 
         try {
             const params = new URLSearchParams({
@@ -330,31 +353,30 @@
 
             if (player === "copy" || player === "mpv") {
                 await navigator.clipboard.writeText(playerUrl);
-                statusMessage = {
-                    episodeId: episode.id,
-                    text: player === "mpv" ? "Stream URL copied! Run in mpv" : "Stream URL copied to clipboard!",
-                };
-                setTimeout(() => {
-                    if (statusMessage?.episodeId === episode.id) statusMessage = null;
-                }, 4000);
+                const message =
+                    player === "mpv"
+                        ? "Stream URL copied! Run in mpv"
+                        : "Stream URL copied to clipboard!";
+                snackbar.success(message);
             } else {
                 window.location.href = playerUrl;
             }
         } catch (err) {
             console.error("Failed to play service stream", err);
-            statusMessage = {
-                episodeId: episode.id,
-                text: "Failed to load stream from provider",
-                isError: true,
-            };
+            snackbar.error("Failed to load stream from provider");
         } finally {
             resolvingEpisodeId = null;
         }
     }
 
     function handleWindowClick(e: MouseEvent) {
-        const target = e.target as HTMLElement;
-        if (!target.closest(".stream-action-group")) {
+        const path = e.composedPath();
+        const isInside = path.some(
+            (node) =>
+                node instanceof HTMLElement &&
+                node.closest?.(".stream-action-group"),
+        );
+        if (!isInside) {
             dropdownOpenEpisodeId = null;
         }
     }
@@ -452,11 +474,6 @@
                     <span class="date"
                         >{formatAiringDate(episode.airingAt)}</span
                     >
-                    {#if statusMessage && statusMessage.episodeId === episode.id}
-                        <span class="status-feedback" class:error={statusMessage.isError}>
-                            {statusMessage.text}
-                        </span>
-                    {/if}
                 </div>
                 <div class="actions">
                     <Button
@@ -466,15 +483,14 @@
                         onclick={() => toggleWatch(episode)}
                     />
 
-                    <!-- Stream via service dropdown action -->
+                    <!-- Stream via service split action -->
                     <div class="stream-action-group">
                         <Button
                             Icon={player === "copy" ? ClipboardIcon : PlayIcon}
-                            active={dropdownOpenEpisodeId === episode.id}
                             disabled={isFuture(episode.airingAt)}
-                            loading={checkingEpisodeId === episode.id || resolvingEpisodeId === episode.id}
-                            onclick={() => handlePlayButtonClick(episode)}
-                            title={player === "copy" ? "Select streaming provider to copy URL" : "Select streaming provider"}
+                            loading={autoPlayingEpisodeId === episode.id || (resolvingEpisodeId === episode.id && dropdownOpenEpisodeId === null)}
+                            onclick={() => handlePlay(episode)}
+                            title={player === "copy" ? "Copy stream URL" : "Play episode"}
                         >
                             {#if selectedServices[episode.id]}
                                 <span class="selected-provider-label">
@@ -483,12 +499,32 @@
                             {/if}
                         </Button>
 
+                        <Button
+                            Icon={CaretDownIcon}
+                            iconSize="0.85rem"
+                            class="dropdown-chevron-btn"
+                            active={dropdownOpenEpisodeId === episode.id}
+                            disabled={isFuture(episode.airingAt)}
+                            loading={checkingEpisodeId === episode.id && autoPlayingEpisodeId !== episode.id}
+                            onclick={(e: MouseEvent) => {
+                                e.stopPropagation();
+                                handleToggleDropdown(episode);
+                            }}
+                            title="Select streaming provider"
+                        />
+
                         {#if dropdownOpenEpisodeId === episode.id}
-                            <div class="services-dropdown" transition:fade={{ duration: 120 }}>
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div
+                                class="services-dropdown"
+                                transition:fade={{ duration: 120 }}
+                                onclick={(e) => e.stopPropagation()}
+                            >
                                 <div class="dropdown-header">
                                     <span>Stream Provider</span>
                                 </div>
-                                {#if checkingEpisodeId === episode.id}
+                                {#if checkingEpisodeId === episode.id && autoPlayingEpisodeId !== episode.id}
                                     <div class="dropdown-loading">
                                         Checking available services…
                                     </div>
@@ -662,16 +698,6 @@
                     font-size: 12px;
                     color: #999;
                 }
-
-                .status-feedback {
-                    font-size: 12px;
-                    color: #ffd52c;
-                    margin-top: 2px;
-
-                    &.error {
-                        color: #e57373;
-                    }
-                }
             }
 
             .actions {
@@ -690,7 +716,36 @@
     .stream-action-group {
         position: relative;
         display: inline-flex;
-        align-items: center;
+        align-items: stretch;
+
+        :global(button.style-normal:first-child) {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+            border-right: none;
+        }
+
+        :global(button.dropdown-chevron-btn) {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            padding-left: 4px;
+            padding-right: 4px;
+            min-width: 22px;
+            border-left: 1px solid hsl(36, 5.7%, 18%);
+
+            &:hover:not(:disabled) {
+                border-left-color: hsl(36, 5.7%, 26%);
+            }
+
+            &.active {
+                border-left-color: #ffd52c;
+            }
+
+            :global(.button-spinner) {
+                width: 0.85rem;
+                height: 0.85rem;
+                border-width: 1.5px;
+            }
+        }
 
         .selected-provider-label {
             font-size: 12px;

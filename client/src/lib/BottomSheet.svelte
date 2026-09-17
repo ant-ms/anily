@@ -80,6 +80,8 @@
         box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.7);
         animation: sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         box-sizing: border-box;
+        max-height: 85vh;
+        max-height: 85dvh;
     }
 
     .sheet-handle {

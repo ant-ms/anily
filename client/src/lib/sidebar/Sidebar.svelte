@@ -13,6 +13,7 @@
     import Badge from "../Badge.svelte";
     import MenuItem from "../MenuItem.svelte";
     import EmptyState from "../EmptyState.svelte";
+    import { snackbar } from "../snackbar.svelte";
 
     let {
         activeTab = $bindable(),
@@ -61,10 +62,17 @@
                 apiBaseUrl.current,
             );
             fetch(url.toString(), { credentials: "include" })
-                .then((res) => res.json())
+                .then((res) => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
                 .then((data) => {
                     visibleCardData = data;
                     animeCount = data.length;
+                })
+                .catch((err) => {
+                    console.error("Failed to load anime list:", err);
+                    snackbar.error("Failed to load anime list");
                 })
                 .finally(() => {
                     isLoading = false;

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import NavigationRail from "$lib/navigation/NavigationRail.svelte";
     import NavigationBar from "$lib/navigation/NavigationBar.svelte";
     import UserMenuModal from "$lib/navigation/UserMenuModal.svelte";
@@ -7,6 +8,8 @@
     import Avatar from "$lib/Avatar.svelte";
     import Badge from "$lib/Badge.svelte";
     import EmptyState from "$lib/EmptyState.svelte";
+    import Snackbar from "$lib/Snackbar.svelte";
+    import { snackbar } from "$lib/snackbar.svelte";
     import "./app.scss";
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import LoginPage from "./pages/LoginPage.svelte";
@@ -73,6 +76,43 @@
             };
         }
     }
+
+    onMount(() => {
+        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+            const msg =
+                event.reason instanceof Error
+                    ? event.reason.message
+                    : typeof event.reason === "string"
+                      ? event.reason
+                      : "";
+            if (msg) {
+                snackbar.error(msg);
+            }
+        };
+
+        const handleError = (event: ErrorEvent) => {
+            if (
+                event.target instanceof HTMLElement &&
+                event.target.tagName === "IMG"
+            ) {
+                return;
+            }
+            if (event.message && !event.message.includes("ResizeObserver")) {
+                snackbar.error(event.message);
+            }
+        };
+
+        window.addEventListener("unhandledrejection", handleUnhandledRejection);
+        window.addEventListener("error", handleError);
+
+        return () => {
+            window.removeEventListener(
+                "unhandledrejection",
+                handleUnhandledRejection,
+            );
+            window.removeEventListener("error", handleError);
+        };
+    });
 </script>
 
 {#if profileData}
@@ -198,6 +238,8 @@
 {:else}
     <LoginPage bind:profileData />
 {/if}
+
+<Snackbar />
 
 <style lang="scss">
     main {

@@ -1,11 +1,23 @@
 <script lang="ts">
-    import { getStoredPlayer, setStoredPlayer, type MediaPlayer } from "../types/Media";
+    import {
+        getStoredPlayer,
+        setStoredPlayer,
+        getStoredLanguagePreference,
+        setStoredLanguagePreference,
+        type MediaPlayer,
+        type StreamLanguagePreference,
+    } from "../types/Media";
     import Select from "../lib/Select.svelte";
 
     let player: MediaPlayer = $state(getStoredPlayer());
+    let languagePreference: StreamLanguagePreference = $state(getStoredLanguagePreference());
 
     function onPlayerChange() {
         setStoredPlayer(player);
+    }
+
+    function onLanguagePreferenceChange() {
+        setStoredLanguagePreference(languagePreference);
     }
 
     const playerOptions = [
@@ -13,6 +25,11 @@
         { value: "mpv", label: "mpv (copy URL to terminal)" },
         { value: "vlc", label: "VLC" },
         { value: "copy", label: "Copy URL only" },
+    ];
+
+    const languageOptions = [
+        { value: "sub", label: "SUB (Subtitled)" },
+        { value: "dub", label: "DUB (Dubbed)" },
     ];
 </script>
 
@@ -26,6 +43,16 @@
             bind:value={player}
             options={playerOptions}
             onchange={onPlayerChange}
+        />
+    </section>
+
+    <section>
+        <h3>Preferred Audio / Subtitles</h3>
+        <p>Choose your preference for SUB or DUB when automatically selecting an episode stream.</p>
+        <Select
+            bind:value={languagePreference}
+            options={languageOptions}
+            onchange={onLanguagePreferenceChange}
         />
     </section>
 </div>

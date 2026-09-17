@@ -4,6 +4,7 @@
     import { Debounced } from "runed";
     import TextInput from "../TextInput.svelte";
     import MenuItem from "../MenuItem.svelte";
+    import { snackbar } from "../snackbar.svelte";
 
     type SearchResult = {
         titleEnglish: string;
@@ -36,9 +37,16 @@
         );
 
         fetch(url.toString(), { credentials: "include" })
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
             .then((data) => {
                 searchResults = data;
+            })
+            .catch((err) => {
+                console.error("Search failed:", err);
+                snackbar.error("Search request failed");
             });
     });
 

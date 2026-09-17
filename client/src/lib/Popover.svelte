@@ -6,11 +6,15 @@
         isOpen = $bindable(false),
         placement = "bottom-end",
         minWidth = "200px",
+        maxWidth = undefined,
+        ariaLabel = undefined,
         children,
     }: {
         isOpen?: boolean;
         placement?: "bottom-start" | "bottom-end" | "top-start" | "top-end";
         minWidth?: string;
+        maxWidth?: string;
+        ariaLabel?: string;
         children?: Snippet;
     } = $props();
 
@@ -23,9 +27,15 @@
             isOpen = false;
         }
     }
+
+    function handleKeydown(e: KeyboardEvent) {
+        if (e.key === "Escape" && isOpen) {
+            isOpen = false;
+        }
+    }
 </script>
 
-<svelte:window onclick={handleWindowClick} />
+<svelte:window onclick={handleWindowClick} onkeydown={handleKeydown} />
 
 {#if isOpen}
     <div
@@ -36,6 +46,9 @@
         class:placement-top-start={placement === "top-start"}
         class:placement-top-end={placement === "top-end"}
         style:min-width={minWidth}
+        style:max-width={maxWidth}
+        role="dialog"
+        aria-label={ariaLabel}
         transition:fade={{ duration: 120 }}
     >
         {#if children}

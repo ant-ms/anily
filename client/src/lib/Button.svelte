@@ -5,53 +5,47 @@
     let {
         children = undefined,
         Icon = undefined,
+        iconSize = "1.25rem",
         onclick = undefined,
         style = "normal",
         active = false,
         disabled = false,
         loading = false,
         title = undefined,
+        class: className = "",
     }: {
         children?: Snippet;
         Icon?: Component<IconComponentProps, {}, "">;
+        iconSize?: string;
         style?: "normal" | "ghost";
         active?: boolean;
-        onclick?: () => void | Promise<void>;
+        onclick?: (e: MouseEvent) => void | Promise<void>;
         disabled?: boolean;
         loading?: boolean;
         title?: string;
+        class?: string;
     } = $props();
 
-    let internalLoading = $state(false);
-    let isBusy = $derived(loading || internalLoading);
-
-    async function handleClick(e: MouseEvent) {
-        if (disabled || isBusy || !onclick) return;
-        try {
-            const result = onclick();
-            if (result instanceof Promise) {
-                internalLoading = true;
-                await result;
-            }
-        } finally {
-            internalLoading = false;
-        }
+    function handleClick(e: MouseEvent) {
+        if (disabled || loading || !onclick) return;
+        onclick(e);
     }
 </script>
 
 <button
     {title}
     onclick={handleClick}
+    class={className}
     class:active
-    disabled={disabled || isBusy}
-    class:is-busy={isBusy}
+    disabled={disabled || loading}
+    class:is-busy={loading}
     class:style-normal={style === "normal"}
     class:style-ghost={style === "ghost"}
 >
-    {#if isBusy}
+    {#if loading}
         <span class="button-spinner"></span>
     {:else if Icon}
-        <Icon size="1.25rem" />
+        <Icon size={iconSize} />
     {/if}
     {#if children}
         {@render children()}
