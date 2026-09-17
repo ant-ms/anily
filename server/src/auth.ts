@@ -26,13 +26,17 @@ export const isAllowedOrigin = (origin: string): boolean => {
 };
 
 export const setupAuthHandlers = (app: Hono) => {
-  app.use(
-    "*",
-    cors({
-      origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined),
-      credentials: true,
-    }),
-  );
+  const corsMiddleware = cors({
+    origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined),
+    credentials: true,
+  });
+
+  app.use("*", async (c, next) => {
+    if (c.req.path.startsWith("/api/stream/proxy")) {
+      return next();
+    }
+    return corsMiddleware(c, next);
+  });
   app.use("*", async (c, next) => {
     c.set("oidcClaimsHook", async (orig, claims) => ({
       ...orig,
@@ -49,5 +53,13 @@ export const setupAuthHandlers = (app: Hono) => {
     console.log("oidc callback");
     return processOAuthCallback(c);
   });
-  app.use("/api/*", oidcAuthMiddleware());
+  app.use("/api/*", async (c, next) => {
+    if (c.req.path.startsWith("/api/stream/proxy")) {
+      return next();
+    }
+    if (!process.env.OIDC_ISSUER && !process.env.OIDC_CLIENT_ID) {
+      return next();
+    }
+    return oidcAuthMiddleware()(c, next);
+  });
 };

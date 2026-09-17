@@ -68,4 +68,19 @@ describe("CORS configuration", () => {
     expect(unauthorizedRes.status).toBe(200);
     expect(unauthorizedRes.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
+
+  it("app singleton applies CORS to attached routes", async () => {
+    const { app } = await import("./app");
+    app.get("/api/test-cors-route", (c) => c.json({ ok: true }));
+
+    const res = await app.request("/api/test-cors-route", {
+      headers: {
+        Origin: "https://codeee-5173.ant.ms",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://codeee-5173.ant.ms");
+    expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+  });
 });

@@ -2,8 +2,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { getAuth } from "@hono/oidc-auth";
 import packageJson from "../package.json";
-import { setupAuthHandlers } from "./auth";
-import { logger, setupLoggerMiddleware } from "./logger";
+import { logger } from "./logger";
 import { keepAnilistDataUpdated } from "./syncs/keepAnilistDataUpdated";
 import "dotenv/config";
 import { app } from "./app";
@@ -41,9 +40,6 @@ const ensureSchema = async () => {
   }
 };
 ensureSchema().catch(() => {});
-
-setupAuthHandlers(app);
-setupLoggerMiddleware(app);
 
 app.get("/info", (c) => {
   return c.json({
