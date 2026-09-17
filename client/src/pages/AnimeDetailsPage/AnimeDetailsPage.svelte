@@ -20,19 +20,36 @@
         ([anilistId], previous) => {
             if (anilistId === undefined) return;
 
-            const animeChanged = !previous || previous[0] !== anilistId;
-            if (animeChanged) animeDetails = undefined;
+            const cacheKey = `anily:cache:details:${anilistId}`;
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    animeDetails = JSON.parse(cached);
+                } else {
+                    const animeChanged = !previous || previous[0] !== anilistId;
+                    if (animeChanged) animeDetails = undefined;
+                }
+            } catch {
+                const animeChanged = !previous || previous[0] !== anilistId;
+                if (animeChanged) animeDetails = undefined;
+            }
+
+            if (!apiBaseUrl.current) return;
 
             const url = new URL(
                 `/api/details/${anilistId}`,
                 apiBaseUrl.current,
             );
             fetch(url.toString(), { credentials: "include" })
-                .then((results) => results.json())
+                .then((results) => (results.ok ? results.json() : null))
                 .then((data) => {
-                    if (selectedAnimeAnilistId.current !== anilistId) return;
+                    if (!data || selectedAnimeAnilistId.current !== anilistId) return;
                     animeDetails = data;
-                });
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify(data));
+                    } catch {}
+                })
+                .catch((err) => console.error("Failed to fetch anime details online:", err));
         },
     );
 </script>

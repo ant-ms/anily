@@ -18,6 +18,7 @@
     import HomePage from "./pages/HomePage.svelte";
     import type ProfileData from "./types/ProfileData";
     import {
+        apiBaseUrl,
         selectedAnimeAnilistId,
         isSeasonsSidebarOpen,
     } from "./lib/context.svelte";
@@ -26,7 +27,37 @@
     import CaretLeftIcon from "phosphor-svelte/lib/CaretLeftIcon";
     import TelevisionIcon from "phosphor-svelte/lib/TelevisionIcon";
 
-    let profileData: ProfileData | undefined = $state(undefined);
+    const loadCachedProfile = (): ProfileData | undefined => {
+        try {
+            const raw = localStorage.getItem("anily:profile_data");
+            return raw ? JSON.parse(raw) : undefined;
+        } catch {
+            return undefined;
+        }
+    };
+
+    let profileData: ProfileData | undefined = $state(loadCachedProfile());
+
+    $effect(() => {
+        if (profileData) {
+            try {
+                localStorage.setItem("anily:profile_data", JSON.stringify(profileData));
+            } catch {}
+        }
+    });
+
+    if (typeof window !== "undefined") {
+        try {
+            const savedBackend = localStorage.getItem("backendUrl");
+            if (savedBackend) {
+                const cleaned = JSON.parse(savedBackend).trim().replace(/\/+$/, "");
+                if (cleaned && URL.canParse(cleaned)) {
+                    apiBaseUrl.set(new URL(cleaned));
+                }
+            }
+        } catch {}
+    }
+
     let activeTab: Tab | undefined = $state({
         id: "home",
         name: "Home",

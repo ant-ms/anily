@@ -83,13 +83,34 @@
     async function refreshEpisodes() {
         const anilistId = selectedAnimeAnilistId.current;
         if (anilistId === undefined) return;
-        const url = new URL(`/api/episodes/${anilistId}`, apiBaseUrl.current);
-        const data = await fetch(url.toString(), { credentials: "include" }).then(
-            (r) => r.json(),
-        );
-        if (selectedAnimeAnilistId.current !== anilistId) return;
-        episodes = Array.isArray(data) ? data : [];
-        episodes.forEach((e) => downloadManager.checkEpisode(e.id, e.number));
+
+        const cacheKey = `anily:cache:episodes:${anilistId}`;
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    episodes = parsed;
+                    episodes.forEach((e) => downloadManager.checkEpisode(e.id, e.number));
+                }
+            }
+        } catch {}
+
+        if (!apiBaseUrl.current) return;
+        try {
+            const url = new URL(`/api/episodes/${anilistId}`, apiBaseUrl.current);
+            const res = await fetch(url.toString(), { credentials: "include" });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (selectedAnimeAnilistId.current !== anilistId) return;
+            episodes = Array.isArray(data) ? data : [];
+            episodes.forEach((e) => downloadManager.checkEpisode(e.id, e.number));
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify(episodes));
+            } catch {}
+        } catch (err) {
+            console.warn("Failed to fetch episodes online, using cached episodes if available:", err);
+        }
     }
 
     let currentRating: Rating = $state("NEUTRAL");

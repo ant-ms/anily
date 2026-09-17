@@ -56,7 +56,24 @@
                 return;
             }
 
-            isLoading = true;
+            const tabKey = `anily:cache:sidebar:${activeTab?.id || "inbox"}`;
+            try {
+                const cached = localStorage.getItem(tabKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        visibleCardData = parsed;
+                        animeCount = parsed.length;
+                    }
+                }
+            } catch {}
+
+            isLoading = visibleCardData.length === 0;
+            if (!apiBaseUrl.current) {
+                isLoading = false;
+                return;
+            }
+
             const url = new URL(
                 `/api/sidebar/${activeTab?.id || "inbox"}`,
                 apiBaseUrl.current,
@@ -69,10 +86,15 @@
                 .then((data) => {
                     visibleCardData = data;
                     animeCount = data.length;
+                    try {
+                        localStorage.setItem(tabKey, JSON.stringify(data));
+                    } catch {}
                 })
                 .catch((err) => {
                     console.error("Failed to load anime list:", err);
-                    snackbar.error("Failed to load anime list");
+                    if (visibleCardData.length === 0) {
+                        snackbar.error("Failed to load anime list");
+                    }
                 })
                 .finally(() => {
                     isLoading = false;
