@@ -12,4 +12,7 @@ export default defineConfig({
       $types: path.resolve(__dirname, "./src/types"),
     },
   },
+  server: {
+    allowedHosts: ["codeee-5173.ant.ms"]
+  }
 });
