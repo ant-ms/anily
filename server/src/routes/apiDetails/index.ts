@@ -27,6 +27,7 @@ export const apiDetailsAnilistIdGetRoute = app.get(
         thumbnailUrl: details.thumbnailUrl,
         groupingId: details.baseAnime.groupings?.[0]?.id || null,
         isDisplayAnime: details.baseAnime.groupings?.[0]?.displayAnimeId === details.baseAnime.anilistId,
+        rating: details.rating ?? "NEUTRAL",
       };
       return c.json(filteredDetails);
     } catch (error) {

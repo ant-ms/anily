@@ -26,6 +26,12 @@ enum AnimeSeason {
   FALL
 }
 
+enum Rating {
+  LIKE
+  NEUTRAL
+  DISLIKE
+}
+
 model BaseAnime {
   anilistId   Int         @id
   malId       Int?
@@ -100,6 +106,7 @@ model AnimeDetails {
   thumbnailUrl String?
   description  String?
   episodes     Episode[]
+  rating       Rating    @default(NEUTRAL)
 
   @@unique([groupingId, groupingOrder])
   @@index([groupingId])

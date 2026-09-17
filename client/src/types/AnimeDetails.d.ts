@@ -1,7 +1,9 @@
 // TODO: can we share these for type safety?
 
+export type Rating = "LIKE" | "NEUTRAL" | "DISLIKE";
+
 export default interface AnimeDetailsData {
-  anilistId: int;
+  anilistId: number;
   titleEnglish: string;
   titleRomanji: string;
   titleNative: string;
@@ -9,4 +11,5 @@ export default interface AnimeDetailsData {
   thumbnailUrl: string;
   groupingId: number | null;
   isDisplayAnime: boolean;
+  rating?: Rating;
 }

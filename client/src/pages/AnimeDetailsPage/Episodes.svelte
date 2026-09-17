@@ -21,13 +21,20 @@
     import CheckIcon from "phosphor-svelte/lib/CheckIcon";
     import EyeIcon from "phosphor-svelte/lib/EyeIcon";
     import ImageIcon from "phosphor-svelte/lib/ImageIcon";
+    import ThumbsUpIcon from "phosphor-svelte/lib/ThumbsUpIcon";
+    import ThumbsDownIcon from "phosphor-svelte/lib/ThumbsDownIcon";
+    import MinusIcon from "phosphor-svelte/lib/MinusIcon";
+    import type AnimeDetailsData from "../../types/AnimeDetails";
+    import type { Rating } from "../../types/AnimeDetails";
 
     let {
         updateSeed,
         animeName = "",
+        animeDetails = undefined,
     }: {
         updateSeed: number;
         animeName?: string;
+        animeDetails?: AnimeDetailsData;
     } = $props();
 
     let episodes: EpisodeData[] = $state([]);
@@ -69,6 +76,67 @@
         if (selectedAnimeAnilistId.current !== anilistId) return;
         episodes = Array.isArray(data) ? data : [];
     }
+
+    let currentRating: Rating = $state("NEUTRAL");
+    let isUpdatingRating = $state(false);
+
+    watch(
+        () => [selectedAnimeAnilistId.current, updateSeed, animeDetails?.rating],
+        () => {
+            const anilistId = selectedAnimeAnilistId.current;
+            if (anilistId === undefined) return;
+            const detailsRating = animeDetails?.rating;
+            if (detailsRating) {
+                currentRating = detailsRating;
+            } else {
+                fetch(new URL(`/api/rate/${anilistId}`, apiBaseUrl.current).toString(), {
+                    credentials: "include",
+                })
+                    .then((res) => (res.ok ? res.json() : null))
+                    .then((data) => {
+                        if (selectedAnimeAnilistId.current === anilistId && data?.rating) {
+                            currentRating = data.rating;
+                        }
+                    })
+                    .catch(() => {});
+            }
+        },
+    );
+
+    const setRating = async (targetRating: Rating) => {
+        const anilistId = selectedAnimeAnilistId.current;
+        if (anilistId === undefined || isUpdatingRating) return;
+
+        const nextRating =
+            currentRating === targetRating && targetRating !== "NEUTRAL"
+                ? "NEUTRAL"
+                : targetRating;
+
+        const previousRating = currentRating;
+        currentRating = nextRating;
+        isUpdatingRating = true;
+
+        try {
+            const url = new URL(`/api/rate/${anilistId}`, apiBaseUrl.current);
+            const res = await fetch(url.toString(), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rating: nextRating }),
+                credentials: "include",
+            });
+            if (!res.ok) {
+                throw new Error("Failed to update rating");
+            }
+            if (animeDetails) {
+                animeDetails.rating = nextRating;
+            }
+        } catch (err) {
+            console.error("Failed to update rating:", err);
+            currentRating = previousRating;
+        } finally {
+            isUpdatingRating = false;
+        }
+    };
 
     watch(
         () => [selectedAnimeAnilistId.current, updateSeed],
@@ -308,15 +376,63 @@
             </div>
         {/each}
     {:else}
-        {#if episodes.length > 0}
+        {#if episodes.length > 0 || !loading}
             <div class="toolbar" transition:fade={{ duration: 200 }}>
+                {#if episodes.length > 0}
+                    <Button
+                        Icon={allReleasedWatched ? CheckIcon : EyeIcon}
+                        active={allReleasedWatched}
+                        disabled={releasedEpisodes.length === 0}
+                        onclick={toggleAllWatch}
+                        title={allReleasedWatched ? "Mark all released episodes as unplayed" : "Mark all released episodes as played"}
+                    >
+                        <span class="mark-all-text">
+                            {allReleasedWatched ? "Mark all as unplayed" : "Mark all as played"}
+                        </span>
+                    </Button>
+                {/if}
                 <div class="spacer"></div>
-                <Button
-                    Icon={allReleasedWatched ? CheckIcon : EyeIcon}
-                    active={allReleasedWatched}
-                    style="ghost"
-                    onclick={toggleAllWatch}
-                />
+                <div class="rating-segmented-group" role="radiogroup" aria-label="Season rating">
+                    <button
+                        type="button"
+                        role="radio"
+                        aria-checked={currentRating === "DISLIKE"}
+                        class="segment-button"
+                        class:active-dislike={currentRating === "DISLIKE"}
+                        onclick={() => setRating("DISLIKE")}
+                        disabled={isUpdatingRating}
+                        title="Thumbs down"
+                        aria-label="Thumbs down"
+                    >
+                        <ThumbsDownIcon size="1.25rem" weight={currentRating === "DISLIKE" ? "fill" : "regular"} />
+                    </button>
+                    <button
+                        type="button"
+                        role="radio"
+                        aria-checked={currentRating === "NEUTRAL"}
+                        class="segment-button"
+                        class:active-neutral={currentRating === "NEUTRAL"}
+                        onclick={() => setRating("NEUTRAL")}
+                        disabled={isUpdatingRating}
+                        title="No rating yet"
+                        aria-label="No rating yet"
+                    >
+                        <MinusIcon size="1.25rem" weight={currentRating === "NEUTRAL" ? "bold" : "regular"} />
+                    </button>
+                    <button
+                        type="button"
+                        role="radio"
+                        aria-checked={currentRating === "LIKE"}
+                        class="segment-button"
+                        class:active-like={currentRating === "LIKE"}
+                        onclick={() => setRating("LIKE")}
+                        disabled={isUpdatingRating}
+                        title="Thumbs up"
+                        aria-label="Thumbs up"
+                    >
+                        <ThumbsUpIcon size="1.25rem" weight={currentRating === "LIKE" ? "fill" : "regular"} />
+                    </button>
+                </div>
             </div>
         {/if}
         {#each episodes as episode (episode.number)}
@@ -444,8 +560,88 @@
             align-items: center;
             flex-shrink: 0;
 
+            .mark-all-text {
+                font-size: 13px;
+                font-weight: 500;
+                padding: 0 4px;
+                white-space: nowrap;
+
+                @media (max-width: 640px) {
+                    font-size: 12px;
+                    padding: 0 2px;
+                }
+            }
+
             .spacer {
                 flex-grow: 1;
+            }
+
+            .rating-segmented-group {
+                display: inline-flex;
+                align-items: center;
+                background: hsl(20, 17.6%, 8.5%);
+                border: 1px solid hsl(36, 5.7%, 20%);
+                border-radius: 6px;
+                overflow: hidden;
+                flex-shrink: 0;
+
+                .segment-button {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 5px;
+                    padding: 6px 10px;
+                    background: transparent;
+                    border: none;
+                    border-right: 1px solid hsl(36, 5.7%, 20%);
+                    color: #a8a29e;
+                    font-size: 12px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition:
+                        background 0.15s ease,
+                        color 0.15s ease,
+                        border-color 0.15s ease;
+                    white-space: nowrap;
+                    user-select: none;
+                    line-height: 1;
+
+                    @media (max-width: 640px) {
+                        padding: 6px 8px;
+                    }
+
+                    &:last-child {
+                        border-right: none;
+                    }
+
+                    &:hover:not(:disabled) {
+                        background: hsl(20, 17.6%, 14%);
+                        color: #e8e4df;
+                    }
+
+                    &:disabled {
+                        opacity: 0.5;
+                        cursor: not-allowed;
+                    }
+
+                    &.active-like {
+                        background: #ffd52c18;
+                        color: #ffd52c;
+                        font-weight: 600;
+                    }
+
+                    &.active-dislike {
+                        background: rgba(229, 115, 115, 0.16);
+                        color: #e57373;
+                        font-weight: 600;
+                    }
+
+                    &.active-neutral {
+                        background: hsl(20, 17.6%, 16%);
+                        color: #e8e4df;
+                        font-weight: 600;
+                    }
+                }
             }
         }
 

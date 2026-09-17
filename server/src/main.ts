@@ -15,6 +15,7 @@ import "$src/routes/apiSearch";
 import "$src/routes/apiSidebar";
 import "$src/routes/apiSyncJobs";
 import "$src/routes/apiStream";
+import "$src/routes/apiRate";
 import { prisma } from "$src/prisma";
 
 // Ensure database schema columns exist
@@ -42,6 +43,13 @@ const ensureSchema = async () => {
       END $$;
       ALTER TABLE "SyncJob" ADD COLUMN IF NOT EXISTS "type" "SyncJobType" NOT NULL DEFAULT 'ANILIST_SYNC';
       ALTER TABLE "SyncJob" ADD COLUMN IF NOT EXISTS "details" JSONB;
+
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Rating') THEN
+          CREATE TYPE "Rating" AS ENUM ('LIKE', 'NEUTRAL', 'DISLIKE');
+        END IF;
+      END $$;
+      ALTER TABLE "AnimeDetails" ADD COLUMN IF NOT EXISTS "rating" "Rating" NOT NULL DEFAULT 'NEUTRAL';
     `);
     logger.info("Database schema verified");
   } catch (err) {
