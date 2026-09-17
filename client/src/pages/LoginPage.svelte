@@ -1,5 +1,6 @@
 <script lang="ts">
     import Button from "../lib/Button.svelte";
+    import TextInput from "../lib/TextInput.svelte";
     import SignInIcon from "phosphor-svelte/lib/SignInIcon";
     import { PersistedState } from "runed";
     import type ProfileData from "../types/ProfileData";
@@ -68,7 +69,7 @@
     <span class="title"> Welcome to Anily </span>
     <label for="backend-url"> Backend URL to connect to: </label>
     <div class="backend-url-wrapper">
-        <input
+        <TextInput
             id="backend-url"
             type="url"
             placeholder="https://"
@@ -107,11 +108,6 @@
         @media (max-width: 640px) {
             margin-left: 1rem;
             margin-right: 1rem;
-
-            .backend-url-wrapper input {
-                width: 100%;
-                max-width: 280px;
-            }
         }
 
         .title {
@@ -121,14 +117,8 @@
 
         .backend-url-wrapper {
             display: flex;
+            align-items: center;
             gap: 0.5rem;
-
-            input {
-                background: #1d1a17;
-                border-radius: 6px;
-                padding: 6px;
-                width: 310px;
-            }
         }
 
         .checkbox-list {

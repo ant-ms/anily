@@ -4,6 +4,8 @@
     import { watch } from "runed";
     import Button from "../../lib/Button.svelte";
     import Skeleton from "../../lib/Skeleton.svelte";
+    import SegmentedControl from "../../lib/SegmentedControl.svelte";
+    import Tag from "../../lib/Tag.svelte";
     import {
         apiBaseUrl,
         selectedAnimeAnilistId,
@@ -392,47 +394,37 @@
                     </Button>
                 {/if}
                 <div class="spacer"></div>
-                <div class="rating-segmented-group" role="radiogroup" aria-label="Season rating">
-                    <button
-                        type="button"
-                        role="radio"
-                        aria-checked={currentRating === "DISLIKE"}
-                        class="segment-button"
-                        class:active-dislike={currentRating === "DISLIKE"}
-                        onclick={() => setRating("DISLIKE")}
-                        disabled={isUpdatingRating}
-                        title="Thumbs down"
-                        aria-label="Thumbs down"
-                    >
-                        <ThumbsDownIcon size="1.25rem" weight={currentRating === "DISLIKE" ? "fill" : "regular"} />
-                    </button>
-                    <button
-                        type="button"
-                        role="radio"
-                        aria-checked={currentRating === "NEUTRAL"}
-                        class="segment-button"
-                        class:active-neutral={currentRating === "NEUTRAL"}
-                        onclick={() => setRating("NEUTRAL")}
-                        disabled={isUpdatingRating}
-                        title="No rating yet"
-                        aria-label="No rating yet"
-                    >
-                        <MinusIcon size="1.25rem" weight={currentRating === "NEUTRAL" ? "bold" : "regular"} />
-                    </button>
-                    <button
-                        type="button"
-                        role="radio"
-                        aria-checked={currentRating === "LIKE"}
-                        class="segment-button"
-                        class:active-like={currentRating === "LIKE"}
-                        onclick={() => setRating("LIKE")}
-                        disabled={isUpdatingRating}
-                        title="Thumbs up"
-                        aria-label="Thumbs up"
-                    >
-                        <ThumbsUpIcon size="1.25rem" weight={currentRating === "LIKE" ? "fill" : "regular"} />
-                    </button>
-                </div>
+                <SegmentedControl
+                    variant="connected"
+                    disabled={isUpdatingRating}
+                    ariaLabel="Season rating"
+                    value={currentRating}
+                    onchange={(val) => setRating(val)}
+                    items={[
+                        {
+                            value: "DISLIKE",
+                            title: "Thumbs down",
+                            Icon: ThumbsDownIcon,
+                            activeIconWeight: "fill",
+                            activeColor: "dislike",
+                        },
+                        {
+                            value: "NEUTRAL",
+                            title: "No rating yet",
+                            Icon: MinusIcon,
+                            iconWeight: "bold",
+                            activeIconWeight: "bold",
+                            activeColor: "neutral",
+                        },
+                        {
+                            value: "LIKE",
+                            title: "Thumbs up",
+                            Icon: ThumbsUpIcon,
+                            activeIconWeight: "fill",
+                            activeColor: "like",
+                        },
+                    ]}
+                />
             </div>
         {/if}
         {#each episodes as episode (episode.number)}
@@ -520,11 +512,11 @@
                                                 </div>
                                                 <div class="service-tags">
                                                     {#if isHdService(service)}
-                                                        <span class="hd-tag">HD</span>
+                                                        <Tag variant="hd">HD</Tag>
                                                     {/if}
-                                                    <span class="lang-tag {service.language}">
+                                                    <Tag variant={service.language === "dub" ? "dub" : "sub"}>
                                                         {service.language.toUpperCase()}
-                                                    </span>
+                                                    </Tag>
                                                 </div>
                                             </button>
                                         {/each}
@@ -576,73 +568,6 @@
                 flex-grow: 1;
             }
 
-            .rating-segmented-group {
-                display: inline-flex;
-                align-items: center;
-                background: hsl(20, 17.6%, 8.5%);
-                border: 1px solid hsl(36, 5.7%, 20%);
-                border-radius: 6px;
-                overflow: hidden;
-                flex-shrink: 0;
-
-                .segment-button {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 5px;
-                    padding: 6px 10px;
-                    background: transparent;
-                    border: none;
-                    border-right: 1px solid hsl(36, 5.7%, 20%);
-                    color: #a8a29e;
-                    font-size: 12px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition:
-                        background 0.15s ease,
-                        color 0.15s ease,
-                        border-color 0.15s ease;
-                    white-space: nowrap;
-                    user-select: none;
-                    line-height: 1;
-
-                    @media (max-width: 640px) {
-                        padding: 6px 8px;
-                    }
-
-                    &:last-child {
-                        border-right: none;
-                    }
-
-                    &:hover:not(:disabled) {
-                        background: hsl(20, 17.6%, 14%);
-                        color: #e8e4df;
-                    }
-
-                    &:disabled {
-                        opacity: 0.5;
-                        cursor: not-allowed;
-                    }
-
-                    &.active-like {
-                        background: #ffd52c18;
-                        color: #ffd52c;
-                        font-weight: 600;
-                    }
-
-                    &.active-dislike {
-                        background: rgba(229, 115, 115, 0.16);
-                        color: #e57373;
-                        font-weight: 600;
-                    }
-
-                    &.active-neutral {
-                        background: hsl(20, 17.6%, 16%);
-                        color: #e8e4df;
-                        font-weight: 600;
-                    }
-                }
-            }
         }
 
         .episode-card {
@@ -874,36 +799,6 @@
                     align-items: center;
                     gap: 4px;
                     flex-shrink: 0;
-                }
-
-                .hd-tag {
-                    font-size: 9px;
-                    font-weight: 700;
-                    padding: 1px 4px;
-                    border-radius: 3px;
-                    background: hsl(44, 80%, 18%);
-                    color: #ffd52c;
-                    border: 1px solid #ffd52c55;
-                    letter-spacing: 0.03em;
-                }
-
-                .lang-tag {
-                    font-size: 10px;
-                    font-weight: 700;
-                    padding: 2px 5px;
-                    border-radius: 4px;
-                    text-transform: uppercase;
-                    flex-shrink: 0;
-
-                    &.sub {
-                        background: #1b3d54;
-                        color: #79c0ff;
-                    }
-
-                    &.dub {
-                        background: #3e2723;
-                        color: #ffb74d;
-                    }
                 }
             }
         }

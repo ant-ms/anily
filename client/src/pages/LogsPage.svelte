@@ -1,16 +1,15 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import Button from "$lib/Button.svelte";
+    import SegmentedControl from "$lib/SegmentedControl.svelte";
+    import StatusIndicator from "$lib/StatusIndicator.svelte";
+    import Tag from "$lib/Tag.svelte";
+    import Alert from "$lib/Alert.svelte";
+    import EmptyState from "$lib/EmptyState.svelte";
     import { apiBaseUrl } from "$lib/context.svelte";
     import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
-    import CheckCircleIcon from "phosphor-svelte/lib/CheckCircleIcon";
-    import XCircleIcon from "phosphor-svelte/lib/XCircleIcon";
-    import ClockIcon from "phosphor-svelte/lib/ClockIcon";
     import CalendarBlankIcon from "phosphor-svelte/lib/CalendarBlankIcon";
     import CursorIcon from "phosphor-svelte/lib/CursorIcon";
-    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
-    import CaretDownIcon from "phosphor-svelte/lib/CaretDownIcon";
-    import CaretUpIcon from "phosphor-svelte/lib/CaretUpIcon";
     import DatabaseIcon from "phosphor-svelte/lib/DatabaseIcon";
 
     type SyncJobType = "ANILIST_SYNC" | "EPISODE_METADATA";
@@ -73,9 +72,17 @@
             : jobs.filter((j) => (j.type ?? "ANILIST_SYNC") === activeTypeFilter)
     );
 
-    const toggleWarnings = (id: number) => {
-        expandedWarnings[id] = !expandedWarnings[id];
-    };
+    const filterOptions = $derived([
+        { value: "ALL", label: `All Jobs (${jobs.length})` },
+        {
+            value: "ANILIST_SYNC",
+            label: `AniList Sync (${jobs.filter((j) => (j.type ?? "ANILIST_SYNC") === "ANILIST_SYNC").length})`,
+        },
+        {
+            value: "EPISODE_METADATA",
+            label: `Episode Metadata (${jobs.filter((j) => j.type === "EPISODE_METADATA").length})`,
+        },
+    ]);
 
     const getJobTypeName = (type?: SyncJobType) => {
         switch (type) {
@@ -148,62 +155,30 @@
     </header>
 
     <div class="filter-bar">
-        <button
-            type="button"
-            class="filter-pill"
-            class:active={activeTypeFilter === "ALL"}
-            onclick={() => (activeTypeFilter = "ALL")}
-        >
-            All Jobs ({jobs.length})
-        </button>
-        <button
-            type="button"
-            class="filter-pill"
-            class:active={activeTypeFilter === "ANILIST_SYNC"}
-            onclick={() => (activeTypeFilter = "ANILIST_SYNC")}
-        >
-            AniList Sync ({jobs.filter((j) => (j.type ?? "ANILIST_SYNC") === "ANILIST_SYNC").length})
-        </button>
-        <button
-            type="button"
-            class="filter-pill"
-            class:active={activeTypeFilter === "EPISODE_METADATA"}
-            onclick={() => (activeTypeFilter = "EPISODE_METADATA")}
-        >
-            Episode Metadata ({jobs.filter((j) => j.type === "EPISODE_METADATA").length})
-        </button>
+        <SegmentedControl
+            variant="pills"
+            items={filterOptions}
+            bind:value={activeTypeFilter}
+        />
     </div>
 
     {#if loading}
-        <div class="empty-state">Loading…</div>
+        <EmptyState title="Loading…" />
     {:else if error}
-        <div class="empty-state error">Failed to load jobs: {error}</div>
+        <EmptyState variant="error" title="Failed to load jobs" description={error} />
     {:else if filteredJobs.length === 0}
-        <div class="empty-state">No jobs found for the selected filter.</div>
+        <EmptyState title="No jobs found for the selected filter." />
     {:else}
         <div class="job-list">
             {#each filteredJobs as job (job.id)}
                 {@const duration = formatDuration(job.startedAt, job.completedAt)}
                 {@const warnings = job.details?.warnings ?? []}
                 {@const hasWarnings = warnings.length > 0}
-                {@const isExpanded = !!expandedWarnings[job.id]}
                 <div class="job-card" class:running={job.status === "RUNNING"} class:failed={job.status === "FAILED"}>
                     <div class="job-header">
                         <div class="job-status-group">
-                            <div class="job-status">
-                                {#if job.status === "COMPLETED"}
-                                    <CheckCircleIcon class="icon completed" weight="fill" size="1.15rem" />
-                                {:else if job.status === "FAILED"}
-                                    <XCircleIcon class="icon failed" weight="fill" size="1.15rem" />
-                                {:else}
-                                    <ClockIcon class="icon running" size="1.15rem" />
-                                {/if}
-                                <span class="status-label {job.status.toLowerCase()}">{job.status}</span>
-                            </div>
-                            <span class="job-type-pill">
-                                <DatabaseIcon size="0.8rem" />
-                                {getJobTypeName(job.type)}
-                            </span>
+                            <StatusIndicator status={job.status} />
+                            <Tag Icon={DatabaseIcon} label={getJobTypeName(job.type)} />
                         </div>
 
                         <div class="job-trigger">
@@ -233,26 +208,11 @@
                     {#if job.status === "COMPLETED"}
                         {#if job.details}
                             <div class="metrics-grid">
-                                <div class="metric-badge">
-                                    <span class="metric-val">{job.details.animeChecked ?? job.updatesCount ?? 0}</span>
-                                    <span class="metric-key">Checked</span>
-                                </div>
-                                <div class="metric-badge">
-                                    <span class="metric-val">{job.details.titlesUpdated ?? 0}</span>
-                                    <span class="metric-key">Titles & Relations</span>
-                                </div>
-                                <div class="metric-badge">
-                                    <span class="metric-val">{job.details.detailsUpdated ?? 0}</span>
-                                    <span class="metric-key">Details Refreshed</span>
-                                </div>
-                                <div class="metric-badge">
-                                    <span class="metric-val">{job.details.episodesUpdated ?? 0}</span>
-                                    <span class="metric-key">Episodes Synced</span>
-                                </div>
-                                <div class="metric-badge">
-                                    <span class="metric-val">{job.details.groupingsUpdated ?? 0}</span>
-                                    <span class="metric-key">Groupings Updated</span>
-                                </div>
+                                <Tag variant="metric" value={job.details.animeChecked ?? job.updatesCount ?? 0} label="Checked" />
+                                <Tag variant="metric" value={job.details.titlesUpdated ?? 0} label="Titles & Relations" />
+                                <Tag variant="metric" value={job.details.detailsUpdated ?? 0} label="Details Refreshed" />
+                                <Tag variant="metric" value={job.details.episodesUpdated ?? 0} label="Episodes Synced" />
+                                <Tag variant="metric" value={job.details.groupingsUpdated ?? 0} label="Groupings Updated" />
                             </div>
                         {:else if job.updatesCount !== null}
                             <div class="job-updates">
@@ -265,39 +225,25 @@
 
                     <!-- Warnings section -->
                     {#if hasWarnings}
-                        <div class="job-warnings">
-                            <button
-                                type="button"
-                                class="warning-toggle"
-                                onclick={() => toggleWarnings(job.id)}
-                            >
-                                <WarningCircleIcon class="warning-icon" weight="fill" size="1.05rem" />
-                                <span>{warnings.length} warning{warnings.length > 1 ? "s" : ""} occurred during sync</span>
-                                {#if isExpanded}
-                                    <CaretUpIcon size="0.9rem" />
-                                {:else}
-                                    <CaretDownIcon size="0.9rem" />
-                                {/if}
-                            </button>
-
-                            {#if isExpanded}
-                                <div class="warning-list">
-                                    {#each warnings as warn}
-                                        <div class="warning-item">
-                                            <span class="warn-title">{warn.title}:</span>
-                                            <span class="warn-msg">{warn.message}</span>
-                                        </div>
-                                    {/each}
-                                </div>
-                            {/if}
-                        </div>
+                        <Alert
+                            variant="warning"
+                            collapsible
+                            bind:isOpen={expandedWarnings[job.id]}
+                            title="{warnings.length} warning{warnings.length > 1 ? 's' : ''} occurred during sync"
+                        >
+                            <div class="warning-list">
+                                {#each warnings as warn}
+                                    <div class="warning-item">
+                                        <span class="warn-title">{warn.title}:</span>
+                                        <span class="warn-msg">{warn.message}</span>
+                                    </div>
+                                {/each}
+                            </div>
+                        </Alert>
                     {/if}
 
                     {#if job.error}
-                        <div class="job-error">
-                            <span class="error-label">Error:</span>
-                            {job.error}
-                        </div>
+                        <Alert variant="error" title="Error:" message={job.error} />
                     {/if}
                 </div>
             {/each}
@@ -353,45 +299,7 @@
 
         .filter-bar {
             display: flex;
-            gap: 8px;
             overflow-x: auto;
-            padding-bottom: 2px;
-
-            .filter-pill {
-                background: hsl(20, 17.6%, 10%);
-                border: 1px solid hsl(36, 5.7%, 20%);
-                color: #a09890;
-                font-size: 0.8rem;
-                font-weight: 500;
-                padding: 5px 12px;
-                border-radius: 9999px;
-                cursor: pointer;
-                transition: all 0.15s ease;
-                white-space: nowrap;
-
-                &:hover {
-                    background: hsl(20, 17.6%, 14%);
-                    color: #e8e4df;
-                }
-
-                &.active {
-                    background: rgba(255, 213, 44, 0.12);
-                    border-color: rgba(255, 213, 44, 0.4);
-                    color: #ffd52c;
-                    font-weight: 600;
-                }
-            }
-        }
-
-        .empty-state {
-            color: #857f78;
-            font-size: 0.9rem;
-            padding: 36px 0;
-            text-align: center;
-
-            &.error {
-                color: #e57373;
-            }
         }
 
         .job-list {
@@ -432,47 +340,6 @@
                     flex-wrap: wrap;
                 }
 
-                .job-status {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-
-                    :global(.icon.completed) {
-                        color: #66bb6a;
-                    }
-                    :global(.icon.failed) {
-                        color: #e57373;
-                    }
-                    :global(.icon.running) {
-                        color: #ffd52c;
-                        animation: spin 1.5s linear infinite;
-                    }
-
-                    .status-label {
-                        font-size: 0.85rem;
-                        font-weight: 600;
-                        text-transform: uppercase;
-                        letter-spacing: 0.04em;
-
-                        &.completed { color: #66bb6a; }
-                        &.failed    { color: #e57373; }
-                        &.running   { color: #ffd52c; }
-                    }
-                }
-
-                .job-type-pill {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 5px;
-                    background: hsl(20, 17.6%, 13%);
-                    border: 1px solid hsl(36, 5.7%, 24%);
-                    border-radius: 6px;
-                    padding: 3px 8px;
-                    font-size: 0.75rem;
-                    color: #d0c8c0;
-                    font-weight: 500;
-                }
-
                 .job-trigger {
                     display: flex;
                     align-items: center;
@@ -499,26 +366,6 @@
                 display: flex;
                 flex-wrap: wrap;
                 gap: 8px;
-
-                .metric-badge {
-                    background: hsl(20, 17.6%, 12%);
-                    border: 1px solid hsl(36, 5.7%, 20%);
-                    border-radius: 6px;
-                    padding: 4px 10px;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    font-size: 0.8rem;
-
-                    .metric-val {
-                        color: #ffd52c;
-                        font-weight: 600;
-                    }
-
-                    .metric-key {
-                        color: #a09890;
-                    }
-                }
             }
 
             .job-updates {
@@ -529,83 +376,28 @@
                 padding: 6px 10px;
             }
 
-            .job-warnings {
-                background: rgba(255, 171, 0, 0.08);
-                border: 1px solid rgba(255, 171, 0, 0.25);
-                border-radius: 6px;
-                overflow: hidden;
+            .warning-list {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
 
-                .warning-toggle {
-                    width: 100%;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 7px 12px;
-                    background: transparent;
-                    border: none;
-                    color: #ffab00;
-                    font-size: 0.8rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    text-align: left;
-                    justify-content: flex-start;
+                .warning-item {
+                    font-size: 0.78rem;
+                    color: #ded7ce;
+                    line-height: 1.4;
 
-                    :global(.warning-icon) {
-                        flex-shrink: 0;
+                    .warn-title {
+                        font-weight: 600;
+                        color: #ffab00;
+                        margin-right: 4px;
                     }
 
-                    span {
-                        flex: 1;
+                    .warn-msg {
+                        color: #c4bfb9;
                     }
-
-                    &:hover {
-                        background: rgba(255, 171, 0, 0.05);
-                    }
-                }
-
-                .warning-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                    padding: 6px 12px 10px 12px;
-                    border-top: 1px solid rgba(255, 171, 0, 0.15);
-
-                    .warning-item {
-                        font-size: 0.78rem;
-                        color: #ded7ce;
-                        line-height: 1.4;
-
-                        .warn-title {
-                            font-weight: 600;
-                            color: #ffab00;
-                            margin-right: 4px;
-                        }
-
-                        .warn-msg {
-                            color: #c4bfb9;
-                        }
-                    }
-                }
-            }
-
-            .job-error {
-                font-size: 0.8rem;
-                color: #e57373;
-                background: hsl(0, 30%, 10%);
-                border-radius: 4px;
-                padding: 8px 10px;
-                word-break: break-word;
-
-                .error-label {
-                    font-weight: 600;
-                    margin-right: 4px;
                 }
             }
         }
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
     }
 
     @keyframes pulse {

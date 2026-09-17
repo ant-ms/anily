@@ -1,5 +1,6 @@
 <script lang="ts">
     import Button from "../Button.svelte";
+    import Avatar from "../Avatar.svelte";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
@@ -24,7 +25,7 @@
 </script>
 
 <div id="sidebar-user">
-    <img src={profileData.pictureUrl} alt="" />
+    <Avatar src={profileData.pictureUrl} alt={profileData.name} size="sm" border={false} />
     <span title={profileData.name}>{profileData.name}</span>
     <Button
         Icon={LogIcon}
@@ -64,14 +65,6 @@
         background: #1d1a17;
         border-top: 1px solid #2e2c29;
         min-width: 0;
-
-        img {
-            height: 2rem;
-            width: 2rem;
-            border-radius: 100%;
-            flex-shrink: 0;
-            object-fit: cover;
-        }
 
         span {
             flex: 1 1 0;

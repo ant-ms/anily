@@ -15,6 +15,7 @@
     } from "../../lib/context.svelte";
     import type AnimeDetailsData from "../../types/AnimeDetails";
     import Button from "../../lib/Button.svelte";
+    import IconButton from "../../lib/IconButton.svelte";
     import type AnimeGroupingsData from "../../types/AnimeGroupings";
     import type { ChainNode } from "../../types/AnimeGroupings";
     import { fade } from "svelte/transition";
@@ -221,9 +222,9 @@
             onclick={() => navigate(1)}
         />
         <div class="close-btn-wrapper">
-            <Button
+            <IconButton
                 Icon={XIcon}
-                style="ghost"
+                variant="ghost"
                 onclick={() => isSeasonsSidebarOpen.set(false)}
                 title="Close seasons"
             />

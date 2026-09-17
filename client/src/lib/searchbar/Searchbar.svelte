@@ -2,6 +2,8 @@
     import MagnifyingGlassIcon from "phosphor-svelte/lib/MagnifyingGlassIcon";
     import { apiBaseUrl, selectedAnimeAnilistId } from "../context.svelte";
     import { Debounced } from "runed";
+    import TextInput from "../TextInput.svelte";
+    import MenuItem from "../MenuItem.svelte";
 
     type SearchResult = {
         titleEnglish: string;
@@ -46,7 +48,6 @@
         autocompleteVisible = searchResults.length > 0;
     });
 
-    // TODO: Set autocomplete position
     let inputElement: HTMLElement | undefined;
     let autocompleteElement: HTMLElement | undefined;
     const autocompleteTopPadding = 8;
@@ -60,10 +61,12 @@
 </script>
 
 <div id="searchbar" bind:this={inputElement}>
-    <MagnifyingGlassIcon />
-    <input
+    <TextInput
         type="search"
         placeholder="Search anime..."
+        Icon={MagnifyingGlassIcon}
+        size="lg"
+        fullWidth
         bind:value={searchQuery}
         oninput={() => (autocompleteVisible = false)}
     />
@@ -75,43 +78,34 @@
     bind:this={autocompleteElement}
 >
     {#each searchResults as result}
-        <button
+        <MenuItem
+            label={result.titleEnglish || result.titleRomanji || result.titleNative}
             onclick={() => {
                 selectedAnimeAnilistId.set(result.anilistId);
             }}
-        >
-            {result.titleEnglish || result.titleRomanji || result.titleNative}
-        </button>
+        />
     {/each}
 </div>
 
 <style lang="scss">
     #searchbar {
         display: flex;
-        align-items: center;
-        gap: 0.5rem;
-
-        background: #1d1a17;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
+        width: 100%;
+        max-width: 600px;
     }
 
     #search-autocomplete {
         position: absolute;
         background: #1d1a17;
-        border-radius: 0.5rem;
+        border: 1px solid #3a3733;
+        border-radius: 8px;
         overflow: hidden;
-
+        z-index: 50;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+        padding: 4px;
         display: none;
         flex-direction: column;
-
-        button {
-            cursor: pointer;
-            padding: 0.5rem;
-            &:hover {
-                background: #2a2622;
-            }
-        }
+        gap: 2px;
 
         &.active {
             display: flex;

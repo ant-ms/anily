@@ -3,6 +3,10 @@
     import NavigationBar from "$lib/navigation/NavigationBar.svelte";
     import UserMenuModal from "$lib/navigation/UserMenuModal.svelte";
     import Sidebar from "$lib/sidebar/Sidebar.svelte";
+    import IconButton from "$lib/IconButton.svelte";
+    import Avatar from "$lib/Avatar.svelte";
+    import Badge from "$lib/Badge.svelte";
+    import EmptyState from "$lib/EmptyState.svelte";
     import "./app.scss";
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import LoginPage from "./pages/LoginPage.svelte";
@@ -77,52 +81,38 @@
         <header class="mobile-topbar">
             <div class="topbar-left">
                 {#if selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs"}
-                    <button
-                        type="button"
-                        class="topbar-btn back-btn"
+                    <IconButton
+                        Icon={CaretLeftIcon}
                         onclick={handleBack}
                         title="Back"
-                        aria-label="Back"
-                    >
-                        <CaretLeftIcon size="1.25rem" />
-                    </button>
+                    />
                 {/if}
 
                 <div class="topbar-title-wrapper">
                     <h1 class="topbar-title">{currentTitle}</h1>
                     {#if selectedAnimeAnilistId.current === undefined && activeTab?.id !== "home" && activeTab?.id !== "settings" && activeTab?.id !== "logs" && sidebarAnimeCount > 0}
-                        <span class="count-badge">{sidebarAnimeCount}</span>
+                        <Badge>{sidebarAnimeCount}</Badge>
                     {/if}
                 </div>
             </div>
 
             <div class="topbar-actions">
                 {#if selectedAnimeAnilistId.current !== undefined}
-                    <button
-                        type="button"
-                        class="topbar-btn"
-                        class:active={isSeasonsSidebarOpen.current}
+                    <IconButton
+                        Icon={TreeStructureIcon}
+                        active={isSeasonsSidebarOpen.current}
                         onclick={() =>
                             isSeasonsSidebarOpen.set(!isSeasonsSidebarOpen.current)}
                         title="Seasons & Relations"
-                        aria-label="Toggle Seasons"
-                    >
-                        <TreeStructureIcon size="1.2rem" />
-                    </button>
+                    />
                 {:else}
-                    <button
-                        type="button"
-                        class="topbar-avatar-btn"
+                    <Avatar
+                        src={profileData.pictureUrl}
+                        alt={profileData.name}
+                        size="sm"
                         onclick={() => (isMobileUserMenuOpen = true)}
                         title={profileData.name}
-                        aria-label="User Account"
-                    >
-                        <img
-                            src={profileData.pictureUrl}
-                            alt={profileData.name}
-                            class="topbar-avatar-img"
-                        />
-                    </button>
+                    />
                 {/if}
             </div>
         </header>
@@ -154,29 +144,21 @@
             {#if selectedAnimeAnilistId.current !== undefined}
                 <header class="tablet-topbar">
                     <div class="topbar-left">
-                        <button
-                            type="button"
-                            class="topbar-btn back-btn"
+                        <IconButton
+                            Icon={CaretLeftIcon}
                             onclick={handleBack}
                             title="Back"
-                            aria-label="Back"
-                        >
-                            <CaretLeftIcon size="1.25rem" />
-                        </button>
+                        />
                         <h2 class="topbar-title">Anime Details</h2>
                     </div>
                     <div class="topbar-actions">
-                        <button
-                            type="button"
-                            class="topbar-btn"
-                            class:active={isSeasonsSidebarOpen.current}
+                        <IconButton
+                            Icon={TreeStructureIcon}
+                            active={isSeasonsSidebarOpen.current}
                             onclick={() =>
                                 isSeasonsSidebarOpen.set(!isSeasonsSidebarOpen.current)}
                             title="Seasons & Relations"
-                            aria-label="Toggle Seasons"
-                        >
-                            <TreeStructureIcon size="1.2rem" />
-                        </button>
+                        />
                     </div>
                 </header>
             {/if}
@@ -191,11 +173,12 @@
                 {:else if selectedAnimeAnilistId.current}
                     <AnimeDetailsPage />
                 {:else}
-                    <div class="no-anime-selected">
-                        <TelevisionIcon size="3.5rem" />
-                        <p class="placeholder-title">Select an anime</p>
-                        <span class="placeholder-sub">Choose an anime from the list to view episodes, progress, and details</span>
-                    </div>
+                    <EmptyState
+                        Icon={TelevisionIcon}
+                        iconSize="3.5rem"
+                        title="Select an anime"
+                        description="Choose an anime from the list to view episodes, progress, and details"
+                    />
                 {/if}
             </div>
         </div>
@@ -265,34 +248,6 @@
         overflow-y: auto;
     }
 
-    .no-anime-selected {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        min-height: 300px;
-        padding: 32px;
-        text-align: center;
-        color: hsl(36, 10%, 40%);
-        user-select: none;
-
-        .placeholder-title {
-            margin: 16px 0 4px 0;
-            font-size: 18px;
-            font-weight: 600;
-            color: hsl(36, 10%, 65%);
-        }
-
-        .placeholder-sub {
-            margin: 0;
-            font-size: 13px;
-            color: hsl(36, 10%, 45%);
-            max-width: 320px;
-            line-height: 1.4;
-        }
-    }
-
     .bar-container {
         display: none;
     }
@@ -328,31 +283,6 @@
                 align-items: center;
                 gap: 12px;
                 min-width: 0;
-            }
-
-            .topbar-btn {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 36px;
-                height: 36px;
-                border-radius: 8px;
-                background: hsl(20, 17.6%, 12%);
-                border: 1px solid hsl(36, 5.7%, 20%);
-                color: #ddd;
-                cursor: pointer;
-                transition: background 0.15s, color 0.15s;
-
-                &:hover {
-                    background: hsl(20, 17.6%, 18%);
-                    color: #fff;
-                }
-
-                &.active {
-                    background: #ffd52c18;
-                    border-color: #ffd52c;
-                    color: #ffd52c;
-                }
             }
 
             .topbar-title {
@@ -445,72 +375,12 @@
                 text-overflow: ellipsis;
             }
 
-            .count-badge {
-                font-size: 11px;
-                font-weight: 600;
-                color: #ffd52c;
-                background: rgba(255, 213, 44, 0.15);
-                padding: 2px 7px;
-                border-radius: 12px;
-            }
-
-            .topbar-btn {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 36px;
-                height: 36px;
-                border-radius: 8px;
-                background: hsl(20, 17.6%, 12%);
-                border: 1px solid hsl(36, 5.7%, 20%);
-                color: #ddd;
-                cursor: pointer;
-                transition: background 0.15s, color 0.15s;
-
-                &:hover {
-                    background: hsl(20, 17.6%, 18%);
-                    color: #fff;
-                }
-
-                &.active {
-                    background: #ffd52c18;
-                    border-color: #ffd52c;
-                    color: #ffd52c;
-                }
-            }
-
             .topbar-actions {
                 display: flex;
                 align-items: center;
                 gap: 8px;
                 margin-left: auto;
                 flex-shrink: 0;
-            }
-
-            .topbar-avatar-btn {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                padding: 0;
-                border: 1.5px solid rgba(255, 213, 44, 0.4);
-                background: transparent;
-                cursor: pointer;
-                overflow: hidden;
-                transition: border-color 0.15s;
-
-                &:hover {
-                    border-color: #ffd52c;
-                }
-
-                .topbar-avatar-img {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                    display: block;
-                }
             }
         }
 

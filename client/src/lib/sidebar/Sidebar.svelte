@@ -10,6 +10,9 @@
     } from "../context.svelte";
     import SidebarCard from "./SidebarCard.svelte";
     import ListDashesIcon from "phosphor-svelte/lib/ListDashesIcon";
+    import Badge from "../Badge.svelte";
+    import MenuItem from "../MenuItem.svelte";
+    import EmptyState from "../EmptyState.svelte";
 
     let {
         activeTab = $bindable(),
@@ -81,7 +84,7 @@
         <div class="header-left">
             <h2 class="pane-title">{currentTitle}</h2>
             {#if activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "home" && visibleCardData.length > 0}
-                <span class="count-badge">{visibleCardData.length}</span>
+                <Badge>{visibleCardData.length}</Badge>
             {/if}
         </div>
     </div>
@@ -90,14 +93,12 @@
     <div class="sidebar-content">
         {#if activeTab?.id === "logs"}
             <div class="logs-sidebar-nav">
-                <button
-                    type="button"
-                    class="nav-item active"
+                <MenuItem
+                    Icon={ListDashesIcon}
+                    label="Import Logs"
+                    active
                     onclick={() => handleNavClick({ id: "logs", name: "Logs" })}
-                >
-                    <ListDashesIcon size="1.2rem" />
-                    <span>Import Logs</span>
-                </button>
+                />
             </div>
         {:else if activeTab?.id !== "settings" && activeTab?.id !== "home"}
             {#if visibleCardData.length > 0}
@@ -107,10 +108,10 @@
                     {/each}
                 </div>
             {:else if !isLoading}
-                <div class="empty-state">
-                    <p class="empty-text">No anime in {currentTitle}</p>
-                    <span class="empty-sub">Anime added will show up here</span>
-                </div>
+                <EmptyState
+                    title="No anime in {currentTitle}"
+                    description="Anime added will show up here"
+                />
             {/if}
         {/if}
     </div>
@@ -166,15 +167,6 @@
                 color: #ffffff;
                 letter-spacing: 0.15px;
             }
-
-            .count-badge {
-                font-size: 11px;
-                font-weight: 600;
-                color: #ffd52c;
-                background: rgba(255, 213, 44, 0.15);
-                padding: 2px 7px;
-                border-radius: 12px;
-            }
         }
 
         .sidebar-content {
@@ -189,55 +181,6 @@
                 flex-direction: column;
                 gap: 8px;
                 padding: 12px;
-
-                .nav-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 12px 16px;
-                    border-radius: 8px;
-                    background: hsl(20, 17.6%, 8.5%);
-                    border: 1px solid hsl(36, 5.7%, 20%);
-                    color: #ddd;
-                    font-size: 14px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: background 0.2s, border 0.2s, color 0.2s;
-
-                    &:hover {
-                        background: hsl(20, 17.6%, 14%);
-                        color: #fff;
-                    }
-
-                    &.active {
-                        background: #ffd52c18;
-                        border-color: #ffd52c;
-                        color: #ffd52c;
-                    }
-                }
-            }
-
-            .empty-state {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                padding: 48px 16px;
-                text-align: center;
-                color: #888;
-
-                .empty-text {
-                    margin: 0;
-                    font-size: 14px;
-                    font-weight: 500;
-                    color: #bbb;
-                }
-
-                .empty-sub {
-                    margin-top: 4px;
-                    font-size: 12px;
-                    color: #777;
-                }
             }
         }
     }
