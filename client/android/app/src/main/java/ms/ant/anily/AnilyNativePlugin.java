@@ -41,8 +41,8 @@ public class AnilyNativePlugin extends Plugin {
                 File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
                 File file = new File(moviesDir, targetFilename);
 
-                if (!file.exists()) {
-                    call.reject("File does not exist: " + targetFilename);
+                if (!file.exists() || file.length() == 0) {
+                    call.reject("File does not exist or is empty: " + targetFilename);
                     return;
                 }
 
@@ -197,6 +197,20 @@ public class AnilyNativePlugin extends Plugin {
                         out.flush();
                     }
 
+                    if (task.bytesDownloaded == 0) {
+                        task.status = "FAILED";
+                        task.errorMessage = "Server returned empty stream (0 bytes)";
+                        if (tmpFile.exists()) tmpFile.delete();
+                        return;
+                    }
+
+                    if (task.totalBytes > 0 && task.bytesDownloaded < task.totalBytes) {
+                        task.status = "FAILED";
+                        task.errorMessage = "Download incomplete: received " + task.bytesDownloaded + " of " + task.totalBytes + " bytes";
+                        if (tmpFile.exists()) tmpFile.delete();
+                        return;
+                    }
+
                     if (finalFile.exists()) {
                         finalFile.delete();
                     }
@@ -253,7 +267,7 @@ public class AnilyNativePlugin extends Plugin {
         File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
         if (filename != null) {
             File file = new File(moviesDir, filename);
-            if (file.exists()) {
+            if (file.exists() && file.length() > 0) {
                 JSObject ret = new JSObject();
                 ret.put("status", "SUCCESSFUL");
                 ret.put("bytesDownloaded", file.length());
@@ -312,9 +326,14 @@ public class AnilyNativePlugin extends Plugin {
             File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
             File file = new File(moviesDir, filename);
 
+            boolean exists = file.exists() && file.length() > 0;
+            if (file.exists() && file.length() == 0) {
+                file.delete();
+            }
+
             JSObject ret = new JSObject();
-            ret.put("exists", file.exists());
-            ret.put("size", file.exists() ? file.length() : 0);
+            ret.put("exists", exists);
+            ret.put("size", exists ? file.length() : 0);
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("Failed to check file: " + e.getMessage(), e);

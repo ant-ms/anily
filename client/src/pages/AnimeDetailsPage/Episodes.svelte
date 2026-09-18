@@ -145,7 +145,8 @@
             } catch {}
         } catch (err) {
             console.warn("Failed to fetch episodes online, using cached episodes if available:", err);
-            if (episodes.length === 0 && networkState.isOnline) {
+            const isLoggedOut = !localStorage.getItem("authToken") && !localStorage.getItem("anily:profile_data");
+            if (episodes.length === 0 && networkState.isOnline && !isLoggedOut) {
                 snackbar.error("Failed to load episodes");
             }
         } finally {
@@ -216,6 +217,12 @@
             month: "short",
             day: "numeric",
         });
+    };
+
+    const formatDownloadBytes = (bytes: number): string => {
+        if (!bytes || bytes <= 0) return "...";
+        const mb = bytes / (1024 * 1024);
+        return `${mb.toFixed(1)} MB`;
     };
 
     function isFuture(airingAt: string | null) {
@@ -528,15 +535,17 @@
                             <Button
                                 disabled={true}
                                 loading={true}
-                                title={`Downloading: ${dlState.progress}%`}
+                                title={dlState.progress > 0 ? `Downloading: ${dlState.progress}%` : `Downloading: ${formatDownloadBytes(dlState.bytesDownloaded)}`}
                             >
-                                <span class="download-progress-text">{dlState.progress}%</span>
+                                <span class="download-progress-text">
+                                    {dlState.progress > 0 ? `${dlState.progress}%` : (dlState.bytesDownloaded > 0 ? `${Math.round(dlState.bytesDownloaded / 1024 / 1024)}MB` : "...")}
+                                </span>
                             </Button>
                         {:else}
                             <Button
                                 Icon={DownloadSimpleIcon}
                                 title="Download episode for offline viewing"
-                                onclick={() => downloadManager.startDownload(episode.id, episode.number, animeName, getStoredLanguagePreference(), selectedAnimeAnilistId.current)}
+                                onclick={() => downloadManager.startDownload(episode.id, episode.number, animeName, getStoredLanguagePreference(), selectedAnimeAnilistId.current, selectedServices[episode.id])}
                             />
                         {/if}
                     {/if}

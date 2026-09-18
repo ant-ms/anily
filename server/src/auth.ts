@@ -6,7 +6,7 @@ import {
   getAuth,
 } from "@hono/oidc-auth";
 import { cors } from "hono/cors";
-import { getCookie } from "hono/cookie";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 
 export const isAllowedOrigin = (origin: string): boolean => {
   if (!origin) return false;
@@ -86,7 +86,35 @@ export const setupAuthHandlers = (app: Hono) => {
     if (!process.env.OIDC_ISSUER && !process.env.OIDC_CLIENT_ID) {
       return next();
     }
-    return oidcAuthMiddleware()(c, next);
+    if (c.req.path === "/api/login") {
+      return oidcAuthMiddleware()(c, next);
+    }
+
+    try {
+      const auth = await getAuth(c);
+      if (!auth) {
+        const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
+        deleteCookie(c, cookieName, { path: "/" });
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+    } catch {
+      const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
+      deleteCookie(c, cookieName, { path: "/" });
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    await next();
+
+    c.res.headers.set("Cache-Control", "private, no-cache");
+    const session_jwt = c.get("oidcAuthJwt" as any);
+    if (session_jwt !== undefined) {
+      const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
+      setCookie(c, cookieName, session_jwt, {
+        path: "/",
+        httpOnly: true,
+        secure: true,
+      });
+    }
   });
   app.get("/api/login", (c) => {
     const isMobile = c.req.query("mobile") === "1";

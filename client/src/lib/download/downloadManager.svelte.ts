@@ -85,7 +85,7 @@ class DownloadManager {
     if (isNative) {
       try {
         const check = await AnilyNative.checkDownloadedEpisode({ filename });
-        if (check.exists) {
+        if (check.exists && check.size > 0) {
           this.states[episodeId] = {
             episodeId,
             anilistId: anilistId ?? this.states[episodeId]?.anilistId,
@@ -208,6 +208,7 @@ class DownloadManager {
     animeName: string,
     lang: "sub" | "dub" = "sub",
     anilistId?: number,
+    service?: { providerId: string; identifier: string; serverId?: string },
   ) {
     if (!apiBaseUrl.current) {
       snackbar.error("Backend URL not configured");
@@ -219,6 +220,14 @@ class DownloadManager {
       `/api/stream/download/${episodeId}?language=${lang}`,
       apiBaseUrl.current,
     );
+
+    if (service?.providerId && service?.identifier) {
+      downloadUrlObj.searchParams.set("providerId", service.providerId);
+      downloadUrlObj.searchParams.set("identifier", service.identifier);
+      if (service.serverId) {
+        downloadUrlObj.searchParams.set("server", service.serverId);
+      }
+    }
 
     const token = localStorage.getItem("authToken");
     if (token) {
@@ -373,14 +382,19 @@ class DownloadManager {
           });
 
           if (status.status === "SUCCESSFUL") {
-            state.status = "completed";
-            state.progress = 100;
-            state.bytesDownloaded = status.bytesDownloaded;
-            state.totalBytes = status.totalBytes;
-            if (state.anilistId) {
-              this.addDownloadedAnimeId(state.anilistId);
+            if (status.bytesDownloaded > 0) {
+              state.status = "completed";
+              state.progress = 100;
+              state.bytesDownloaded = status.bytesDownloaded;
+              state.totalBytes = status.totalBytes;
+              if (state.anilistId) {
+                this.addDownloadedAnimeId(state.anilistId);
+              }
+              snackbar.success(`Episode download completed!`);
+            } else {
+              state.status = "failed";
+              snackbar.error("Episode download failed: received 0 bytes");
             }
-            snackbar.success(`Episode download completed!`);
           } else if (status.status === "FAILED") {
             state.status = "failed";
             snackbar.error(String(status.reason || "Episode download failed"));

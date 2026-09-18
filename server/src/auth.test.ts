@@ -148,4 +148,28 @@ describe("CORS configuration", () => {
     const data = await res.json();
     expect(data.cookie).toContain("oidc-auth=my-query-token-abc");
   });
+
+  it("returns 401 Unauthorized for unauthenticated /api/* requests when OIDC is active", async () => {
+    process.env.OIDC_ISSUER = "https://example.com";
+    process.env.OIDC_CLIENT_ID = "test-client";
+    try {
+      const testApp = new Hono();
+      setupAuthHandlers(testApp);
+      testApp.get("/api/episodes/123", (c) => c.json({ episodes: [] }));
+
+      const res = await testApp.request("/api/episodes/123", {
+        headers: {
+          Origin: "https://codeee-5173.ant.ms",
+        },
+      });
+
+      expect(res.status).toBe(401);
+      const data = await res.json();
+      expect(data.error).toBe("Unauthorized");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://codeee-5173.ant.ms");
+    } finally {
+      delete process.env.OIDC_ISSUER;
+      delete process.env.OIDC_CLIENT_ID;
+    }
+  });
 });
