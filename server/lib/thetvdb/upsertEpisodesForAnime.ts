@@ -125,6 +125,10 @@ export const upsertEpisodesForAnime = async (
     await cleanupStrayEpisodes(details.id, effectiveEpisodeCount);
   }
 
+  const mapping = await resolveTvdbMapping(anilistId, async () => {
+    return details.baseAnime.titleEnglish || details.baseAnime.titleRomanji || null;
+  });
+
   if (!mapping) {
     await upsertFallbackEpisodes(details, effectiveEpisodeCount, fallbackStartDate);
     return;
