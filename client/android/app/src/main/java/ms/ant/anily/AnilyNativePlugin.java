@@ -101,6 +101,53 @@ public class AnilyNativePlugin extends Plugin {
     private final java.util.Map<String, DownloadTask> activeDownloads = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ExecutorService downloadExecutor = java.util.concurrent.Executors.newFixedThreadPool(2);
 
+    private void startDownloadService(String title, String text) {
+        try {
+            Context context = getContext();
+            Intent intent = new Intent(context, DownloadService.class);
+            intent.setAction(DownloadService.ACTION_START);
+            intent.putExtra("title", title);
+            intent.putExtra("text", text);
+            intent.putExtra("indeterminate", true);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(intent);
+            } else {
+                context.startService(intent);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void updateDownloadServiceProgress(String title, String text, int progress) {
+        try {
+            Context context = getContext();
+            Intent intent = new Intent(context, DownloadService.class);
+            intent.setAction(DownloadService.ACTION_UPDATE);
+            intent.putExtra("title", title);
+            intent.putExtra("text", text);
+            intent.putExtra("progress", progress);
+            intent.putExtra("indeterminate", progress < 0);
+            context.startService(intent);
+        } catch (Exception ignored) {}
+    }
+
+    private void checkStopDownloadService() {
+        boolean hasActive = false;
+        for (DownloadTask t : activeDownloads.values()) {
+            if ("RUNNING".equals(t.status) || "PENDING".equals(t.status)) {
+                hasActive = true;
+                break;
+            }
+        }
+        if (!hasActive) {
+            try {
+                Context context = getContext();
+                Intent intent = new Intent(context, DownloadService.class);
+                intent.setAction(DownloadService.ACTION_STOP);
+                context.startService(intent);
+            } catch (Exception ignored) {}
+        }
+    }
+
     @PluginMethod
     public void downloadEpisode(PluginCall call) {
         String url = call.getString("url");
@@ -122,6 +169,8 @@ public class AnilyNativePlugin extends Plugin {
             task.filename = filename;
             task.status = "RUNNING";
             activeDownloads.put(downloadId, task);
+
+            startDownloadService(animeTitle, "Downloading " + title);
 
             task.future = downloadExecutor.submit(() -> {
                 File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
@@ -201,6 +250,7 @@ public class AnilyNativePlugin extends Plugin {
                          FileOutputStream out = new FileOutputStream(tmpFile)) {
                         byte[] buffer = new byte[16384];
                         int bytesRead;
+                        long lastNotifiedBytes = 0;
                         while ((bytesRead = in.read(buffer)) != -1) {
                             if (Thread.currentThread().isInterrupted()) {
                                 task.status = "FAILED";
@@ -210,6 +260,17 @@ public class AnilyNativePlugin extends Plugin {
                             }
                             out.write(buffer, 0, bytesRead);
                             task.bytesDownloaded += bytesRead;
+
+                            if (task.bytesDownloaded - lastNotifiedBytes > 512 * 1024) {
+                                lastNotifiedBytes = task.bytesDownloaded;
+                                int prog = -1;
+                                String progressText = (task.bytesDownloaded / (1024 * 1024)) + " MB";
+                                if (task.totalBytes > 0) {
+                                    prog = (int) ((task.bytesDownloaded * 100) / task.totalBytes);
+                                    progressText += " / " + (task.totalBytes / (1024 * 1024)) + " MB (" + prog + "%)";
+                                }
+                                updateDownloadServiceProgress(animeTitle, title + " • " + progressText, prog);
+                            }
                         }
                         out.flush();
                     }
@@ -246,6 +307,7 @@ public class AnilyNativePlugin extends Plugin {
                     if (conn != null) {
                         try { conn.disconnect(); } catch (Exception ignored) {}
                     }
+                    checkStopDownloadService();
                 }
             });
 
@@ -304,12 +366,22 @@ public class AnilyNativePlugin extends Plugin {
     @PluginMethod
     public void cancelDownload(PluginCall call) {
         String downloadIdStr = call.getString("downloadId");
-        if (downloadIdStr == null) {
-            call.reject("downloadId is required");
+        String filename = call.getString("filename");
+        if (downloadIdStr == null && filename == null) {
+            call.reject("downloadId or filename is required");
             return;
         }
 
-        DownloadTask task = activeDownloads.remove(downloadIdStr);
+        DownloadTask task = downloadIdStr != null ? activeDownloads.remove(downloadIdStr) : null;
+        if (task == null && filename != null) {
+            for (java.util.Map.Entry<String, DownloadTask> entry : activeDownloads.entrySet()) {
+                if (filename.equals(entry.getValue().filename)) {
+                    task = activeDownloads.remove(entry.getKey());
+                    break;
+                }
+            }
+        }
+
         if (task != null) {
             if (task.future != null) {
                 task.future.cancel(true);
@@ -324,6 +396,8 @@ public class AnilyNativePlugin extends Plugin {
                 tmpFile.delete();
             }
         }
+
+        checkStopDownloadService();
 
         JSObject ret = new JSObject();
         ret.put("success", true);

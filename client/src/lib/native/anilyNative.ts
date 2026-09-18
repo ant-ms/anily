@@ -36,7 +36,8 @@ export interface AnilyNativePlugin {
   }>;
 
   cancelDownload(options: {
-    downloadId: string;
+    downloadId?: string;
+    filename?: string;
   }): Promise<{ success: boolean }>;
 
   checkDownloadedEpisode(options: {

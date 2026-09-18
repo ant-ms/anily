@@ -19,6 +19,7 @@
     import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
     import DatabaseIcon from "phosphor-svelte/lib/DatabaseIcon";
     import TelevisionIcon from "phosphor-svelte/lib/TelevisionIcon";
+    import XIcon from "phosphor-svelte/lib/XIcon";
 
     const COLOR_PALETTE = [
         "#ffd52c", // Gold / Amber
@@ -82,6 +83,12 @@
             return null;
         }
     }
+
+    const activeDownloadingEpisodes = $derived.by((): DownloadState[] => {
+        return Object.values(downloadManager.states).filter(
+            (s) => s.status === "downloading",
+        );
+    });
 
     const animeGroups = $derived.by((): AnimeDownloadGroup[] => {
         const completed = Object.values(downloadManager.states).filter(
@@ -250,6 +257,44 @@
         </div>
     </header>
 
+    {#if activeDownloadingEpisodes.length > 0}
+        <!-- Active Downloads Section -->
+        <section class="active-downloads-section">
+            <div class="section-header">
+                <h3>Active Downloads ({activeDownloadingEpisodes.length})</h3>
+            </div>
+            <div class="active-downloads-list">
+                {#each activeDownloadingEpisodes as dl (dl.episodeId)}
+                    <div class="active-dl-card">
+                        <div class="active-dl-main">
+                            <div class="active-dl-info">
+                                <span class="active-dl-title">{dl.animeTitle || "Anime"} • EP {dl.episodeNumber ?? "?"}</span>
+                                <span class="active-dl-meta">
+                                    {dl.progress > 0 ? `${dl.progress}%` : formatBytes(dl.bytesDownloaded)}
+                                    {#if dl.totalBytes > 0} / {formatBytes(dl.totalBytes)}{/if}
+                                </span>
+                            </div>
+                            <div class="active-dl-bar-bg">
+                                <div class="active-dl-bar-fill" style="width: {Math.max(dl.progress, 3)}%"></div>
+                            </div>
+                        </div>
+                        <div class="active-dl-actions">
+                            <Button
+                                Icon={XIcon}
+                                style="ghost"
+                                class="btn-cancel-dl"
+                                onclick={() => downloadManager.cancelDownload(dl.episodeId)}
+                                title="Cancel download"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        </section>
+    {/if}
+
     {#if animeGroups.length > 0}
         <!-- Storage Overview Card with Segmented Linear Visual Bar -->
         <section class="storage-card">
@@ -413,7 +458,7 @@
                 {/each}
             </div>
         </section>
-    {:else}
+    {:else if activeDownloadingEpisodes.length === 0}
         <EmptyState
             Icon={DownloadSimpleIcon}
             iconSize="3.5rem"
@@ -655,6 +700,96 @@
                         color: #857f78;
                         font-size: 0.75rem;
                     }
+                }
+            }
+        }
+
+        /* Active Downloads Section */
+        .active-downloads-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+
+            .section-header {
+                h3 {
+                    margin: 0;
+                    font-size: 1.05rem;
+                    font-weight: 600;
+                    color: #ded7ce;
+                }
+            }
+
+            .active-downloads-list {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .active-dl-card {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                padding: 12px 16px;
+                background: hsl(20, 17.6%, 8.5%);
+                border: 1px solid hsl(36, 5.7%, 18%);
+                border-radius: 10px;
+
+                @media (max-width: 600px) {
+                    flex-direction: column;
+                    align-items: stretch;
+                    gap: 12px;
+                }
+
+                .active-dl-main {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    flex: 1;
+                    min-width: 0;
+
+                    .active-dl-info {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: baseline;
+                        gap: 12px;
+
+                        .active-dl-title {
+                            font-weight: 600;
+                            font-size: 0.95rem;
+                            color: #ded7ce;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                        }
+
+                        .active-dl-meta {
+                            font-size: 0.8rem;
+                            color: #ffd52c;
+                            font-weight: 600;
+                            flex-shrink: 0;
+                        }
+                    }
+
+                    .active-dl-bar-bg {
+                        height: 6px;
+                        border-radius: 3px;
+                        background: hsl(20, 17.6%, 14%);
+                        overflow: hidden;
+
+                        .active-dl-bar-fill {
+                            height: 100%;
+                            background: #ffd52c;
+                            border-radius: 3px;
+                            transition: width 0.3s ease;
+                        }
+                    }
+                }
+
+                .active-dl-actions {
+                    flex-shrink: 0;
+                    display: flex;
+                    justify-content: flex-end;
                 }
             }
         }
@@ -904,6 +1039,15 @@
     }
 
     :global(.btn-delete-anime) {
+        color: #f87171 !important;
+
+        &:hover {
+            background: rgba(239, 68, 68, 0.15) !important;
+            color: #ef4444 !important;
+        }
+    }
+
+    :global(.btn-cancel-dl) {
         color: #f87171 !important;
 
         &:hover {

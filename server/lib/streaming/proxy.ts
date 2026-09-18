@@ -35,6 +35,39 @@ export function makeProxiedUrl(
   return `/api/stream/proxy/${filename}?url=${encodeURIComponent(absUrl)}${refParam}`;
 }
 
+const vttDurationCache = new Map<string, number>();
+
+export async function getVttDuration(vttUrl: string, referer?: string): Promise<number> {
+  if (vttDurationCache.has(vttUrl)) {
+    return vttDurationCache.get(vttUrl)!;
+  }
+  try {
+    const headers: Record<string, string> = {
+      "User-Agent": DEFAULT_USER_AGENT,
+    };
+    if (referer) {
+      headers["Referer"] = referer;
+    }
+    const res = await fetch(vttUrl, { headers, signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const text = await res.text();
+      const matches = [...text.matchAll(/(?:(\d{1,2}):)?(\d{2}):(\d{2})\.(\d{3})/g)];
+      if (matches.length > 0) {
+        const last = matches[matches.length - 1];
+        const h = last[1] ? parseInt(last[1], 10) : 0;
+        const m = parseInt(last[2], 10);
+        const s = parseInt(last[3], 10);
+        const dur = h * 3600 + m * 60 + s + 2;
+        vttDurationCache.set(vttUrl, dur);
+        return dur;
+      }
+    }
+  } catch (err) {
+    log.warn({ err, vttUrl }, "Failed to fetch/parse VTT duration, using fallback");
+  }
+  return 1440;
+}
+
 export async function handleStreamProxy(c: Context) {
   if (c.req.method === "OPTIONS") {
     return new Response(null, {
@@ -52,12 +85,13 @@ export async function handleStreamProxy(c: Context) {
   const referer = c.req.query("ref") || "";
 
   if (subVtt) {
+    const duration = await getVttDuration(subVtt, referer);
     const vttProxiedUrl = `/api/stream/proxy/subtitle.vtt?url=${encodeURIComponent(subVtt)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}`;
     const vttPlaylist = `#EXTM3U
-#EXT-X-TARGETDURATION:7200
+#EXT-X-TARGETDURATION:${Math.ceil(duration)}
 #EXT-X-VERSION:3
 #EXT-X-MEDIA-SEQUENCE:0
-#EXTINF:7200.0,
+#EXTINF:${duration.toFixed(1)},
 ${vttProxiedUrl}
 #EXT-X-ENDLIST
 `;

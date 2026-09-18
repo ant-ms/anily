@@ -30,6 +30,18 @@ class DownloadManager {
   constructor() {
     if (typeof window !== "undefined") {
       this.loadPersistedDownloads();
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && isNative) {
+          this.checkAllActiveDownloads();
+        }
+      });
+
+      window.addEventListener("focus", () => {
+        if (isNative) {
+          this.checkAllActiveDownloads();
+        }
+      });
     }
   }
 
@@ -335,6 +347,34 @@ class DownloadManager {
       console.error("Failed to launch offline player:", err);
       snackbar.error("Failed to open video player");
     }
+  }
+
+  public async cancelDownload(episodeId: number) {
+    const state = this.states[episodeId];
+    if (!state) return;
+
+    if (isNative) {
+      try {
+        await AnilyNative.cancelDownload({
+          downloadId: state.downloadId,
+          filename: state.filename,
+        });
+      } catch (err) {
+        console.error("Failed to cancel native download:", err);
+      }
+    }
+
+    delete this.states[episodeId];
+    this.persist();
+
+    const hasActive = Object.values(this.states).some(
+      (s) => s.status === "downloading",
+    );
+    if (!hasActive) {
+      this.stopPolling();
+    }
+
+    snackbar.info("Download cancelled");
   }
 
   public async deleteDownload(

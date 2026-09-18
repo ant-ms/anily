@@ -27,6 +27,7 @@
     import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
     import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
     import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
+    import XIcon from 'phosphor-svelte/lib/XIcon';
 
     let {
         episode,
@@ -129,11 +130,11 @@
                 />
             {:else if dlState?.status === 'downloading'}
                 <Button
-                    disabled={true}
-                    loading={true}
+                    Icon={XIcon}
                     title={dlState.progress > 0
-                        ? `Downloading: ${dlState.progress}%`
-                        : `Downloading: ${formatDownloadBytes(dlState.bytesDownloaded)}`}
+                        ? `Downloading: ${dlState.progress}% (click to cancel)`
+                        : `Downloading... (click to cancel)`}
+                    onclick={() => downloadManager.cancelDownload(episode.id)}
                 >
                     <span class="download-progress-text">
                         {dlState.progress > 0
