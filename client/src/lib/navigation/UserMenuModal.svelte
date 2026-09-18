@@ -12,6 +12,8 @@
     import IconButton from "../IconButton.svelte";
     import MenuItem from "../MenuItem.svelte";
 
+    import { signOut } from "$lib/auth";
+
     let {
         profileData,
         activeTab = $bindable(),
@@ -29,9 +31,8 @@
     }
 
     function handleSignOut() {
-        if (typeof window !== "undefined") {
-            window.location.href = `${apiBaseUrl.current}logout`;
-        }
+        isOpen = false;
+        signOut();
     }
 </script>
 

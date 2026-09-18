@@ -515,7 +515,7 @@
                     />
 
                     <!-- Offline Download action -->
-                    {#if !isFuture(episode.airingAt)}
+                    {#if isNative && !isFuture(episode.airingAt)}
                         {@const dlState = downloadManager.states[episode.id]}
                         {#if dlState?.status === "completed"}
                             <Button

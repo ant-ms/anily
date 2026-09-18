@@ -12,6 +12,8 @@
     import CloudSlashIcon from "phosphor-svelte/lib/CloudSlashIcon";
     import { networkState } from "../network.svelte";
 
+    import { signOut } from "$lib/auth";
+
     let {
         activeTab = $bindable(),
         profileData,
@@ -38,9 +40,8 @@
     }
 
     function handleSignOut() {
-        if (typeof window !== "undefined") {
-            window.location.href = `${apiBaseUrl.current}logout`;
-        }
+        isProfileMenuOpen = false;
+        signOut();
     }
 </script>
 

@@ -6,7 +6,8 @@
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
     import type { Tab } from "../tab-switcher/tab-switcher-types";
     import type ProfileData from "../../types/ProfileData";
-    import { apiBaseUrl, isMobileNavOpen } from "../context.svelte";
+    import { signOut } from "../auth";
+    import { isMobileNavOpen } from "../context.svelte";
 
     let {
         activeTab = $bindable(),
@@ -48,9 +49,7 @@
     />
     <Button
         Icon={SignOutIcon}
-        onclick={() => {
-            window.location.href = `${apiBaseUrl.current}logout`;
-        }}
+        onclick={() => signOut()}
     />
 </div>
 

@@ -135,8 +135,14 @@
             }
         };
 
+        const handleUnauthorized = () => {
+            profileData = undefined;
+            snackbar.error("Session expired. Please sign in again.");
+        };
+
         window.addEventListener("unhandledrejection", handleUnhandledRejection);
         window.addEventListener("error", handleError);
+        window.addEventListener("anily:unauthorized", handleUnauthorized);
 
         return () => {
             window.removeEventListener(
@@ -144,7 +150,34 @@
                 handleUnhandledRejection,
             );
             window.removeEventListener("error", handleError);
+            window.removeEventListener("anily:unauthorized", handleUnauthorized);
         };
+    });
+
+    $effect(() => {
+        if (networkState.isOnline && apiBaseUrl.current && profileData) {
+            fetch(`${apiBaseUrl.current}api/me`, { credentials: "include" })
+                .then(async (res) => {
+                    if (res.ok) {
+                        const contentType = res.headers.get("content-type") || "";
+                        if (contentType.includes("application/json")) {
+                            const content = await res.json();
+                            const displayName =
+                                content.name ||
+                                content.preferred_username ||
+                                content.email ||
+                                content.sub;
+                            if (displayName) {
+                                profileData = {
+                                    name: typeof displayName === "string" ? displayName.split(" ")[0] : "User",
+                                    pictureUrl: content.picture || "",
+                                };
+                            }
+                        }
+                    }
+                })
+                .catch(() => {});
+        }
     });
 </script>
 
