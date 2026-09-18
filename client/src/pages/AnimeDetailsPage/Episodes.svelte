@@ -288,13 +288,35 @@
             }
 
             const preferredLang = getStoredLanguagePreference();
-            const bestService = pickBestService(services, preferredLang);
-            if (!bestService) {
+            // Prioritize preferred language candidates first, keeping others as fallback
+            const matchingLanguage = sortServicesWithHdFirst(
+                services.filter((s) => s.language === preferredLang),
+            );
+            const otherLanguage = sortServicesWithHdFirst(
+                services.filter((s) => s.language !== preferredLang),
+            );
+            const candidateQueue = [...matchingLanguage, ...otherLanguage];
+
+            if (candidateQueue.length === 0) {
                 snackbar.error("No suitable stream found for this episode");
                 return;
             }
 
-            await playService(episode, bestService);
+            let played = false;
+            for (const candidate of candidateQueue) {
+                const success = await playService(episode, candidate, false);
+                if (success) {
+                    played = true;
+                    break;
+                }
+                console.warn(
+                    `Streaming server ${candidate.providerName} (${candidate.serverName}) failed, trying next candidate...`,
+                );
+            }
+
+            if (!played) {
+                snackbar.error("Failed to load stream from any available server");
+            }
         } finally {
             autoPlayingEpisodeId = null;
         }
@@ -317,7 +339,11 @@
         }
     }
 
-    async function playService(episode: EpisodeData, service: AvailableService) {
+    async function playService(
+        episode: EpisodeData,
+        service: AvailableService,
+        showErrorMessage = true,
+    ): Promise<boolean> {
         selectedServices[episode.id] = service;
         dropdownOpenEpisodeId = null;
         resolvingEpisodeId = episode.id;
@@ -362,9 +388,13 @@
                     window.location.href = playerUrl;
                 }
             }
+            return true;
         } catch (err) {
             console.error("Failed to play service stream", err);
-            snackbar.error("Failed to load stream from provider");
+            if (showErrorMessage) {
+                snackbar.error("Failed to load stream from provider");
+            }
+            return false;
         } finally {
             resolvingEpisodeId = null;
         }

@@ -79,9 +79,8 @@ export class JustAnimeProvider implements BaseProvider {
     _lang: StreamLanguage,
   ): Promise<{ episodes: number[]; servers: Array<{ id: string; name: string }> }> {
     const servers = [
+      { id: "megaplay", name: "HD - MegaPlay" },
       { id: "zokoanime", name: "HD - ZokoAnime" },
-      { id: "megaplay", name: "MegaPlay" },
-      { id: "animegg", name: "AnimeGG" },
     ];
 
     if (this.episodesCache.has(identifier)) {
@@ -125,16 +124,16 @@ export class JustAnimeProvider implements BaseProvider {
     identifier: string,
     episode: number,
     lang: StreamLanguage,
-    server = "zokoanime",
+    server = "megaplay",
   ): Promise<StreamSource | null> {
-    const candidateServers = Array.from(new Set([server, "zokoanime", "megaplay", "animegg"]));
+    const candidateServers = Array.from(new Set([server, "megaplay", "zokoanime"]));
 
     for (const s of candidateServers) {
       try {
         const url = `${API_BASE}/watch/${identifier}/episode/${episode}/${s}`;
         const res = await fetch(url, {
           headers: DEFAULT_HEADERS,
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(6000),
         });
 
         if (!res.ok) continue;
@@ -161,8 +160,7 @@ export class JustAnimeProvider implements BaseProvider {
           url: source.url,
           container: isHls ? "hls" : "mp4",
           headers,
-          serverName:
-            s === "zokoanime" ? "HD - ZokoAnime" : s === "megaplay" ? "MegaPlay" : "AnimeGG",
+          serverName: s === "megaplay" ? "HD - MegaPlay" : "HD - ZokoAnime",
         };
       } catch (err) {
         log.warn({ err, identifier, episode, server: s }, "JustAnime server attempt failed");

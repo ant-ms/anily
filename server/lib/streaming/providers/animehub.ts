@@ -104,7 +104,7 @@ export class AnimeHubProvider implements BaseProvider {
 
       // Extract available servers
       const servers: Array<{ id: string; name: string }> = [];
-      const tabRegex = /<span[^>]*class="[^"]*tab[^"]*"[^>]*data-name="([^"]+)"[^>]*>([^<]+)<\/span>/g;
+      const tabRegex = /<span[^>]*class="[^"]*tab[^"]*"[^>]*data-name="(\d+)"[^>]*>([^<]+)<\/span>/g;
       let tabMatch: RegExpExecArray | null;
       while ((tabMatch = tabRegex.exec(html)) !== null) {
         servers.push({
