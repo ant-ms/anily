@@ -1,51 +1,16 @@
-import { spawn } from "node:child_process";
-import { Readable } from "node:stream";
-import type { Context } from "hono";
-import { prisma } from "$src/prisma";
-import { registry } from "$lib/streaming/registry";
-import { logger } from "$src/logger";
-import type { StreamLanguage } from "$lib/streaming/types";
+import { spawn } from 'node:child_process';
+import { Readable } from 'node:stream';
+import type { Context } from 'hono';
+import { prisma } from '$src/prisma';
+import { registry } from '$lib/streaming/registry';
+import { logger } from '$src/logger';
+import type { StreamLanguage, SubtitleTrack } from '$lib/streaming/types';
+import { getServiceScore } from '$lib/streaming/qualityScore';
 
 const log = logger.child({ module: "downloadStream" });
 
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-
-/**
- * Reliability and quality weights for download server selection.
- *
- * Rationale:
- * - MegaPlay (+6): Benchmark testing showed 100% success rate with <150ms start time.
- * - AnimeHub Internal (+4): F5 - HQ and No Ads 4 deliver steady ~900ms CDN streams.
- * - Explicit resolutions (+3 for 1080p, +2 for 720p, +1 for generic HD/HQ).
- * - Fallbacks (0): Standard servers (e.g. ZokoAnime) are kept as backups.
- */
-const SCORE_WEIGHT_MEGAPLAY = 6;
-const SCORE_WEIGHT_ANIMEHUB_INTERNAL = 4;
-const SCORE_WEIGHT_1080P = 3;
-const SCORE_WEIGHT_720P = 2;
-const SCORE_WEIGHT_GENERIC_HD = 1;
-
-function getQualityScore(serviceName: string): number {
-  const text = serviceName.toLowerCase();
-  let score = 0;
-
-  if (text.includes("megaplay")) {
-    score += SCORE_WEIGHT_MEGAPLAY;
-  } else if (text.includes("f5 - hq") || text.includes("no ads")) {
-    score += SCORE_WEIGHT_ANIMEHUB_INTERNAL;
-  }
-
-  if (/\b1080p\b/i.test(text)) {
-    score += SCORE_WEIGHT_1080P;
-  } else if (/\b720p\b/i.test(text)) {
-    score += SCORE_WEIGHT_720P;
-  } else if (/\b(hd|hq)\b/i.test(text)) {
-    score += SCORE_WEIGHT_GENERIC_HD;
-  }
-
-  return score;
-}
 
 interface StartedFfmpeg {
   process: ReturnType<typeof spawn>;
@@ -53,7 +18,12 @@ interface StartedFfmpeg {
 }
 
 function startFfmpegStream(
-  streamSource: { url: string; container?: string; headers?: Record<string, string> },
+  streamSource: {
+    url: string;
+    container?: string;
+    headers?: Record<string, string>;
+    subtitles?: SubtitleTrack[];
+  },
   signal?: AbortSignal,
 ): Promise<StartedFfmpeg> {
   return new Promise((resolve, reject) => {
@@ -89,9 +59,27 @@ function startFfmpegStream(
     }
     args.push("-headers", headerStr);
     args.push("-i", streamSource.url);
+
+    const bestSub = streamSource.subtitles?.find((s) => s.default) ||
+      streamSource.subtitles?.find((s) => s.language === "en" || s.language === "eng") ||
+      streamSource.subtitles?.[0];
+
+    if (bestSub?.url) {
+      args.push("-headers", headerStr);
+      args.push("-i", bestSub.url);
+      args.push("-map", "0:v:0");
+      args.push("-map", "0:a:0?");
+      args.push("-map", "1:s:0?");
+      args.push("-c:v", "copy");
+      args.push("-c:a", "copy");
+      args.push("-c:s", "mov_text");
+      args.push("-metadata:s:s:0", `language=${bestSub.language || "eng"}`);
+      args.push("-metadata:s:s:0", `title=${bestSub.label || "English"}`);
+    } else {
+      args.push("-c", "copy");
+    }
+
     args.push(
-      "-c",
-      "copy",
       "-bsf:a",
       "aac_adtstoasc",
       "-movflags",
@@ -256,11 +244,7 @@ export async function handleStreamDownload(
 
     const langServices = services.filter((s) => s.language === language);
     const candidates = langServices.length > 0 ? langServices : services;
-    candidates.sort(
-      (a, b) =>
-        getQualityScore(`${b.serverName} ${b.providerName}`) -
-        getQualityScore(`${a.serverName} ${a.providerName}`),
-    );
+    candidates.sort((a, b) => getServiceScore(b) - getServiceScore(a));
 
     // Try candidates in order until ffmpeg starts successfully
     for (const candidate of candidates) {

@@ -1,4 +1,4 @@
-import type { BaseProvider, ProviderSearchResult, StreamLanguage, StreamSource } from "../types";
+import type { BaseProvider, ProviderSearchResult, StreamLanguage, StreamSource, SubtitleTrack } from "../types";
 import { logger } from "$src/logger";
 
 const log = logger.child({ provider: "hianime" });
@@ -246,6 +246,18 @@ export class HiAnimeProvider implements BaseProvider {
 
       const embedOrigin = new URL(embedUrl).origin;
 
+      const subtitles: SubtitleTrack[] = (config.subtitles || [])
+        .filter((sub) => sub.src && sub.lang && sub.lang.toLowerCase() !== "thumbnails")
+        .map((sub) => {
+          const lang = sub.lang.toLowerCase();
+          return {
+            label: sub.label || sub.lang,
+            language: lang.startsWith("eng") || lang === "en" ? "en" : lang,
+            url: sub.src,
+            default: Boolean(sub.default || lang.includes("english") || lang === "en"),
+          };
+        });
+
       return {
         url: config.src,
         container: "hls",
@@ -253,6 +265,7 @@ export class HiAnimeProvider implements BaseProvider {
           Referer: `${embedOrigin}/`,
         },
         serverName: "HD - ZokoAnime",
+        subtitles,
       };
     } catch (err) {
       log.error({ err, identifier, episode, lang }, "Failed to resolve HiAnime stream");

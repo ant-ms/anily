@@ -3,11 +3,13 @@
     import Avatar from "../Avatar.svelte";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
+    import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
     import type { Tab } from "../tab-switcher/tab-switcher-types";
     import type ProfileData from "../../types/ProfileData";
     import { signOut } from "../auth";
     import { isMobileNavOpen } from "../context.svelte";
+    import { isNative } from "../native/anilyNative";
 
     let {
         activeTab = $bindable(),
@@ -28,9 +30,23 @@
 <div id="sidebar-user">
     <Avatar src={profileData.pictureUrl} alt={profileData.name} size="sm" border={false} />
     <span title={profileData.name}>{profileData.name}</span>
+    {#if isNative}
+        <Button
+            Icon={DownloadSimpleIcon}
+            active={activeTab?.id === "downloads"}
+            title="Downloads"
+            onclick={() => {
+                selectTab({
+                    id: "downloads",
+                    name: "Downloads",
+                });
+            }}
+        />
+    {/if}
     <Button
         Icon={LogIcon}
         active={activeTab?.id === "logs"}
+        title="System Jobs"
         onclick={() => {
             selectTab({
                 id: "logs",
@@ -41,6 +57,7 @@
     <Button
         Icon={GearIcon}
         active={activeTab?.id === "settings"}
+        title="Settings"
         onclick={() => {
             selectTab({
                 id: "settings",

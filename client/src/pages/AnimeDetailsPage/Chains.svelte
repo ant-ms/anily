@@ -23,6 +23,7 @@
     import { watch } from "runed";
     import ChainTree from "./chains/ChainTree.svelte";
     import NotInChain from "./chains/NotInChain.svelte";
+    import { buildGroupingCacheKey } from "../../lib/storageKeys";
 
     let {
         animeDetails,
@@ -46,6 +47,8 @@
     watch(
         () => [selectedAnimeAnilistId.current, updateSeed, sidebarDataRefreshSeed.current],
         ([anilistId, seed, sidebarSeed], previous) => {
+            if (anilistId === undefined) return;
+
             // A bookmark toggle (updateSeed change) always forces a refresh.
             const seedChanged = !previous || previous[1] !== seed || previous[2] !== sidebarSeed;
 
@@ -59,13 +62,13 @@
                 }
             }
 
-            const cacheKey = `anily:cache:grouping:${selectedAnimeAnilistId.current}`;
+            const cacheKey = buildGroupingCacheKey(anilistId as number);
             try {
                 const cached = localStorage.getItem(cacheKey);
                 if (cached) {
                     const parsed = JSON.parse(cached);
                     animeGroupings = parsed;
-                    currentPage = findPageForAnime(parsed, selectedAnimeAnilistId.current) ?? 0;
+                    currentPage = findPageForAnime(parsed, anilistId as number) ?? 0;
                 }
             } catch {}
 

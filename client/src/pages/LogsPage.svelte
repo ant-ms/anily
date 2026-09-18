@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
+    import { onMount } from "svelte";
     import Button from "$lib/Button.svelte";
     import SegmentedControl from "$lib/SegmentedControl.svelte";
     import StatusIndicator from "$lib/StatusIndicator.svelte";
@@ -11,44 +11,13 @@
     import CalendarBlankIcon from "phosphor-svelte/lib/CalendarBlankIcon";
     import CursorIcon from "phosphor-svelte/lib/CursorIcon";
     import DatabaseIcon from "phosphor-svelte/lib/DatabaseIcon";
-
-    type SyncJobType = "ANILIST_SYNC" | "EPISODE_METADATA";
-    type SyncJobStatus = "RUNNING" | "COMPLETED" | "FAILED";
-    type SyncJobTrigger = "SCHEDULED" | "MANUAL";
-
-    type SyncJobWarning = {
-        anilistId: number;
-        title: string;
-        message: string;
-    };
-
-    type SyncJobDetails = {
-        animeChecked?: number;
-        titlesUpdated?: number;
-        detailsUpdated?: number;
-        episodesUpdated?: number;
-        groupingsUpdated?: number;
-        warnings?: SyncJobWarning[];
-    };
-
-    type SyncJob = {
-        id: number;
-        type?: SyncJobType;
-        trigger: SyncJobTrigger;
-        status: SyncJobStatus;
-        startedAt: string;
-        completedAt: string | null;
-        updatesCount: number | null;
-        details?: SyncJobDetails | null;
-        error: string | null;
-    };
+    import type { SyncJob, SyncJobType } from "../types/SyncJob";
 
     let jobs: SyncJob[] = $state([]);
     let loading = $state(true);
     let error: string | null = $state(null);
     let activeTypeFilter: "ALL" | SyncJobType = $state("ALL");
     let expandedWarnings: Record<number, boolean> = $state({});
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     const fetchJobs = async () => {
         try {
@@ -84,40 +53,24 @@
         },
     ]);
 
-    const getJobTypeName = (type?: SyncJobType) => {
-        switch (type) {
-            case "ANILIST_SYNC":
-                return "AniList Sync";
-            case "EPISODE_METADATA":
-                return "Episode Metadata";
-            default:
-                return "AniList Sync";
-        }
+    const JOB_TYPE_NAMES: Record<string, string> = {
+        ANILIST_SYNC: 'AniList Sync',
+        EPISODE_METADATA: 'Episode Metadata',
     };
+
+    const getJobTypeName = (type?: SyncJobType): string =>
+        JOB_TYPE_NAMES[type ?? 'ANILIST_SYNC'] ?? 'AniList Sync';
 
     onMount(() => {
         fetchJobs();
     });
 
-    onDestroy(() => {
-        if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
-        }
-    });
-
-    // Poll every 3s while a job is running
+    // Poll every 3s while a job is running; the effect teardown clears the interval on re-run
     $effect(() => {
-        if (hasRunningJob) {
-            if (!pollInterval) {
-                pollInterval = setInterval(fetchJobs, 3000);
-            }
-        } else {
-            if (pollInterval) {
-                clearInterval(pollInterval);
-                pollInterval = null;
-            }
-        }
+        if (!hasRunningJob) return;
+
+        const interval = setInterval(fetchJobs, 3000);
+        return () => clearInterval(interval);
     });
 
     const formatDate = (iso: string) => {

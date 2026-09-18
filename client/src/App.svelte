@@ -15,6 +15,7 @@
     import LoginPage from "./pages/LoginPage.svelte";
     import LogsPage from "./pages/LogsPage.svelte";
     import SettingsPage from "./pages/SettingsPage.svelte";
+    import DownloadsPage from "./pages/DownloadsPage.svelte";
     import HomePage from "./pages/HomePage.svelte";
     import type ProfileData from "./types/ProfileData";
     import {
@@ -28,10 +29,12 @@
     import TelevisionIcon from "phosphor-svelte/lib/TelevisionIcon";
     import CloudSlashIcon from "phosphor-svelte/lib/CloudSlashIcon";
     import { networkState } from "./lib/network.svelte";
+    import { STORAGE_KEYS } from "./lib/storageKeys";
+    import { isNative } from "./lib/native/anilyNative";
 
     const loadCachedProfile = (): ProfileData | undefined => {
         try {
-            const raw = localStorage.getItem("anily:profile_data");
+            const raw = localStorage.getItem(STORAGE_KEYS.PROFILE_DATA);
             return raw ? JSON.parse(raw) : undefined;
         } catch {
             return undefined;
@@ -43,14 +46,14 @@
     $effect(() => {
         if (profileData) {
             try {
-                localStorage.setItem("anily:profile_data", JSON.stringify(profileData));
+                localStorage.setItem(STORAGE_KEYS.PROFILE_DATA, JSON.stringify(profileData));
             } catch {}
         }
     });
 
     if (typeof window !== "undefined") {
         try {
-            const savedBackend = localStorage.getItem("backendUrl");
+            const savedBackend = localStorage.getItem(STORAGE_KEYS.BACKEND_URL);
             if (savedBackend) {
                 const cleaned = JSON.parse(savedBackend).trim().replace(/\/+$/, "");
                 if (cleaned && URL.canParse(cleaned)) {
@@ -78,6 +81,7 @@
         if (selectedAnimeAnilistId.current !== undefined) return "Anime Details";
         if (activeTab?.id === "settings") return "Settings";
         if (activeTab?.id === "logs") return "Import Logs";
+        if (activeTab?.id === "downloads") return "Downloads";
         if (activeTab?.id === "home") return "Home";
         if (activeTab?.id === "waiting") return "Caught Up";
         if (activeTab?.id === "upcoming") return "Upcoming";
@@ -93,7 +97,13 @@
     });
 
     $effect(() => {
-        if (activeTab && activeTab.id !== "settings" && activeTab.id !== "logs") {
+        if (!isNative && activeTab?.id === "downloads") {
+            activeTab = { id: "home", name: "Home", default: true };
+        }
+    });
+
+    $effect(() => {
+        if (activeTab && activeTab.id !== "settings" && activeTab.id !== "logs" && activeTab.id !== "downloads") {
             previousAnimeTab = activeTab;
         }
     });
@@ -101,7 +111,7 @@
     function handleBack() {
         if (selectedAnimeAnilistId.current !== undefined) {
             selectedAnimeAnilistId.set(undefined);
-        } else if (activeTab?.id === "settings" || activeTab?.id === "logs") {
+        } else if (activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads") {
             activeTab = previousAnimeTab || {
                 id: "home",
                 name: "Home",
@@ -186,7 +196,7 @@
         <!-- Single Unified Mobile Top App Bar for Phones (<= 768px) -->
         <header class="mobile-topbar">
             <div class="topbar-left">
-                {#if selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs"}
+                {#if selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads"}
                     <IconButton
                         Icon={CaretLeftIcon}
                         onclick={handleBack}
@@ -196,7 +206,7 @@
 
                 <div class="topbar-title-wrapper">
                     <h1 class="topbar-title">{currentTitle}</h1>
-                    {#if selectedAnimeAnilistId.current === undefined && activeTab?.id !== "home" && activeTab?.id !== "settings" && activeTab?.id !== "logs" && sidebarAnimeCount > 0}
+                    {#if selectedAnimeAnilistId.current === undefined && activeTab?.id !== "home" && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads" && sidebarAnimeCount > 0}
                         <Badge>{sidebarAnimeCount}</Badge>
                     {/if}
                 </div>
@@ -237,8 +247,8 @@
         <!-- Sidebar / List Pane -->
         <div
             class="sidebar-container"
-            class:mobile-hidden={selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "home"}
-            class:desktop-collapsed={activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "home"}
+            class:mobile-hidden={selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads" || activeTab?.id === "home"}
+            class:desktop-collapsed={activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads" || activeTab?.id === "home"}
         >
             <Sidebar
                 bind:activeTab
@@ -250,7 +260,7 @@
         <!-- Detail / Main Content Area -->
         <div
             id="content"
-            class:mobile-hidden={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "home"}
+            class:mobile-hidden={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads" && activeTab?.id !== "home"}
         >
             <!-- Tablet Topbar (769px - 1024px, shown only when an anime is selected) -->
             {#if selectedAnimeAnilistId.current !== undefined}
@@ -286,6 +296,8 @@
                     <SettingsPage />
                 {:else if activeTab?.id === "logs"}
                     <LogsPage />
+                {:else if activeTab?.id === "downloads" && isNative}
+                    <DownloadsPage />
                 {:else if activeTab?.id === "home"}
                     <HomePage />
                 {:else if selectedAnimeAnilistId.current}

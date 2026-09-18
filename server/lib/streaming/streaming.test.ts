@@ -202,5 +202,19 @@ describe("Streaming Providers", () => {
       expect(headRes.status).toBe(200);
       expect(headRes.headers.get("content-type")).toContain("mpegurl");
     }, 25000);
+
+    it("apiStream proxy serves virtual WebVTT subtitle playlist", async () => {
+      const { app } = await import("../../src/app");
+      await import("../../src/routes/apiStream");
+
+      const subPlaylistRes = await app.request(
+        `/api/stream/proxy/sub_en.m3u8?sub_vtt=${encodeURIComponent("https://example.com/subs/eng.vtt")}&ref=${encodeURIComponent("https://example.com")}`,
+      );
+      expect(subPlaylistRes.status).toBe(200);
+      expect(subPlaylistRes.headers.get("content-type")).toContain("mpegurl");
+      const subBody = await subPlaylistRes.text();
+      expect(subBody).toContain("#EXT-X-TARGETDURATION");
+      expect(subBody).toContain("/api/stream/proxy/subtitle.vtt?url=");
+    });
   });
 });

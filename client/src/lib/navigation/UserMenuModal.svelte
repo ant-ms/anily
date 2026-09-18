@@ -4,6 +4,7 @@
     import { apiBaseUrl, selectedAnimeAnilistId } from "../context.svelte";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
+    import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
     import XIcon from "phosphor-svelte/lib/XIcon";
     import BottomSheet from "../BottomSheet.svelte";
@@ -13,6 +14,7 @@
     import MenuItem from "../MenuItem.svelte";
 
     import { signOut } from "$lib/auth";
+    import { isNative } from "$lib/native/anilyNative";
 
     let {
         profileData,
@@ -61,6 +63,16 @@
     <div class="menu-divider"></div>
 
     <div class="menu-items">
+        {#if isNative}
+            <MenuItem
+                Icon={DownloadSimpleIcon}
+                label="Downloads"
+                hasIconPill
+                active={activeTab?.id === "downloads"}
+                onclick={() => navigateTo({ id: "downloads", name: "Downloads" })}
+            />
+        {/if}
+
         <MenuItem
             Icon={GearIcon}
             label="Settings"

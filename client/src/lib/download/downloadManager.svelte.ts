@@ -1,9 +1,18 @@
 import { AnilyNative, isNative } from "../native/anilyNative";
 import { apiBaseUrl } from "../context.svelte";
 import { snackbar } from "../snackbar.svelte";
+import {
+  STORAGE_KEYS,
+  buildEpisodeCacheKey,
+  buildDetailsCacheKey,
+  buildGroupingCacheKey,
+} from "../storageKeys";
 
 export interface DownloadState {
   episodeId: number;
+  episodeNumber?: number;
+  animeTitle?: string;
+  thumbnailUrl?: string;
   anilistId?: number;
   filename: string;
   downloadId?: string;
@@ -12,9 +21,6 @@ export interface DownloadState {
   totalBytes: number;
   bytesDownloaded: number;
 }
-
-const ACTIVE_DOWNLOADS_KEY = "anily:active_downloads";
-const DOWNLOADED_ANIME_IDS_KEY = "anily:downloaded_anime_ids";
 
 class DownloadManager {
   public states: Record<number, DownloadState> = $state({});
@@ -33,14 +39,14 @@ class DownloadManager {
 
   private loadPersistedDownloads() {
     try {
-      const raw = localStorage.getItem(ACTIVE_DOWNLOADS_KEY);
+      const raw = localStorage.getItem(STORAGE_KEYS.ACTIVE_DOWNLOADS);
       if (raw) {
         this.states = JSON.parse(raw);
       }
     } catch {}
 
     try {
-      const rawIds = localStorage.getItem(DOWNLOADED_ANIME_IDS_KEY);
+      const rawIds = localStorage.getItem(STORAGE_KEYS.DOWNLOADED_ANIME_IDS);
       if (rawIds) {
         this.downloadedAnilistIds = JSON.parse(rawIds);
       }
@@ -53,11 +59,11 @@ class DownloadManager {
 
   private persist() {
     try {
-      localStorage.setItem(ACTIVE_DOWNLOADS_KEY, JSON.stringify(this.states));
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_DOWNLOADS, JSON.stringify(this.states));
     } catch {}
     try {
       localStorage.setItem(
-        DOWNLOADED_ANIME_IDS_KEY,
+        STORAGE_KEYS.DOWNLOADED_ANIME_IDS,
         JSON.stringify(this.downloadedAnilistIds),
       );
     } catch {}
@@ -79,6 +85,8 @@ class DownloadManager {
     episodeId: number,
     episodeNumber?: number,
     anilistId?: number,
+    animeName?: string,
+    thumbnailUrl?: string,
   ): Promise<boolean> {
     const filename = this.getFilename(episodeId, episodeNumber);
 
@@ -86,9 +94,13 @@ class DownloadManager {
       try {
         const check = await AnilyNative.checkDownloadedEpisode({ filename });
         if (check.exists && check.size > 0) {
+          const prev = this.states[episodeId];
           this.states[episodeId] = {
             episodeId,
-            anilistId: anilistId ?? this.states[episodeId]?.anilistId,
+            episodeNumber: episodeNumber ?? prev?.episodeNumber,
+            animeTitle: animeName ?? prev?.animeTitle,
+            thumbnailUrl: thumbnailUrl ?? prev?.thumbnailUrl,
+            anilistId: anilistId ?? prev?.anilistId,
             filename,
             status: "completed",
             progress: 100,
@@ -115,7 +127,7 @@ class DownloadManager {
   public async precacheGroupMetadata(anilistId?: number) {
     if (!anilistId || !apiBaseUrl.current) return;
 
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
     const headers: Record<string, string> = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -135,7 +147,7 @@ class DownloadManager {
         const groupData = await groupRes.json();
         try {
           localStorage.setItem(
-            `anily:cache:grouping:${anilistId}`,
+            buildGroupingCacheKey(anilistId),
             JSON.stringify(groupData),
           );
         } catch {}
@@ -160,7 +172,7 @@ class DownloadManager {
         for (const id of animeIds) {
           try {
             localStorage.setItem(
-              `anily:cache:grouping:${id}`,
+              buildGroupingCacheKey(id),
               JSON.stringify(groupData),
             );
           } catch {}
@@ -175,7 +187,7 @@ class DownloadManager {
             if (dRes.ok) {
               const dData = await dRes.json();
               localStorage.setItem(
-                `anily:cache:details:${id}`,
+                buildDetailsCacheKey(id),
                 JSON.stringify(dData),
               );
             }
@@ -190,7 +202,7 @@ class DownloadManager {
             if (eRes.ok) {
               const eData = await eRes.json();
               localStorage.setItem(
-                `anily:cache:episodes:${id}`,
+                buildEpisodeCacheKey(id),
                 JSON.stringify(eData),
               );
             }
@@ -209,6 +221,7 @@ class DownloadManager {
     lang: "sub" | "dub" = "sub",
     anilistId?: number,
     service?: { providerId: string; identifier: string; serverId?: string },
+    thumbnailUrl?: string,
   ) {
     if (!apiBaseUrl.current) {
       snackbar.error("Backend URL not configured");
@@ -229,7 +242,7 @@ class DownloadManager {
       }
     }
 
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
     if (token) {
       downloadUrlObj.searchParams.set("token", token);
     }
@@ -249,6 +262,9 @@ class DownloadManager {
     try {
       this.states[episodeId] = {
         episodeId,
+        episodeNumber,
+        animeTitle: animeName,
+        thumbnailUrl,
         anilistId,
         filename,
         status: "downloading",
@@ -286,6 +302,9 @@ class DownloadManager {
       console.error("Download failed to start:", err);
       this.states[episodeId] = {
         episodeId,
+        episodeNumber,
+        animeTitle: animeName,
+        thumbnailUrl,
         anilistId,
         filename,
         status: "failed",
@@ -349,6 +368,96 @@ class DownloadManager {
 
     this.persist();
     snackbar.success("Deleted downloaded episode");
+  }
+
+  public async deleteAnimeDownloads(anilistId?: number, animeTitle?: string) {
+    const toDelete = Object.values(this.states).filter((s) => {
+      if (anilistId !== undefined && s.anilistId === anilistId) return true;
+      if (animeTitle && s.animeTitle === animeTitle) return true;
+      return false;
+    });
+
+    for (const item of toDelete) {
+      if (isNative) {
+        try {
+          await AnilyNative.deleteDownloadedEpisode({ filename: item.filename });
+        } catch (err) {
+          console.error("Failed to delete file:", item.filename, err);
+        }
+      }
+      delete this.states[item.episodeId];
+    }
+
+    if (anilistId !== undefined) {
+      this.downloadedAnilistIds = this.downloadedAnilistIds.filter(
+        (id) => id !== anilistId,
+      );
+    }
+    this.persist();
+    snackbar.success("Deleted all downloads for this anime");
+  }
+
+  public async deleteAllDownloads() {
+    for (const item of Object.values(this.states)) {
+      if (isNative) {
+        try {
+          await AnilyNative.deleteDownloadedEpisode({ filename: item.filename });
+        } catch (err) {
+          console.error("Failed to delete file:", item.filename, err);
+        }
+      }
+    }
+    this.states = {};
+    this.downloadedAnilistIds = [];
+    this.persist();
+    snackbar.success("Deleted all downloaded episodes");
+  }
+
+  public async syncNativeStorage(): Promise<{
+    freeSpace: number;
+    totalSpace: number;
+    usedByApp: number;
+  }> {
+    if (!isNative) {
+      const usedByApp = Object.values(this.states)
+        .filter((s) => s.status === "completed")
+        .reduce((sum, s) => sum + (s.bytesDownloaded || s.totalBytes || 0), 0);
+      return { freeSpace: 0, totalSpace: 0, usedByApp };
+    }
+
+    try {
+      const info = await AnilyNative.getStorageInfo();
+      if (Array.isArray(info.files)) {
+        const fileMap = new Map(info.files.map((f) => [f.filename, f.size]));
+
+        for (const epIdStr of Object.keys(this.states)) {
+          const epId = Number(epIdStr);
+          const state = this.states[epId];
+          if (state.status === "completed") {
+            const actualSize = fileMap.get(state.filename);
+            if (!actualSize || actualSize === 0) {
+              delete this.states[epId];
+            } else {
+              state.bytesDownloaded = actualSize;
+              state.totalBytes = actualSize;
+            }
+          }
+        }
+        this.persist();
+      }
+
+      return {
+        freeSpace: info.freeSpace,
+        totalSpace: info.totalSpace,
+        usedByApp: info.usedByApp,
+      };
+    } catch (err) {
+      console.error("Failed to get storage info:", err);
+      const usedByApp = Object.values(this.states)
+        .filter((s) => s.status === "completed")
+        .reduce((sum, s) => sum + (s.bytesDownloaded || s.totalBytes || 0), 0);
+      return { freeSpace: 0, totalSpace: 0, usedByApp };
+    }
   }
 
   private startPolling() {

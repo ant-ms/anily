@@ -27,6 +27,9 @@ public class AnilyNativePlugin extends Plugin {
         Boolean isLocalFile = call.getBoolean("isLocalFile", false);
         String filename = call.getString("filename");
 
+        String subtitleUrl = call.getString("subtitleUrl");
+        String subtitleTitle = call.getString("subtitleTitle", "English");
+
         if (url == null && filename == null) {
             call.reject("Either url or filename must be provided");
             return;
@@ -54,6 +57,20 @@ public class AnilyNativePlugin extends Plugin {
             } else {
                 Uri uri = Uri.parse(url);
                 intent.setDataAndType(uri, mimeType);
+            }
+
+            if (subtitleUrl != null && !subtitleUrl.isEmpty()) {
+                Uri subUri = Uri.parse(subtitleUrl);
+                // VLC for Android
+                intent.putExtra("subtitles_location", subtitleUrl);
+                // MX Player
+                intent.putExtra("subs", new android.os.Parcelable[] { subUri });
+                intent.putExtra("subs.name", new String[] { subtitleTitle });
+                intent.putExtra("subs.filename", new String[] { subtitleTitle });
+                intent.putExtra("subs.enable", new boolean[] { true });
+                // MPV Android / Just Player
+                intent.putExtra("subtitles", subtitleUrl);
+                intent.putExtra("sub", subUri);
             }
 
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -360,6 +377,53 @@ public class AnilyNativePlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("Failed to delete file: " + e.getMessage(), e);
+        }
+    }
+
+    @PluginMethod
+    public void getStorageInfo(PluginCall call) {
+        try {
+            Context context = getContext();
+            File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+            if (moviesDir == null) {
+                JSObject ret = new JSObject();
+                ret.put("freeSpace", 0);
+                ret.put("totalSpace", 0);
+                ret.put("usedByApp", 0);
+                ret.put("files", new com.getcapacitor.JSArray());
+                call.resolve(ret);
+                return;
+            }
+
+            long freeSpace = moviesDir.getFreeSpace();
+            long totalSpace = moviesDir.getTotalSpace();
+            long usedByApp = 0;
+
+            File[] files = moviesDir.listFiles((dir, name) -> name.startsWith("anily_ep_") && name.endsWith(".mp4"));
+            com.getcapacitor.JSArray filesArr = new com.getcapacitor.JSArray();
+
+            if (files != null) {
+                for (File f : files) {
+                    if (f.length() > 0) {
+                        usedByApp += f.length();
+                        JSObject fileObj = new JSObject();
+                        fileObj.put("filename", f.getName());
+                        fileObj.put("size", f.length());
+                        filesArr.put(fileObj);
+                    } else {
+                        f.delete();
+                    }
+                }
+            }
+
+            JSObject ret = new JSObject();
+            ret.put("freeSpace", freeSpace);
+            ret.put("totalSpace", totalSpace);
+            ret.put("usedByApp", usedByApp);
+            ret.put("files", filesArr);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to get storage info: " + e.getMessage(), e);
         }
     }
 }

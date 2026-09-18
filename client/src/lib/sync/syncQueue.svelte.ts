@@ -1,6 +1,7 @@
 import { Network } from "@capacitor/network";
 import { apiBaseUrl, sidebarDataRefreshSeed } from "../context.svelte";
 import { snackbar } from "../snackbar.svelte";
+import { STORAGE_KEYS } from "../storageKeys";
 
 export interface PendingWatch {
   episodeId: number;
@@ -8,8 +9,6 @@ export interface PendingWatch {
   timestamp: number;
   retryCount: number;
 }
-
-const STORAGE_KEY = "anily:pending_watch_queue";
 
 class SyncQueue {
   public isOnline: boolean = $state(true);
@@ -56,7 +55,7 @@ class SyncQueue {
 
   private getQueue(): PendingWatch[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEYS.PENDING_WATCH_QUEUE);
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -65,7 +64,7 @@ class SyncQueue {
 
   private setQueue(queue: PendingWatch[]) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+      localStorage.setItem(STORAGE_KEYS.PENDING_WATCH_QUEUE, JSON.stringify(queue));
       this.pendingCount = queue.length;
     } catch (e) {
       console.error("Failed to save sync queue:", e);

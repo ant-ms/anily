@@ -6,6 +6,8 @@ export interface AnilyNativePlugin {
     mimeType?: string;
     isLocalFile?: boolean;
     filename?: string;
+    subtitleUrl?: string;
+    subtitleTitle?: string;
   }): Promise<{ success: boolean }>;
 
   downloadEpisode(options: {
@@ -44,6 +46,13 @@ export interface AnilyNativePlugin {
   deleteDownloadedEpisode(options: {
     filename: string;
   }): Promise<{ success: boolean; deleted: boolean }>;
+
+  getStorageInfo(): Promise<{
+    freeSpace: number;
+    totalSpace: number;
+    usedByApp: number;
+    files: Array<{ filename: string; size: number }>;
+  }>;
 }
 
 export const AnilyNative = registerPlugin<AnilyNativePlugin>("AnilyNative", {
@@ -62,7 +71,14 @@ export const AnilyNative = registerPlugin<AnilyNativePlugin>("AnilyNative", {
     cancelDownload: async () => ({ success: false }),
     checkDownloadedEpisode: async () => ({ exists: false, size: 0 }),
     deleteDownloadedEpisode: async () => ({ success: false, deleted: false }),
+    getStorageInfo: async () => ({
+      freeSpace: 0,
+      totalSpace: 0,
+      usedByApp: 0,
+      files: [],
+    }),
   },
 });
 
 export const isNative = Capacitor.isNativePlatform();
+export const isAndroid = isNative && Capacitor.getPlatform() === 'android';

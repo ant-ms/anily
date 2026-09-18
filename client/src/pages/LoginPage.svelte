@@ -6,6 +6,7 @@
     import { PersistedState } from "runed";
     import type ProfileData from "../types/ProfileData";
     import { apiBaseUrl } from "../lib/context.svelte";
+    import { STORAGE_KEYS } from "../lib/storageKeys";
     import { Browser } from "@capacitor/browser";
     import { App } from "@capacitor/app";
     import { Capacitor, CapacitorCookies } from "@capacitor/core";
@@ -16,7 +17,7 @@
         profileData?: ProfileData;
     } = $props();
 
-    const enteredUrl = new PersistedState("backendUrl", "https://");
+    const enteredUrl = new PersistedState(STORAGE_KEYS.BACKEND_URL, "https://");
     const cleanEnteredUrl: string = $derived(
         enteredUrl.current ? enteredUrl.current.trim().replace(/\/+$/, "") : ""
     );
@@ -143,7 +144,7 @@
                         const parsed = new URL(data.url);
                         const session = parsed.searchParams.get("session");
                         if (session) {
-                            localStorage.setItem("authToken", session);
+                            localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, session);
                             try {
                                 await CapacitorCookies.setCookie({
                                     url: cleanEnteredUrl,

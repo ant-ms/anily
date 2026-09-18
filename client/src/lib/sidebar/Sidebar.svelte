@@ -14,6 +14,7 @@
     import MenuItem from "../MenuItem.svelte";
     import EmptyState from "../EmptyState.svelte";
     import { snackbar } from "../snackbar.svelte";
+    import { buildSidebarCacheKey } from "../storageKeys";
 
     let {
         activeTab = $bindable(),
@@ -36,6 +37,7 @@
         if (activeTab.id === "completed") return "Completed";
         if (activeTab.id === "logs") return "Import Logs";
         if (activeTab.id === "settings") return "Settings";
+        if (activeTab.id === "downloads") return "Downloads";
         return activeTab.name || activeTab.id;
     });
 
@@ -46,17 +48,17 @@
             if (tabChanged) {
                 visibleCardData = [];
                 animeCount = 0;
-                // If switching to a non-anime tab like settings, logs, or home, clear selected anime
-                if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "home")) {
+                // If switching to a non-anime tab like settings, logs, downloads, or home, clear selected anime
+                if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads" || tab.id === "home")) {
                     selectedAnimeAnilistId.set(undefined);
                 }
             }
 
-            if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "home")) {
+            if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads" || tab.id === "home")) {
                 return;
             }
 
-            const tabKey = `anily:cache:sidebar:${activeTab?.id || "inbox"}`;
+            const tabKey = buildSidebarCacheKey(activeTab?.id || "inbox");
             try {
                 const cached = localStorage.getItem(tabKey);
                 if (cached) {

@@ -2,10 +2,18 @@ import { mount } from 'svelte';
 import './app.scss';
 import App from './App.svelte';
 import { clearAuthSession } from './lib/auth';
+import { STORAGE_KEYS } from './lib/storageKeys';
+
+const getUrlString = (input: RequestInfo | URL): string => {
+  if (typeof input === 'string') return input;
+  if (input instanceof Request) return input.url;
+  if (input instanceof URL) return input.toString();
+  return '';
+};
 
 const originalFetch = window.fetch;
 window.fetch = async (input, init) => {
-  const token = localStorage.getItem('authToken');
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
   let res: Response;
   try {
     if (token) {
@@ -20,15 +28,9 @@ window.fetch = async (input, init) => {
       res = await originalFetch(input, init);
     }
   } catch (err) {
-    const urlStr = typeof input === 'string'
-      ? input
-      : input instanceof Request
-      ? input.url
-      : input instanceof URL
-      ? input.toString()
-      : '';
+    const urlStr = getUrlString(input);
     const isApi = urlStr.includes('/api/') && !urlStr.includes('/api/login') && !urlStr.includes('/info');
-    const hasAuthData = !!localStorage.getItem('authToken') || !!localStorage.getItem('anily:profile_data');
+    const hasAuthData = !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || !!localStorage.getItem(STORAGE_KEYS.PROFILE_DATA);
     if (isApi && hasAuthData && typeof navigator !== 'undefined' && navigator.onLine) {
       try {
         const infoUrl = new URL('/info', urlStr).toString();
@@ -41,16 +43,9 @@ window.fetch = async (input, init) => {
     throw err;
   }
 
-  const urlStr = typeof input === 'string'
-    ? input
-    : input instanceof Request
-    ? input.url
-    : input instanceof URL
-    ? input.toString()
-    : '';
-
+  const urlStr = getUrlString(input);
   const isApi = urlStr.includes('/api/') && !urlStr.includes('/api/login') && !urlStr.includes('/info');
-  const hasAuthData = !!localStorage.getItem('authToken') || !!localStorage.getItem('anily:profile_data');
+  const hasAuthData = !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || !!localStorage.getItem(STORAGE_KEYS.PROFILE_DATA);
 
   if (hasAuthData && isApi) {
     if (
@@ -70,3 +65,4 @@ const app = mount(App, {
 });
 
 export default app;
+

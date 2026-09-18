@@ -4,6 +4,7 @@
     import { apiBaseUrl, selectedAnimeAnilistId } from "../context.svelte";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
+    import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
     import NavDestination from "./NavDestination.svelte";
     import { defaultDestinations } from "./destinations";
@@ -13,6 +14,7 @@
     import { networkState } from "../network.svelte";
 
     import { signOut } from "$lib/auth";
+    import { isNative } from "$lib/native/anilyNative";
 
     let {
         activeTab = $bindable(),
@@ -24,7 +26,7 @@
 
     let isProfileMenuOpen = $state(false);
 
-    const isProfileTabActive = $derived(activeTab?.id === "logs" || activeTab?.id === "settings");
+    const isProfileTabActive = $derived(activeTab?.id === "logs" || activeTab?.id === "settings" || activeTab?.id === "downloads");
 
     function isTabActive(tab: Tab): boolean {
         if (!activeTab) {
@@ -95,6 +97,16 @@
                             <span class="popover-sub">Signed in</span>
                         </div>
                         <div class="popover-divider"></div>
+
+                        {#if isNative}
+                            <MenuItem
+                                Icon={DownloadSimpleIcon}
+                                label="Downloads"
+                                active={activeTab?.id === "downloads"}
+                                onclick={() => handleTabClick({ id: "downloads", name: "Downloads" })}
+                                role="menuitem"
+                            />
+                        {/if}
 
                         <MenuItem
                             Icon={GearIcon}

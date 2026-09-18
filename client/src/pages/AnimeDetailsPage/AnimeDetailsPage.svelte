@@ -11,6 +11,7 @@
     import HeroSkeleton from "./HeroSkeleton.svelte";
     import Chains from "./Chains.svelte";
     import Episodes from "./Episodes.svelte";
+    import { buildDetailsCacheKey } from "../../lib/storageKeys";
 
     let animeDetails: AnimeDetailsData | undefined = $state();
     let updateSeed = $state(Math.random());
@@ -20,7 +21,7 @@
         ([anilistId], previous) => {
             if (anilistId === undefined) return;
 
-            const cacheKey = `anily:cache:details:${anilistId}`;
+            const cacheKey = buildDetailsCacheKey(anilistId);
             try {
                 const cached = localStorage.getItem(cacheKey);
                 if (cached) {

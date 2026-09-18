@@ -48,8 +48,32 @@ export async function handleStreamProxy(c: Context) {
     });
   }
 
-  const targetUrl = c.req.query("url");
+  const subVtt = c.req.query("sub_vtt");
   const referer = c.req.query("ref") || "";
+
+  if (subVtt) {
+    const vttProxiedUrl = `/api/stream/proxy/subtitle.vtt?url=${encodeURIComponent(subVtt)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}`;
+    const vttPlaylist = `#EXTM3U
+#EXT-X-TARGETDURATION:7200
+#EXT-X-VERSION:3
+#EXT-X-MEDIA-SEQUENCE:0
+#EXTINF:7200.0,
+${vttProxiedUrl}
+#EXT-X-ENDLIST
+`;
+    return new Response(vttPlaylist, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/vnd.apple.mpegurl",
+        "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+      },
+    });
+  }
+
+  const targetUrl = c.req.query("url");
 
   if (!targetUrl) {
     return c.text("Missing url parameter", 400);
@@ -129,6 +153,21 @@ export async function handleStreamProxy(c: Context) {
       const text = await upstream.text();
       const baseUrl = parsedUrl.toString();
       const isMasterPlaylist = text.includes("#EXT-X-STREAM-INF");
+      const subsParam = c.req.query("subs");
+
+      let parsedSubs: Array<{ l: string; lang: string; u: string; d?: boolean }> = [];
+      if (subsParam && isMasterPlaylist) {
+        try {
+          parsedSubs = JSON.parse(subsParam);
+        } catch {}
+      }
+
+      let subTagsInjected = false;
+      const subTags = parsedSubs.map((s, idx) => {
+        const subPlaylistUrl = `/api/stream/proxy/sub_${s.lang || idx}.m3u8?sub_vtt=${encodeURIComponent(s.u)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}`;
+        const isDef = s.d ? "YES" : idx === 0 ? "YES" : "NO";
+        return `#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${(s.l || "Subtitles").replace(/"/g, "")}",DEFAULT=${isDef},AUTOSELECT=${isDef},FORCED=NO,LANGUAGE="${s.lang || "en"}",URI="${subPlaylistUrl}"`;
+      });
 
       // Rewrite M3U8 playlist lines so all segments/sub-playlists route through our proxy
       const rewritten = text
@@ -138,6 +177,15 @@ export async function handleStreamProxy(c: Context) {
           if (!trimmed) return line;
 
           if (trimmed.startsWith("#")) {
+            if (trimmed.startsWith("#EXT-X-STREAM-INF") && parsedSubs.length > 0) {
+              const withSubs = trimmed.includes("SUBTITLES=") ? trimmed : `${trimmed},SUBTITLES="subs"`;
+              if (!subTagsInjected) {
+                subTagsInjected = true;
+                return `${subTags.join("\n")}\n${withSubs}`;
+              }
+              return withSubs;
+            }
+
             // Rewrite URI="..." attributes in tags like #EXT-X-KEY, #EXT-X-MAP, #EXT-X-MEDIA, #EXT-X-I-FRAME-STREAM-INF
             if (trimmed.includes('URI="')) {
               return trimmed.replace(/URI="([^"]+)"/g, (_, tagUri) => {
@@ -173,7 +221,7 @@ export async function handleStreamProxy(c: Context) {
       });
     }
 
-    // Binary segment or direct media stream (TS or MP4)
+    // Binary segment or direct media stream (TS, MP4, or VTT)
     const responseHeaders = new Headers();
     for (const [headerKey, headerVal] of upstream.headers) {
       const lower = headerKey.toLowerCase();
@@ -189,6 +237,10 @@ export async function handleStreamProxy(c: Context) {
       ) {
         responseHeaders.set(headerKey, headerVal);
       }
+    }
+
+    if (parsedUrl.pathname.endsWith(".vtt") || c.req.path.endsWith(".vtt")) {
+      responseHeaders.set("content-type", "text/vtt; charset=utf-8");
     }
 
     responseHeaders.set("Access-Control-Allow-Origin", "*");

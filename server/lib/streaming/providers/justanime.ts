@@ -1,4 +1,4 @@
-import type { BaseProvider, ProviderSearchResult, StreamLanguage, StreamSource } from "../types";
+import type { BaseProvider, ProviderSearchResult, StreamLanguage, StreamSource, SubtitleTrack } from "../types";
 import { logger } from "$src/logger";
 
 const log = logger.child({ provider: "justanime" });
@@ -142,6 +142,7 @@ export class JustAnimeProvider implements BaseProvider {
           string,
           {
             sources?: Array<{ url: string; isM3U8?: boolean; quality?: string }>;
+            subtitles?: Array<{ file: string; label?: string; kind?: string; default?: boolean }>;
             headers?: Record<string, string>;
           }
         >;
@@ -156,11 +157,36 @@ export class JustAnimeProvider implements BaseProvider {
           headers.Referer = "https://zokoanime.video/";
         }
 
+        const rawSubs = langData.subtitles;
+        const subtitles: SubtitleTrack[] = (rawSubs || [])
+          .filter((sub) => sub.file && sub.kind !== "thumbnails")
+          .map((sub) => {
+            const label = sub.label || "English";
+            const lowerLabel = label.toLowerCase();
+            let langCode = "en";
+            if (lowerLabel.includes("spanish")) langCode = "es";
+            else if (lowerLabel.includes("french")) langCode = "fr";
+            else if (lowerLabel.includes("german")) langCode = "de";
+            else if (lowerLabel.includes("italian")) langCode = "it";
+            else if (lowerLabel.includes("portuguese")) langCode = "pt";
+            else if (lowerLabel.includes("russian")) langCode = "ru";
+            else if (lowerLabel.includes("arabic")) langCode = "ar";
+            else if (lowerLabel.includes("japanese")) langCode = "ja";
+
+            return {
+              label,
+              language: langCode,
+              url: sub.file,
+              default: Boolean(sub.default || lowerLabel.includes("english")),
+            };
+          });
+
         return {
           url: source.url,
           container: isHls ? "hls" : "mp4",
           headers,
           serverName: s === "megaplay" ? "HD - MegaPlay" : "HD - ZokoAnime",
+          subtitles,
         };
       } catch (err) {
         log.warn({ err, identifier, episode, server: s }, "JustAnime server attempt failed");

@@ -6,12 +6,21 @@ export interface ProviderSearchResult {
   languages: StreamLanguage[];
 }
 
+export interface SubtitleTrack {
+  id?: string;
+  label: string;
+  language: string;
+  url: string;
+  default?: boolean;
+}
+
 export interface StreamSource {
   url: string;
   resolution?: number;
   container?: 'hls' | 'mp4';
   headers?: Record<string, string>;
   serverName?: string;
+  subtitles?: SubtitleTrack[];
 }
 
 export interface AvailableService {

@@ -7,6 +7,12 @@ export interface PlayStreamResult {
   streamUrl?: string;
   container?: "hls" | "mp4";
   serverName?: string;
+  subtitles?: Array<{
+    label: string;
+    language: string;
+    url: string;
+    default?: boolean;
+  }>;
   notFound?: boolean;
   unavailable?: boolean;
 }
@@ -48,13 +54,39 @@ export async function resolvePlayStream(
   const refParam = streamSource.headers?.Referer
     ? `&ref=${encodeURIComponent(streamSource.headers.Referer)}`
     : "";
+
+  let subsParam = "";
+  if (streamSource.subtitles && streamSource.subtitles.length > 0) {
+    const subsPayload = streamSource.subtitles.map((s) => ({
+      l: s.label,
+      lang: s.language,
+      u: s.url,
+      d: s.default,
+    }));
+    subsParam = `&subs=${encodeURIComponent(JSON.stringify(subsPayload))}`;
+  }
+
   const streamUrl = `${origin}/api/stream/proxy/${filename}?url=${encodeURIComponent(
     streamSource.url,
-  )}${refParam}`;
+  )}${refParam}${subsParam}`;
+
+  const subtitles = (streamSource.subtitles || []).map((sub) => {
+    const subFilename = `sub_${sub.language || "en"}.vtt`;
+    const subUrl = `${origin}/api/stream/proxy/${subFilename}?url=${encodeURIComponent(
+      sub.url,
+    )}${refParam}`;
+    return {
+      label: sub.label,
+      language: sub.language,
+      url: subUrl,
+      default: sub.default,
+    };
+  });
 
   return {
     streamUrl,
     container: streamSource.container,
     serverName: streamSource.serverName,
+    subtitles,
   };
 }

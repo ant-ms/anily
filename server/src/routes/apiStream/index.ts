@@ -82,6 +82,7 @@ export const apiStreamPlayGetRoute = app.get(
         streamUrl: result.streamUrl,
         container: result.container,
         serverName: result.serverName,
+        subtitles: result.subtitles ?? [],
       });
     } catch (error) {
       log.error({ error, episodeId, providerId }, "Failed to resolve stream");

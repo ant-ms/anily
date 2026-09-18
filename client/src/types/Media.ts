@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from '../lib/storageKeys';
+
 export type StreamLanguage = 'sub' | 'dub';
 
 export interface AvailableService {
@@ -13,11 +15,15 @@ export type MediaPlayer = 'mpv' | 'iina' | 'vlc' | 'copy';
 
 export type StreamLanguagePreference = 'sub' | 'dub';
 
-// Build a player URL from a media URL and player type
-export function buildPlayerUrl(mediaUrl: string, player: MediaPlayer): string {
+export const buildPlayerUrl = (mediaUrl: string, player: MediaPlayer, subtitleUrl?: string): string => {
   switch (player) {
-    case 'iina':
-      return `iina://open?url=${encodeURIComponent(mediaUrl)}`;
+    case 'iina': {
+      let url = `iina://open?url=${encodeURIComponent(mediaUrl)}`;
+      if (subtitleUrl) {
+        url += `&sub=${encodeURIComponent(subtitleUrl)}&mpv_sub-file=${encodeURIComponent(subtitleUrl)}`;
+      }
+      return url;
+    }
     case 'vlc': {
       // VLC's custom URL scheme handler prepends its own protocol (https://).
       // If mediaUrl has http:// or https://, VLC creates malformed URLs like https://http://...
@@ -26,35 +32,34 @@ export function buildPlayerUrl(mediaUrl: string, player: MediaPlayer): string {
       return `vlc://${strippedUrl}`;
     }
     case 'mpv':
-      // mpv doesn't have a standard URL scheme, return the raw URL
-      return mediaUrl;
+      return subtitleUrl ? `mpv "${mediaUrl}" --sub-file="${subtitleUrl}"` : `mpv "${mediaUrl}"`;
     case 'copy':
       return mediaUrl;
   }
-}
+};
 
-export function getStoredPlayer(): MediaPlayer {
-  return (localStorage.getItem('anily:mediaPlayer') as MediaPlayer) ?? 'iina';
-}
+export const getStoredPlayer = (): MediaPlayer => {
+  return (localStorage.getItem(STORAGE_KEYS.MEDIA_PLAYER) as MediaPlayer) ?? 'iina';
+};
 
-export function setStoredPlayer(player: MediaPlayer): void {
-  localStorage.setItem('anily:mediaPlayer', player);
-}
+export const setStoredPlayer = (player: MediaPlayer): void => {
+  localStorage.setItem(STORAGE_KEYS.MEDIA_PLAYER, player);
+};
 
-export function getStoredLanguagePreference(): StreamLanguagePreference {
-  return (localStorage.getItem('anily:languagePreference') as StreamLanguagePreference) ?? 'sub';
-}
+export const getStoredLanguagePreference = (): StreamLanguagePreference => {
+  return (localStorage.getItem(STORAGE_KEYS.LANGUAGE_PREFERENCE) as StreamLanguagePreference) ?? 'sub';
+};
 
-export function setStoredLanguagePreference(pref: StreamLanguagePreference): void {
-  localStorage.setItem('anily:languagePreference', pref);
-}
+export const setStoredLanguagePreference = (pref: StreamLanguagePreference): void => {
+  localStorage.setItem(STORAGE_KEYS.LANGUAGE_PREFERENCE, pref);
+};
 
-export function isHdService(service: AvailableService): boolean {
+export const isHdService = (service: AvailableService): boolean => {
   return (
     /\b(hd|1080p|720p|hq|megaplay)\b/i.test(service.serverName) ||
     /\b(hd|1080p|720p|hq)\b/i.test(service.providerName)
   );
-}
+};
 
 /**
  * Scoring weights for sorting streaming servers by reliability and quality.
@@ -76,7 +81,7 @@ const SCORE_WEIGHT_1080P = 3;
 const SCORE_WEIGHT_720P = 2;
 const SCORE_WEIGHT_GENERIC_HD = 1;
 
-export function getQualityScore(service: AvailableService): number {
+export const getQualityScore = (service: AvailableService): number => {
   const text = `${service.serverName} ${service.providerName}`.toLowerCase();
   let score = 0;
 
@@ -97,21 +102,21 @@ export function getQualityScore(service: AvailableService): number {
   }
 
   return score;
-}
+};
 
-export function sortServicesWithHdFirst(services: AvailableService[]): AvailableService[] {
+export const sortServicesWithHdFirst = (services: AvailableService[]): AvailableService[] => {
   return [...services].sort((a, b) => {
     const aScore = getQualityScore(a);
     const bScore = getQualityScore(b);
     if (bScore !== aScore) return bScore - aScore;
     return 0;
   });
-}
+};
 
-export function pickBestService(
+export const pickBestService = (
   services: AvailableService[],
   preferredLang: StreamLanguagePreference = 'sub',
-): AvailableService | null {
+): AvailableService | null => {
   if (!services || services.length === 0) return null;
 
   // Filter services that match the user's preferred language (sub or dub)
@@ -124,5 +129,6 @@ export function pickBestService(
     if (scoreDiff !== 0) return scoreDiff;
     return 0;
   })[0];
-}
+};
+
 
