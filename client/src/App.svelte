@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, untrack } from "svelte";
     import NavigationRail from "$lib/navigation/NavigationRail.svelte";
     import NavigationBar from "$lib/navigation/NavigationBar.svelte";
     import UserMenuModal from "$lib/navigation/UserMenuModal.svelte";
@@ -165,7 +165,7 @@
     });
 
     $effect(() => {
-        if (networkState.isOnline && apiBaseUrl.current && profileData) {
+        if (networkState.isOnline && apiBaseUrl.current && untrack(() => profileData)) {
             fetch(`${apiBaseUrl.current}api/me`, { credentials: "include" })
                 .then(async (res) => {
                     if (res.ok) {
@@ -292,7 +292,9 @@
             {/if}
 
             <div class="content-body">
-                {#if activeTab?.id === "settings"}
+                {#if selectedAnimeAnilistId.current !== undefined}
+                    <AnimeDetailsPage />
+                {:else if activeTab?.id === "settings"}
                     <SettingsPage />
                 {:else if activeTab?.id === "logs"}
                     <LogsPage />
@@ -300,8 +302,6 @@
                     <DownloadsPage />
                 {:else if activeTab?.id === "home"}
                     <HomePage />
-                {:else if selectedAnimeAnilistId.current}
-                    <AnimeDetailsPage />
                 {:else}
                     <EmptyState
                         Icon={TelevisionIcon}

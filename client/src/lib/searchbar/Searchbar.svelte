@@ -89,6 +89,8 @@
         <MenuItem
             label={result.titleEnglish || result.titleRomanji || result.titleNative}
             onclick={() => {
+                autocompleteVisible = false;
+                searchQuery = "";
                 selectedAnimeAnilistId.set(result.anilistId);
             }}
         />
