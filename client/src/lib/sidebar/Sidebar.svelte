@@ -10,9 +10,12 @@
     } from "../context.svelte";
     import SidebarCard from "./SidebarCard.svelte";
     import ListDashesIcon from "phosphor-svelte/lib/ListDashesIcon";
+    import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
     import Badge from "../Badge.svelte";
     import MenuItem from "../MenuItem.svelte";
     import EmptyState from "../EmptyState.svelte";
+    import IconButton from "../IconButton.svelte";
+    import PullToRefresh from "../PullToRefresh.svelte";
     import { snackbar } from "../snackbar.svelte";
     import { buildSidebarCacheKey } from "../storageKeys";
 
@@ -28,6 +31,15 @@
 
     let visibleCardData: SidebarCardData[] = $state([]);
     let isLoading = $state(false);
+    let isRefreshing = $state(false);
+    let scrollContainer: HTMLElement | undefined = $state();
+
+    let isAnimeListTab = $derived(
+        activeTab?.id !== "settings" &&
+        activeTab?.id !== "logs" &&
+        activeTab?.id !== "home" &&
+        activeTab?.id !== "downloads"
+    );
 
     let currentTitle = $derived.by(() => {
         if (activeTab?.id === "home") return "Home";
@@ -48,6 +60,7 @@
             if (tabChanged) {
                 visibleCardData = [];
                 animeCount = 0;
+                isRefreshing = false;
                 // If switching to a non-anime tab like settings, logs, downloads, or home, clear selected anime
                 if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads" || tab.id === "home")) {
                     selectedAnimeAnilistId.set(undefined);
@@ -104,6 +117,35 @@
         },
     );
 
+    async function refreshList() {
+        if (isRefreshing || !apiBaseUrl.current || !isAnimeListTab) return;
+        isRefreshing = true;
+        const currentTabId = activeTab?.id || "inbox";
+        const tabKey = buildSidebarCacheKey(currentTabId);
+
+        try {
+            const url = new URL(
+                `/api/sidebar/${currentTabId}`,
+                apiBaseUrl.current,
+            );
+            const res = await fetch(url.toString(), { credentials: "include" });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if ((activeTab?.id || "inbox") === currentTabId) {
+                visibleCardData = data;
+                animeCount = data.length;
+                try {
+                    localStorage.setItem(tabKey, JSON.stringify(data));
+                } catch {}
+            }
+        } catch (err) {
+            console.error("Failed to refresh anime list:", err);
+            snackbar.error("Failed to refresh anime list");
+        } finally {
+            isRefreshing = false;
+        }
+    }
+
     function handleNavClick(tab: Tab) {
         activeTab = tab;
         selectedAnimeAnilistId.set(undefined);
@@ -115,37 +157,51 @@
     <div class="sidebar-pane-header">
         <div class="header-left">
             <h2 class="pane-title">{currentTitle}</h2>
-            {#if activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "home" && visibleCardData.length > 0}
+            {#if isAnimeListTab && visibleCardData.length > 0}
                 <Badge>{visibleCardData.length}</Badge>
             {/if}
         </div>
+        {#if isAnimeListTab}
+            <div class="header-right">
+                <IconButton
+                    Icon={ArrowsClockwiseIcon}
+                    variant="ghost"
+                    size="sm"
+                    loading={isRefreshing}
+                    onclick={refreshList}
+                    title="Refresh {currentTitle}"
+                />
+            </div>
+        {/if}
     </div>
 
     <!-- Content / Cards List -->
-    <div class="sidebar-content">
-        {#if activeTab?.id === "logs"}
-            <div class="logs-sidebar-nav">
-                <MenuItem
-                    Icon={ListDashesIcon}
-                    label="Import Logs"
-                    active
-                    onclick={() => handleNavClick({ id: "logs", name: "Logs" })}
-                />
-            </div>
-        {:else if activeTab?.id !== "settings" && activeTab?.id !== "home"}
-            {#if visibleCardData.length > 0}
-                <div class="cards">
-                    {#each visibleCardData as data}
-                        <SidebarCard {data} />
-                    {/each}
+    <div class="sidebar-content" bind:this={scrollContainer}>
+        <PullToRefresh {scrollContainer} onrefresh={refreshList} disabled={!isAnimeListTab}>
+            {#if activeTab?.id === "logs"}
+                <div class="logs-sidebar-nav">
+                    <MenuItem
+                        Icon={ListDashesIcon}
+                        label="Import Logs"
+                        active
+                        onclick={() => handleNavClick({ id: "logs", name: "Logs" })}
+                    />
                 </div>
-            {:else if !isLoading}
-                <EmptyState
-                    title="No anime in {currentTitle}"
-                    description="Anime added will show up here"
-                />
+            {:else if activeTab?.id !== "settings" && activeTab?.id !== "home"}
+                {#if visibleCardData.length > 0}
+                    <div class="cards">
+                        {#each visibleCardData as data}
+                            <SidebarCard {data} />
+                        {/each}
+                    </div>
+                {:else if !isLoading}
+                    <EmptyState
+                        title="No anime in {currentTitle}"
+                        description="Anime added will show up here"
+                    />
+                {/if}
             {/if}
-        {/if}
+        </PullToRefresh>
     </div>
 </div>
 
@@ -195,6 +251,11 @@
                 gap: 8px;
             }
 
+            .header-right {
+                display: flex;
+                align-items: center;
+            }
+
             .pane-title {
                 margin: 0;
                 font-size: 16px;
@@ -208,6 +269,7 @@
             flex: 1 1 0px;
             min-height: 0;
             overflow-y: auto;
+            overscroll-behavior-y: contain;
             scrollbar-width: thin;
             scrollbar-color: #3a3733 transparent;
 

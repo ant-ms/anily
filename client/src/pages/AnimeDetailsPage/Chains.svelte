@@ -36,6 +36,14 @@
     let animeGroupings: AnimeGroupingsData | undefined = $state();
     let isBookmarked = $state(false);
     let isDisplayAnime = $state(false);
+    let isTogglingBookmark = $state(false);
+
+    watch(
+        () => selectedAnimeAnilistId.current,
+        () => {
+            isTogglingBookmark = false;
+        },
+    );
 
     $effect(() => {
         if (animeDetails !== undefined) {
@@ -132,45 +140,66 @@
         );
     };
 
-    const toggleGrouping = () => {
-        if (!animeDetails) return;
+    const toggleGrouping = async () => {
+        if (
+            !animeDetails ||
+            isTogglingBookmark ||
+            !apiBaseUrl.current ||
+            selectedAnimeAnilistId.current === undefined
+        ) {
+            return;
+        }
+
+        const currentAnilistId = selectedAnimeAnilistId.current;
+        const removing = animeDetails.groupingId !== null;
+        isTogglingBookmark = true;
 
         const url = new URL(
-            `/api/details/${selectedAnimeAnilistId.current}/grouping`,
+            `/api/details/${currentAnilistId}/grouping`,
             apiBaseUrl.current,
         );
 
-        // Remove the grouping if it exists
-        if (animeDetails.groupingId !== null) {
-            fetch(url.toString(), {
-                method: "DELETE",
-                credentials: "include",
-            })
-                .then((res) => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    updateSeed = Math.random();
-                })
-                .catch((err) => {
-                    console.error("Failed to remove anime from chain:", err);
-                    snackbar.error("Failed to remove anime from chain");
+        try {
+            // Remove the grouping if it exists
+            if (removing) {
+                const res = await fetch(url.toString(), {
+                    method: "DELETE",
+                    credentials: "include",
                 });
-        }
-
-        // or add it if it doesn't
-        if (animeDetails.groupingId === null) {
-            fetch(url.toString(), {
-                method: "POST",
-                credentials: "include",
-            })
-                .then((res) => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (selectedAnimeAnilistId.current === currentAnilistId) {
+                    isBookmarked = false;
+                    updateSeed = Math.random();
+                }
+            } else {
+                // or add it if it doesn't
+                const res = await fetch(url.toString(), {
+                    method: "POST",
+                    credentials: "include",
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (selectedAnimeAnilistId.current === currentAnilistId) {
+                    isBookmarked = true;
                     updateSeed = Math.random();
                     sidebarDataRefreshSeed.set(Math.random());
-                })
-                .catch((err) => {
-                    console.error("Failed to add anime to chain:", err);
-                    snackbar.error("Failed to add anime to chain");
-                });
+                }
+            }
+        } catch (err) {
+            console.error(
+                removing
+                    ? "Failed to remove anime from chain:"
+                    : "Failed to add anime to chain:",
+                err,
+            );
+            snackbar.error(
+                removing
+                    ? "Failed to remove anime from chain"
+                    : "Failed to add anime to chain",
+            );
+        } finally {
+            if (selectedAnimeAnilistId.current === currentAnilistId) {
+                isTogglingBookmark = false;
+            }
         }
     };
 
@@ -245,6 +274,7 @@
         <Button
             Icon={BookmarkIcon}
             active={isBookmarked}
+            loading={isTogglingBookmark}
             onclick={toggleGrouping}
         />
         <Button 

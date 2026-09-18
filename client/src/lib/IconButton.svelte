@@ -91,13 +91,13 @@
             color 0.15s ease,
             transform 0.15s ease;
 
-        &:disabled {
+        &:disabled:not(.is-busy) {
             opacity: 0.4;
             cursor: not-allowed;
         }
 
         &.is-busy {
-            opacity: 0.65;
+            opacity: 0.85;
             cursor: wait;
         }
 

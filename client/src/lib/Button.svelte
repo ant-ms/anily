@@ -72,7 +72,7 @@
                 background: hsl(20, 17.6%, 14%);
             }
 
-            &:disabled {
+            &:disabled:not(.is-busy) {
                 opacity: 0.4;
                 cursor: not-allowed;
             }
@@ -92,7 +92,7 @@
                 background: hsl(20, 17.6%, 14%);
             }
 
-            &:disabled {
+            &:disabled:not(.is-busy) {
                 opacity: 0.4;
                 cursor: not-allowed;
             }
@@ -105,7 +105,7 @@
         }
 
         &.is-busy {
-            opacity: 0.65;
+            opacity: 0.8;
             cursor: wait;
         }
     }
