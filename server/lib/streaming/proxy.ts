@@ -144,6 +144,7 @@ ${vttProxiedUrl}
     let upstream = await fetch(parsedUrl.toString(), {
       method: c.req.method === "HEAD" ? "HEAD" : "GET",
       headers: upstreamHeaders,
+      signal: AbortSignal.timeout(12000),
     });
 
     // Fall back to GET if upstream CDN rejects HEAD requests
@@ -151,6 +152,7 @@ ${vttProxiedUrl}
       upstream = await fetch(parsedUrl.toString(), {
         method: "GET",
         headers: upstreamHeaders,
+        signal: AbortSignal.timeout(12000),
       });
     }
 
@@ -286,8 +288,16 @@ ${vttProxiedUrl}
       status: upstream.status,
       headers: responseHeaders,
     });
-  } catch (err) {
-    log.error({ err, targetUrl }, "Stream proxy error");
-    return c.text("Proxy request failed", 502);
+  } catch (err: any) {
+    log.error({ err: err?.message, targetUrl }, "Stream proxy error");
+    const isTimeout = err?.name === "TimeoutError" || err?.message?.includes("aborted") || err?.name === "AbortError";
+    return new Response(isTimeout ? "Upstream timeout" : "Proxy request failed", {
+      status: isTimeout ? 504 : 502,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Content-Type": "text/plain",
+      },
+    });
   }
 }

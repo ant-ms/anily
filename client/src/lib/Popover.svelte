@@ -2,6 +2,8 @@
     import { fade } from "svelte/transition";
     import type { Snippet } from "svelte";
 
+    import { registerBackHandler } from "./navigation/backHandler";
+
     let {
         isOpen = $bindable(false),
         placement = "bottom-end",
@@ -17,6 +19,18 @@
         ariaLabel?: string;
         children?: Snippet;
     } = $props();
+
+    $effect(() => {
+        if (isOpen) {
+            return registerBackHandler(() => {
+                if (isOpen) {
+                    isOpen = false;
+                    return true;
+                }
+                return false;
+            });
+        }
+    });
 
     let popoverRef: HTMLElement | undefined = $state();
 

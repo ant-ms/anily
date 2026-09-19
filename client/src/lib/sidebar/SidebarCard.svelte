@@ -38,7 +38,7 @@
         if (data.allAnilistIds.includes(selectedAnimeAnilistId.current ?? 0)) {
             selectedAnimeAnilistId.set(undefined);
         } else {
-            selectedAnimeAnilistId.set(data.displayAnilistId);
+            selectedAnimeAnilistId.set(data.displayAnilistId, { clearHistory: true });
         }
         if (typeof window !== "undefined" && window.innerWidth <= 768) {
             isMobileNavOpen.set(false);

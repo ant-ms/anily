@@ -1,5 +1,6 @@
 import { prisma } from "$src/prisma";
 import { registry } from "$lib/streaming/registry";
+import { probeStreamHealth } from "$lib/streaming/healthCheck";
 import type { AvailableService } from "$lib/streaming/types";
 import { logger } from "$src/logger";
 
@@ -45,7 +46,7 @@ export async function getAvailableStreamServices(
     return { services: [] };
   }
 
-  // Pre-flight check: Verify that servers actually resolve and respond with working streams
+  // Pre-flight check: Verify that servers actually resolve and respond with working media segments
   const verifiedResults = await Promise.all(
     rawServices.map(async (service) => {
       try {
@@ -65,17 +66,8 @@ export async function getAvailableStreamServices(
           return null;
         }
 
-        // Fast range request probe to verify stream URL health (not 500 or timeout)
-        const probeRes = await fetch(streamSource.url, {
-          method: "GET",
-          headers: {
-            ...(streamSource.headers || {}),
-            Range: "bytes=0-100",
-          },
-          signal: AbortSignal.timeout(2500),
-        });
-
-        if (probeRes.status >= 200 && probeRes.status < 400) {
+        const isHealthy = await probeStreamHealth(streamSource, 2500);
+        if (isHealthy) {
           return service;
         }
 
@@ -83,10 +75,9 @@ export async function getAvailableStreamServices(
           {
             provider: service.providerName,
             server: service.serverName,
-            status: probeRes.status,
             episodeId,
           },
-          "Filtering out server: stream probe returned non-2xx status",
+          "Filtering out server: health probe failed or timed out",
         );
         return null;
       } catch (err: any) {
@@ -97,7 +88,7 @@ export async function getAvailableStreamServices(
             err: err.message,
             episodeId,
           },
-          "Filtering out server: probe timed out or threw error",
+          "Filtering out server: probe exception",
         );
         return null;
       }

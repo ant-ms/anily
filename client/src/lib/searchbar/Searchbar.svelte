@@ -50,10 +50,24 @@
             });
     });
 
+    import { registerBackHandler } from "../navigation/backHandler";
+
     let autocompleteVisible = $state(false);
 
     $effect(() => {
         autocompleteVisible = searchResults.length > 0;
+    });
+
+    $effect(() => {
+        if (autocompleteVisible) {
+            return registerBackHandler(() => {
+                if (autocompleteVisible) {
+                    autocompleteVisible = false;
+                    return true;
+                }
+                return false;
+            });
+        }
     });
 
     let inputElement: HTMLElement | undefined;

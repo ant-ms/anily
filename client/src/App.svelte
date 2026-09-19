@@ -31,6 +31,9 @@
     import { networkState } from "./lib/network.svelte";
     import { STORAGE_KEYS } from "./lib/storageKeys";
     import { isNative } from "./lib/native/anilyNative";
+    import { App } from "@capacitor/app";
+    import type { PluginListenerHandle } from "@capacitor/core";
+    import { executeBackHandler } from "./lib/navigation/backHandler";
 
     const loadCachedProfile = (): ProfileData | undefined => {
         try {
@@ -108,19 +111,105 @@
         }
     });
 
-    function handleBack() {
+    let isHandlingPopState = false;
+
+    function handleBack(): boolean {
+        // 1. Dismiss any open BottomSheets / Popovers / overlays
+        if (executeBackHandler()) {
+            return true;
+        }
+
+        // 2. Close mobile user menu if open
+        if (isMobileUserMenuOpen) {
+            isMobileUserMenuOpen = false;
+            return true;
+        }
+
+        // 3. Close seasons drawer on mobile / tablet if open
+        if (
+            isSeasonsSidebarOpen.current &&
+            typeof window !== "undefined" &&
+            window.innerWidth <= 1024
+        ) {
+            isSeasonsSidebarOpen.set(false);
+            return true;
+        }
+
+        // 4. If looking at an anime, navigate to previous anime in history, or close anime view
         if (selectedAnimeAnilistId.current !== undefined) {
-            selectedAnimeAnilistId.set(undefined);
-        } else if (activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads") {
+            return selectedAnimeAnilistId.back();
+        }
+
+        // 5. If on settings, logs, or downloads sub-pages, return to previous tab
+        if (
+            activeTab?.id === "settings" ||
+            activeTab?.id === "logs" ||
+            activeTab?.id === "downloads"
+        ) {
             activeTab = previousAnimeTab || {
                 id: "home",
                 name: "Home",
                 default: true,
             };
+            return true;
+        }
+
+        return false;
+    }
+
+    function onBackClick() {
+        if (!isNative && typeof window !== "undefined" && window.history.state?.anilyAnime) {
+            window.history.back();
+        } else {
+            handleBack();
         }
     }
 
+    $effect(() => {
+        const id = selectedAnimeAnilistId.current;
+        if (!isNative && !isHandlingPopState && typeof window !== "undefined") {
+            if (id !== undefined && window.history.state?.anilyAnime !== id) {
+                window.history.pushState({ anilyAnime: id }, "");
+            }
+        }
+    });
+
     onMount(() => {
+        let backListenerHandle: PluginListenerHandle | undefined;
+
+        // Native Android back button handling
+        if (isNative) {
+            App.addListener("backButton", () => {
+                const handled = handleBack();
+                if (!handled) {
+                    App.exitApp();
+                }
+            }).then((handle) => {
+                backListenerHandle = handle;
+            });
+        }
+
+        // Web browser back gesture handling
+        const handlePopState = () => {
+            isHandlingPopState = true;
+            try {
+                handleBack();
+            } finally {
+                isHandlingPopState = false;
+            }
+        };
+
+        if (!isNative && typeof window !== "undefined") {
+            window.addEventListener("popstate", handlePopState);
+        }
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                handleBack();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+
         const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
             const msg =
                 event.reason instanceof Error
@@ -155,6 +244,13 @@
         window.addEventListener("anily:unauthorized", handleUnauthorized);
 
         return () => {
+            if (backListenerHandle) {
+                backListenerHandle.remove();
+            }
+            if (!isNative && typeof window !== "undefined") {
+                window.removeEventListener("popstate", handlePopState);
+            }
+            window.removeEventListener("keydown", handleKeyDown);
             window.removeEventListener(
                 "unhandledrejection",
                 handleUnhandledRejection,
@@ -199,7 +295,7 @@
                 {#if selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads"}
                     <IconButton
                         Icon={CaretLeftIcon}
-                        onclick={handleBack}
+                        onclick={onBackClick}
                         title="Back"
                     />
                 {/if}
@@ -268,7 +364,7 @@
                     <div class="topbar-left">
                         <IconButton
                             Icon={CaretLeftIcon}
-                            onclick={handleBack}
+                            onclick={onBackClick}
                             title="Back"
                         />
                         <h2 class="topbar-title">Anime Details</h2>

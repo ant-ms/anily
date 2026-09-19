@@ -1,6 +1,8 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
 
+    import { registerBackHandler } from "./navigation/backHandler";
+
     let {
         isOpen = $bindable(false),
         ariaLabel = "Dialog",
@@ -14,6 +16,18 @@
         maxWidth?: string;
         children?: Snippet;
     } = $props();
+
+    $effect(() => {
+        if (isOpen) {
+            return registerBackHandler(() => {
+                if (isOpen) {
+                    isOpen = false;
+                    return true;
+                }
+                return false;
+            });
+        }
+    });
 
     function handleBackdropClick() {
         isOpen = false;
