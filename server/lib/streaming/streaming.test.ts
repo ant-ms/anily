@@ -338,5 +338,30 @@ describe("Streaming Providers & Quality Benchmarks", () => {
       expect(subBody).toContain("#EXT-X-TARGETDURATION");
       expect(subBody).toContain("/api/stream/proxy/subtitle.vtt?url=");
     });
+
+    it("apiStream proxy handles disguised Content-Type (image/jpeg) child playlists and segment types", async () => {
+      const { app } = await import("$src/app");
+      await import("$src/routes/apiStream");
+
+      const childUrl = "https://imgcdn44.dpopdrop89.store/cdn/092e3d2d14736a0ad5386790ceacb405f2c00bf1259443f3ff8bca9c318cd299f0667764f651a8e8cf994633faa91c7b8a85a1dc91893631b78d626e62";
+      const referer = "https://play2.echovideo.ru/";
+
+      const childProxyUrl = `/api/stream/proxy/media.m3u8?url=${encodeURIComponent(childUrl)}&ref=${encodeURIComponent(referer)}`;
+      const res = await app.request(childProxyUrl);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("mpegurl");
+      const body = await res.text();
+      expect(body).toContain("#EXTM3U");
+      expect(body).toContain("/api/stream/proxy/");
+
+      // Find first proxied segment and verify it's proxied with video/mp2t MIME type
+      const segLine = body.split("\n").find((l) => l.includes("/api/stream/proxy/"));
+      expect(segLine).toBeDefined();
+
+      const segRes = await app.request(segLine!.trim(), { method: "HEAD" });
+      expect(segRes.status).toBe(200);
+      expect(segRes.headers.get("content-type")).toBe("video/mp2t");
+    }, 25000);
   });
 });

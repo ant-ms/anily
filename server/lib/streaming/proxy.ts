@@ -30,6 +30,15 @@ export function makeProxiedUrl(
   let filename = extractFilename(absUrl);
   if (!filename) {
     filename = `media.${defaultExt}`;
+  } else if (defaultExt === "m3u8" && !filename.endsWith(".m3u8")) {
+    filename = `${filename}.m3u8`;
+  } else if (
+    defaultExt === "ts" &&
+    !filename.endsWith(".ts") &&
+    !filename.endsWith(".mp4") &&
+    !filename.endsWith(".m4s")
+  ) {
+    filename = `${filename}.ts`;
   }
   const refParam = referer ? `&ref=${encodeURIComponent(referer)}` : "";
   return `/api/stream/proxy/${filename}?url=${encodeURIComponent(absUrl)}${refParam}`;
@@ -167,14 +176,91 @@ ${vttProxiedUrl}
     }
 
     const contentType = (upstream.headers.get("content-type") || "").toLowerCase();
-    const isM3U8 =
+    const reqPathIsM3U8 = c.req.path.endsWith(".m3u8") || c.req.path.includes(".m3u8");
+    const targetUrlIsM3U8 =
       contentType.includes("mpegurl") ||
       parsedUrl.pathname.endsWith(".m3u8") ||
       parsedUrl.search.includes(".m3u8");
+    const isM3U8Requested = reqPathIsM3U8 || targetUrlIsM3U8;
 
-    if (isM3U8) {
-      if (c.req.method === "HEAD") {
-        return new Response(null, {
+    if (isM3U8Requested && c.req.method === "HEAD") {
+      return new Response(null, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.apple.mpegurl",
+          "Cache-Control": "no-cache",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+          "Access-Control-Allow-Headers": "*",
+        },
+      });
+    }
+
+    if (isM3U8Requested) {
+      const text = await upstream.text();
+      const trimmedText = text.trim();
+
+      // Only rewrite if it's actually an M3U8 playlist
+      if (trimmedText.startsWith("#EXTM3U") || isM3U8Requested) {
+        const baseUrl = parsedUrl.toString();
+        const isMasterPlaylist = trimmedText.includes("#EXT-X-STREAM-INF");
+        const subsParam = c.req.query("subs");
+
+        let parsedSubs: Array<{ l: string; lang: string; u: string; d?: boolean }> = [];
+        if (subsParam && isMasterPlaylist) {
+          try {
+            parsedSubs = JSON.parse(subsParam);
+          } catch {}
+        }
+
+        let subTagsInjected = false;
+        const subTags = parsedSubs.map((s, idx) => {
+          const subPlaylistUrl = `/api/stream/proxy/sub_${s.lang || idx}.m3u8?sub_vtt=${encodeURIComponent(s.u)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}`;
+          const isDef = s.d ? "YES" : idx === 0 ? "YES" : "NO";
+          return `#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${(s.l || "Subtitles").replace(/"/g, "")}",DEFAULT=${isDef},AUTOSELECT=${isDef},FORCED=NO,LANGUAGE="${s.lang || "en"}",URI="${subPlaylistUrl}"`;
+        });
+
+        // Rewrite M3U8 playlist lines so all segments/sub-playlists route through our proxy
+        const rewritten = text
+          .split("\n")
+          .map((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return line;
+
+            if (trimmed.startsWith("#")) {
+              if (trimmed.startsWith("#EXT-X-STREAM-INF") && parsedSubs.length > 0) {
+                const withSubs = trimmed.includes("SUBTITLES=") ? trimmed : `${trimmed},SUBTITLES="subs"`;
+                if (!subTagsInjected) {
+                  subTagsInjected = true;
+                  return `${subTags.join("\n")}\n${withSubs}`;
+                }
+                return withSubs;
+              }
+
+              // Rewrite URI="..." attributes in tags like #EXT-X-KEY, #EXT-X-MAP, #EXT-X-MEDIA, #EXT-X-I-FRAME-STREAM-INF
+              if (trimmed.includes('URI="')) {
+                return trimmed.replace(/URI="([^"]+)"/g, (_, tagUri) => {
+                  const isPlaylist =
+                    trimmed.startsWith("#EXT-X-MEDIA") ||
+                    trimmed.startsWith("#EXT-X-I-FRAME");
+                  const defaultExt = isPlaylist
+                    ? "m3u8"
+                    : trimmed.startsWith("#EXT-X-KEY")
+                      ? "key"
+                      : "mp4";
+                  return `URI="${makeProxiedUrl(tagUri, baseUrl, referer, defaultExt)}"`;
+                });
+              }
+              return line;
+            }
+
+            // Non-comment lines are segment or variant playlist URIs
+            const defaultExt = isMasterPlaylist ? "m3u8" : "ts";
+            return makeProxiedUrl(trimmed, baseUrl, referer, defaultExt);
+          })
+          .join("\n");
+
+        return new Response(rewritten, {
           status: 200,
           headers: {
             "Content-Type": "application/vnd.apple.mpegurl",
@@ -185,76 +271,6 @@ ${vttProxiedUrl}
           },
         });
       }
-
-      const text = await upstream.text();
-      const baseUrl = parsedUrl.toString();
-      const isMasterPlaylist = text.includes("#EXT-X-STREAM-INF");
-      const subsParam = c.req.query("subs");
-
-      let parsedSubs: Array<{ l: string; lang: string; u: string; d?: boolean }> = [];
-      if (subsParam && isMasterPlaylist) {
-        try {
-          parsedSubs = JSON.parse(subsParam);
-        } catch {}
-      }
-
-      let subTagsInjected = false;
-      const subTags = parsedSubs.map((s, idx) => {
-        const subPlaylistUrl = `/api/stream/proxy/sub_${s.lang || idx}.m3u8?sub_vtt=${encodeURIComponent(s.u)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}`;
-        const isDef = s.d ? "YES" : idx === 0 ? "YES" : "NO";
-        return `#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${(s.l || "Subtitles").replace(/"/g, "")}",DEFAULT=${isDef},AUTOSELECT=${isDef},FORCED=NO,LANGUAGE="${s.lang || "en"}",URI="${subPlaylistUrl}"`;
-      });
-
-      // Rewrite M3U8 playlist lines so all segments/sub-playlists route through our proxy
-      const rewritten = text
-        .split("\n")
-        .map((line) => {
-          const trimmed = line.trim();
-          if (!trimmed) return line;
-
-          if (trimmed.startsWith("#")) {
-            if (trimmed.startsWith("#EXT-X-STREAM-INF") && parsedSubs.length > 0) {
-              const withSubs = trimmed.includes("SUBTITLES=") ? trimmed : `${trimmed},SUBTITLES="subs"`;
-              if (!subTagsInjected) {
-                subTagsInjected = true;
-                return `${subTags.join("\n")}\n${withSubs}`;
-              }
-              return withSubs;
-            }
-
-            // Rewrite URI="..." attributes in tags like #EXT-X-KEY, #EXT-X-MAP, #EXT-X-MEDIA, #EXT-X-I-FRAME-STREAM-INF
-            if (trimmed.includes('URI="')) {
-              return trimmed.replace(/URI="([^"]+)"/g, (_, tagUri) => {
-                const isPlaylist =
-                  trimmed.startsWith("#EXT-X-MEDIA") ||
-                  trimmed.startsWith("#EXT-X-I-FRAME");
-                const defaultExt = isPlaylist
-                  ? "m3u8"
-                  : trimmed.startsWith("#EXT-X-KEY")
-                    ? "key"
-                    : "mp4";
-                return `URI="${makeProxiedUrl(tagUri, baseUrl, referer, defaultExt)}"`;
-              });
-            }
-            return line;
-          }
-
-          // Non-comment lines are segment or variant playlist URIs
-          const defaultExt = isMasterPlaylist ? "m3u8" : "ts";
-          return makeProxiedUrl(trimmed, baseUrl, referer, defaultExt);
-        })
-        .join("\n");
-
-      return new Response(rewritten, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/vnd.apple.mpegurl",
-          "Cache-Control": "no-cache",
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-          "Access-Control-Allow-Headers": "*",
-        },
-      });
     }
 
     // Binary segment or direct media stream (TS, MP4, or VTT)
@@ -277,6 +293,15 @@ ${vttProxiedUrl}
 
     if (parsedUrl.pathname.endsWith(".vtt") || c.req.path.endsWith(".vtt")) {
       responseHeaders.set("content-type", "text/vtt; charset=utf-8");
+    } else if (
+      parsedUrl.pathname.endsWith(".ts") ||
+      c.req.path.endsWith(".ts") ||
+      c.req.path.endsWith(".m4s") ||
+      parsedUrl.pathname.endsWith(".m4s")
+    ) {
+      responseHeaders.set("content-type", "video/mp2t");
+    } else if (parsedUrl.pathname.endsWith(".mp4") || c.req.path.endsWith(".mp4")) {
+      responseHeaders.set("content-type", "video/mp4");
     }
 
     responseHeaders.set("Access-Control-Allow-Origin", "*");
