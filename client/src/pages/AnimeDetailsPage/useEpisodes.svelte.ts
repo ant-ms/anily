@@ -15,7 +15,7 @@ const bootstrapDownloadStates = (eps: EpisodeData[], anilistId: number): void =>
         const raw = localStorage.getItem(buildDetailsCacheKey(anilistId));
         if (raw) details = JSON.parse(raw);
     } catch {}
-    const title = details?.titleEnglish || details?.titleRomanji;
+    const title = details?.titleNative || details?.titleEnglish || details?.titleRomanji;
     const thumb = details?.thumbnailUrl;
     eps.forEach((e) => downloadManager.checkEpisode(e.id, e.number, anilistId, title, thumb));
 };

@@ -16,18 +16,20 @@
     import LogsPage from "./pages/LogsPage.svelte";
     import SettingsPage from "./pages/SettingsPage.svelte";
     import DownloadsPage from "./pages/DownloadsPage.svelte";
-    import HomePage from "./pages/HomePage.svelte";
+    import GlobalSearchModal from "./lib/search/GlobalSearchModal.svelte";
     import type ProfileData from "./types/ProfileData";
     import {
         apiBaseUrl,
         selectedAnimeAnilistId,
         isSeasonsSidebarOpen,
+        isGlobalSearchOpen,
     } from "./lib/context.svelte";
     import AnimeDetailsPage from "./pages/AnimeDetailsPage/AnimeDetailsPage.svelte";
     import TreeStructureIcon from "phosphor-svelte/lib/TreeStructureIcon";
     import CaretLeftIcon from "phosphor-svelte/lib/CaretLeftIcon";
     import TelevisionIcon from "phosphor-svelte/lib/TelevisionIcon";
     import CloudSlashIcon from "phosphor-svelte/lib/CloudSlashIcon";
+    import MagnifyingGlassIcon from "phosphor-svelte/lib/MagnifyingGlassIcon";
     import { networkState } from "./lib/network.svelte";
     import { STORAGE_KEYS } from "./lib/storageKeys";
     import { isNative } from "./lib/native/anilyNative";
@@ -68,13 +70,13 @@
     }
 
     let activeTab: Tab | undefined = $state({
-        id: "home",
-        name: "Home",
+        id: "inbox",
+        name: "Inbox",
         default: true,
     });
     let previousAnimeTab: Tab | undefined = $state({
-        id: "home",
-        name: "Home",
+        id: "inbox",
+        name: "Inbox",
         default: true,
     });
     let isMobileUserMenuOpen = $state(false);
@@ -86,7 +88,6 @@
         if (activeTab?.id === "settings") return "Settings";
         if (activeTab?.id === "logs") return "Import Logs";
         if (activeTab?.id === "downloads") return "Downloads";
-        if (activeTab?.id === "home") return "Home";
         if (activeTab?.id === "waiting") return "Caught Up";
         if (activeTab?.id === "upcoming") return "Upcoming";
         if (activeTab?.id === "completed") return "Completed";
@@ -102,7 +103,7 @@
 
     $effect(() => {
         if (!isNative && activeTab?.id === "downloads") {
-            activeTab = { id: "home", name: "Home", default: true };
+            activeTab = { id: "inbox", name: "Inbox", default: true };
         }
     });
 
@@ -148,8 +149,8 @@
             activeTab?.id === "downloads"
         ) {
             activeTab = previousAnimeTab || {
-                id: "home",
-                name: "Home",
+                id: "inbox",
+                name: "Inbox",
                 default: true,
             };
             return true;
@@ -205,6 +206,28 @@
         }
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Global shortcut Cmd+K or Ctrl+K
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+                e.preventDefault();
+                isGlobalSearchOpen.set(!isGlobalSearchOpen.current);
+                return;
+            }
+
+            // Shortcut "/" when not typing in an input/textarea
+            if (
+                e.key === "/" &&
+                !isGlobalSearchOpen.current &&
+                !(
+                    e.target instanceof HTMLInputElement ||
+                    e.target instanceof HTMLTextAreaElement ||
+                    (e.target as HTMLElement)?.isContentEditable
+                )
+            ) {
+                e.preventDefault();
+                isGlobalSearchOpen.set(true);
+                return;
+            }
+
             if (e.key === "Escape") {
                 handleBack();
             }
@@ -293,13 +316,21 @@
 
                 <div class="topbar-title-wrapper">
                     <h1 class="topbar-title">{currentTitle}</h1>
-                    {#if selectedAnimeAnilistId.current === undefined && activeTab?.id !== "home" && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads" && sidebarAnimeCount > 0}
+                    {#if selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads" && sidebarAnimeCount > 0}
                         <Badge>{sidebarAnimeCount}</Badge>
                     {/if}
                 </div>
             </div>
 
             <div class="topbar-actions">
+                <IconButton
+                    Icon={MagnifyingGlassIcon}
+                    variant="ghost"
+                    shape="circle"
+                    onclick={() => isGlobalSearchOpen.set(true)}
+                    title="Search anime"
+                    ariaLabel="Search anime"
+                />
                 {#if !networkState.isOnline}
                     <div class="mobile-offline-badge" title="Offline Mode: only downloaded anime are available">
                         <CloudSlashIcon size={14} weight="bold" />
@@ -334,8 +365,8 @@
         <!-- Sidebar / List Pane -->
         <div
             class="sidebar-container"
-            class:mobile-hidden={selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads" || activeTab?.id === "home"}
-            class:desktop-collapsed={activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads" || activeTab?.id === "home"}
+            class:mobile-hidden={selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads"}
+            class:desktop-collapsed={activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads"}
         >
             <Sidebar
                 bind:activeTab
@@ -347,7 +378,7 @@
         <!-- Detail / Main Content Area -->
         <div
             id="content"
-            class:mobile-hidden={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads" && activeTab?.id !== "home"}
+            class:mobile-hidden={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads"}
         >
             <!-- Tablet Topbar (769px - 1024px, shown only when an anime is selected) -->
             {#if selectedAnimeAnilistId.current !== undefined}
@@ -361,6 +392,14 @@
                         <h2 class="topbar-title">Anime Details</h2>
                     </div>
                     <div class="topbar-actions">
+                        <IconButton
+                            Icon={MagnifyingGlassIcon}
+                            variant="ghost"
+                            shape="circle"
+                            onclick={() => isGlobalSearchOpen.set(true)}
+                            title="Search anime"
+                            ariaLabel="Search anime"
+                        />
                         {#if !networkState.isOnline}
                             <div class="mobile-offline-badge" title="Offline Mode: only downloaded anime are available">
                                 <CloudSlashIcon size={14} weight="bold" />
@@ -378,7 +417,10 @@
                 </header>
             {/if}
 
-            <div class="content-body">
+            <div
+                class="content-body"
+                class:content-empty={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads"}
+            >
                 {#if selectedAnimeAnilistId.current !== undefined}
                     <AnimeDetailsPage />
                 {:else if activeTab?.id === "settings"}
@@ -387,8 +429,6 @@
                     <LogsPage />
                 {:else if activeTab?.id === "downloads" && isNative}
                     <DownloadsPage />
-                {:else if activeTab?.id === "home"}
-                    <HomePage />
                 {:else}
                     <EmptyState
                         Icon={TelevisionIcon}
@@ -417,6 +457,7 @@
 {/if}
 
 <Snackbar />
+<GlobalSearchModal />
 
 <style lang="scss">
     main {
@@ -465,6 +506,12 @@
         flex: 1 1 0;
         min-height: 0;
         overflow-y: auto;
+
+        &.content-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     }
 
     .bar-container {

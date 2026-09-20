@@ -107,7 +107,7 @@
             const groupKey = s.anilistId ? `anime_${s.anilistId}` : (s.animeTitle || `ep_${s.episodeId}`);
             const cached = getCachedDetails(s.anilistId);
 
-            const title = s.animeTitle || cached?.titleEnglish || cached?.titleRomanji || (s.anilistId ? `Anime #${s.anilistId}` : "Downloaded Anime");
+            const title = s.animeTitle || cached?.titleNative || cached?.titleEnglish || cached?.titleRomanji || (s.anilistId ? `Anime #${s.anilistId}` : "Downloaded Anime");
             const thumb = s.thumbnailUrl || cached?.thumbnailUrl;
             const size = s.bytesDownloaded || s.totalBytes || 0;
 

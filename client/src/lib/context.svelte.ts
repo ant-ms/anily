@@ -72,3 +72,4 @@ export const selectedAnimeAnilistId = new AnimeContext();
 export const sidebarDataRefreshSeed = new Context<number>();
 export const isSeasonsSidebarOpen = new Context<boolean>();
 export const isMobileNavOpen = new Context<boolean>(false);
+export const isGlobalSearchOpen = new Context<boolean>(false);

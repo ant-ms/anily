@@ -35,9 +35,9 @@
     });
 
     let rawTitles = $derived([
+        animeDetails.titleNative,
         animeDetails.titleEnglish,
         animeDetails.titleRomanji,
-        animeDetails.titleNative,
     ]);
     let titles = $derived(
         [...new Set(rawTitles.filter((t): t is string => Boolean(t && t.trim())))],

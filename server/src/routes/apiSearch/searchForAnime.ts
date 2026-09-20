@@ -18,6 +18,27 @@ export const searchForAnime = async (q: string) =>
     },
     include: {
       synonyms: true,
+      animeDetails: true,
+      groupings: {
+        include: {
+          displayAnime: {
+            include: { animeDetails: true },
+          },
+          items: {
+            include: { animeDetails: true },
+          },
+        },
+      },
+      displayForGroupings: {
+        include: {
+          displayAnime: {
+            include: { animeDetails: true },
+          },
+          items: {
+            include: { animeDetails: true },
+          },
+        },
+      },
     },
-    take: 20,
+    take: 30,
   });

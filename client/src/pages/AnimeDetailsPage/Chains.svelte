@@ -328,7 +328,7 @@
         height: 100dvh;
         max-height: 100dvh;
         grid-template-rows: auto 1fr;
-        grid-template-columns: minmax(250px, auto);
+        grid-template-columns: minmax(235px, auto);
         border-left: 1px solid #2e2c29;
         background: #1d1a17;
         min-height: 0;

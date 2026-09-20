@@ -69,7 +69,7 @@
             <HeroSkeleton />
         {/if}
 
-        <Episodes {animeDetails} {updateSeed} animeName={animeDetails?.titleEnglish ?? animeDetails?.titleRomanji ?? ""} />
+        <Episodes {animeDetails} {updateSeed} animeName={animeDetails?.titleNative ?? animeDetails?.titleEnglish ?? animeDetails?.titleRomanji ?? ""} />
     </div>
     <div class="right" class:open={isSeasonsSidebarOpen.current}>
         <Chains {animeDetails} bind:updateSeed />

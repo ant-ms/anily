@@ -37,12 +37,10 @@
     let isAnimeListTab = $derived(
         activeTab?.id !== "settings" &&
         activeTab?.id !== "logs" &&
-        activeTab?.id !== "home" &&
         activeTab?.id !== "downloads"
     );
 
     let currentTitle = $derived.by(() => {
-        if (activeTab?.id === "home") return "Home";
         if (!activeTab || activeTab.id === "inbox") return "Inbox";
         if (activeTab.id === "waiting") return "Caught Up";
         if (activeTab.id === "upcoming") return "Upcoming";
@@ -61,13 +59,13 @@
                 visibleCardData = [];
                 animeCount = 0;
                 isRefreshing = false;
-                // If switching to a non-anime tab like settings, logs, downloads, or home, clear selected anime
-                if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads" || tab.id === "home")) {
+                // If switching to a non-anime tab like settings, logs, or downloads, clear selected anime
+                if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads")) {
                     selectedAnimeAnilistId.set(undefined);
                 }
             }
 
-            if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads" || tab.id === "home")) {
+            if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads")) {
                 return;
             }
 
@@ -187,7 +185,7 @@
                         onclick={() => handleNavClick({ id: "logs", name: "Logs" })}
                     />
                 </div>
-            {:else if activeTab?.id !== "settings" && activeTab?.id !== "home"}
+            {:else if activeTab?.id !== "settings"}
                 {#if visibleCardData.length > 0}
                     <div class="cards">
                         {#each visibleCardData as data}
@@ -272,6 +270,12 @@
             overscroll-behavior-y: contain;
             scrollbar-width: thin;
             scrollbar-color: #3a3733 transparent;
+
+            .cards {
+                display: flex;
+                flex-direction: column;
+                padding: 6px 0;
+            }
 
             .logs-sidebar-nav {
                 display: flex;

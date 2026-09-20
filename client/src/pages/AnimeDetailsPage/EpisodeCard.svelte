@@ -86,6 +86,15 @@
     const isChecking = $derived(checkingEpisodeId === episode.id);
     const dlState = $derived(downloadManager.states[episode.id]);
     const episodeFuture = $derived(isFuture(episode.airingAt));
+
+    let rawTitles = $derived([
+        episode.titleNative,
+        episode.titleEnglish,
+        episode.titleRomanji,
+    ]);
+    let titles = $derived(
+        [...new Set(rawTitles.filter((t): t is string => Boolean(t && t.trim())))],
+    );
 </script>
 
 <div class="episode-card" transition:fade={{ duration: 200 }}>
@@ -106,8 +115,8 @@
     </div>
 
     <div class="titles">
-        <span class="title-1">{episode.titleEnglish ?? `Episode ${episode.number}`}</span>
-        <span class="title-2">{episode.titleNative ?? ''}</span>
+        <span class="title-1">{titles[0] ?? `Episode ${episode.number}`}</span>
+        <span class="title-2">{titles[1] ?? ''}</span>
         <span class="date">{formatAiringDate(episode.airingAt)}</span>
     </div>
 

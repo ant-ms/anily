@@ -1,7 +1,8 @@
 <script lang="ts">
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import type ProfileData from "../../types/ProfileData";
-    import { apiBaseUrl, selectedAnimeAnilistId } from "../context.svelte";
+    import { apiBaseUrl, selectedAnimeAnilistId, isGlobalSearchOpen } from "../context.svelte";
+    import MagnifyingGlassIcon from "phosphor-svelte/lib/MagnifyingGlassIcon";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
     import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
@@ -50,6 +51,19 @@
 <svelte:window onclick={() => { if (isProfileMenuOpen) isProfileMenuOpen = false; }} />
 
 <nav class="m3-navigation-rail" aria-label="Main Navigation">
+    <!-- M3 Rail Top Action: Standard 56dp FAB -->
+    <div class="rail-header">
+        <button
+            type="button"
+            class="rail-fab"
+            onclick={() => isGlobalSearchOpen.set(true)}
+            title="Search anime (⌘K or Ctrl+K)"
+            aria-label="Search anime"
+        >
+            <MagnifyingGlassIcon size={24} weight="bold" />
+        </button>
+    </div>
+
     <!-- Primary Destinations -->
     <div class="rail-destinations" role="tablist" aria-orientation="vertical">
         {#each defaultDestinations as dest}
@@ -161,6 +175,77 @@
         position: relative;
         z-index: 30;
         flex-shrink: 0;
+
+        .rail-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 16px;
+
+            .rail-fab {
+                position: relative;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 56px;
+                height: 56px;
+                border-radius: 16px;
+                background: #ffd52c;
+                color: #2b2000;
+                border: none;
+                cursor: pointer;
+                outline: none;
+                box-shadow:
+                    0 4px 8px 3px rgba(0, 0, 0, 0.25),
+                    0 1px 3px rgba(0, 0, 0, 0.35);
+                transition:
+                    box-shadow 200ms cubic-bezier(0.2, 0, 0, 1),
+                    background-color 200ms cubic-bezier(0.2, 0, 0, 1);
+
+                /* M3 State layer overlay */
+                &::after {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    border-radius: inherit;
+                    background: #2b2000; /* on-primary-container */
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 200ms cubic-bezier(0.2, 0, 0, 1);
+                }
+
+                &:hover {
+                    box-shadow:
+                        0 6px 10px 4px rgba(0, 0, 0, 0.28),
+                        0 2px 3px rgba(0, 0, 0, 0.38);
+
+                    &::after {
+                        opacity: 0.08; /* M3 Hover state layer: 8% */
+                    }
+                }
+
+                &:active {
+                    box-shadow:
+                        0 4px 8px 3px rgba(0, 0, 0, 0.25),
+                        0 1px 3px rgba(0, 0, 0, 0.35);
+
+                    &::after {
+                        opacity: 0.12; /* M3 Pressed state layer: 12% */
+                    }
+                }
+
+                &:focus-visible {
+                    outline: 2px solid #ffd52c;
+                    outline-offset: 3px;
+
+                    &::after {
+                        opacity: 0.12;
+                    }
+                }
+            }
+        }
 
         .rail-destinations {
             display: flex;

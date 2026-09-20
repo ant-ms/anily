@@ -13,9 +13,9 @@
     } = $props();
 
     let titles = $derived([
+        ...(data.titleNative ? [data.titleNative] : []),
         ...(data.titleEnglish ? [data.titleEnglish] : []),
         ...(data.titleRomanji ? [data.titleRomanji] : []),
-        ...(data.titleNative ? [data.titleNative] : []),
     ]);
 
     let hasOfflineDownloads = $derived(
@@ -82,17 +82,17 @@
         display: flex;
         gap: 0.5rem;
         padding: 8px;
+        margin: 2px 12px;
+        border-radius: 12px;
+        cursor: pointer;
 
-        transition:
-            background 0.2s,
-            border-left 0.2s;
-        border-left: 3px solid transparent;
+        transition: background 0.2s cubic-bezier(0.2, 0, 0, 1);
 
         img {
             width: 65px;
             height: 90px;
             object-fit: cover;
-            border-radius: 5px;
+            border-radius: 8px;
         }
 
         .right {
@@ -133,12 +133,14 @@
 
         &:hover {
             background: hsl(36, 7%, 14%);
-            border-left: 3px solid hsl(36, 7%, 14%);
         }
 
         &.active {
-            background: #ffd52c14;
-            border-left: 3px solid #ffd52c;
+            background: rgba(255, 213, 44, 0.12);
+
+            &:hover {
+                background: rgba(255, 213, 44, 0.18);
+            }
         }
 
         &.offline-disabled {
@@ -149,7 +151,6 @@
 
             &:hover {
                 background: transparent;
-                border-left: 3px solid transparent;
             }
         }
 
@@ -176,10 +177,12 @@
         @media (max-width: 1024px) {
             padding: 6px;
             gap: 0.4rem;
+            margin: 2px 8px;
 
             img {
                 width: 52px;
                 height: 72px;
+                border-radius: 6px;
             }
 
             .right span {
