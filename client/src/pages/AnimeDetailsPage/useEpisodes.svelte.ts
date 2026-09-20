@@ -1,4 +1,4 @@
-import { selectedAnimeAnilistId, apiBaseUrl } from '../../lib/context.svelte';
+import { selectedAnimeAnilistId, apiBaseUrl, sidebarDataRefreshSeed } from '../../lib/context.svelte';
 import { snackbar } from '../../lib/snackbar.svelte';
 import { downloadManager } from '../../lib/download/downloadManager.svelte';
 import { networkState } from '../../lib/network.svelte';
@@ -23,9 +23,7 @@ const bootstrapDownloadStates = (eps: EpisodeData[], anilistId: number): void =>
 const loadFromCache = (anilistId: number): EpisodeData[] => {
     try {
         const raw = localStorage.getItem(buildEpisodeCacheKey(anilistId));
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) && parsed.length > 0 ? parsed : [];
+        return raw ? JSON.parse(raw) : [];
     } catch {
         return [];
     }
@@ -43,7 +41,7 @@ export class EpisodesState {
 
     constructor(updateSeed: () => number) {
         watch(
-            () => [selectedAnimeAnilistId.current, updateSeed()],
+            () => [selectedAnimeAnilistId.current, updateSeed(), sidebarDataRefreshSeed.current],
             () => {
                 const anilistId = selectedAnimeAnilistId.current;
                 if (anilistId === undefined) return;

@@ -5,6 +5,7 @@
         apiBaseUrl,
         selectedAnimeAnilistId,
         isSeasonsSidebarOpen,
+        sidebarDataRefreshSeed,
     } from "../../lib/context.svelte";
     import type AnimeDetailsData from "../../types/AnimeDetails";
     import Hero from "./Hero.svelte";
@@ -17,7 +18,7 @@
     let updateSeed = $state(Math.random());
 
     watch(
-        () => [selectedAnimeAnilistId.current, updateSeed],
+        () => [selectedAnimeAnilistId.current, updateSeed, sidebarDataRefreshSeed.current],
         ([anilistId], previous) => {
             if (anilistId === undefined) return;
 

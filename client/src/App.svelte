@@ -34,6 +34,7 @@
     import { App } from "@capacitor/app";
     import type { PluginListenerHandle } from "@capacitor/core";
     import { executeBackHandler } from "./lib/navigation/backHandler";
+    import { serverPing } from "./lib/serverPing.svelte";
 
     const loadCachedProfile = (): ProfileData | undefined => {
         try {
@@ -243,7 +244,17 @@
         window.addEventListener("error", handleError);
         window.addEventListener("anily:unauthorized", handleUnauthorized);
 
+        serverPing.init((updatedProfile) => {
+            if (
+                profileData?.name !== updatedProfile.name ||
+                profileData?.pictureUrl !== updatedProfile.pictureUrl
+            ) {
+                profileData = updatedProfile;
+            }
+        });
+
         return () => {
+            serverPing.destroy();
             if (backListenerHandle) {
                 backListenerHandle.remove();
             }
@@ -261,28 +272,8 @@
     });
 
     $effect(() => {
-        if (networkState.isOnline && apiBaseUrl.current && untrack(() => profileData)) {
-            fetch(`${apiBaseUrl.current}api/me`, { credentials: "include" })
-                .then(async (res) => {
-                    if (res.ok) {
-                        const contentType = res.headers.get("content-type") || "";
-                        if (contentType.includes("application/json")) {
-                            const content = await res.json();
-                            const displayName =
-                                content.name ||
-                                content.preferred_username ||
-                                content.email ||
-                                content.sub;
-                            if (displayName) {
-                                profileData = {
-                                    name: typeof displayName === "string" ? displayName.split(" ")[0] : "User",
-                                    pictureUrl: content.picture || "",
-                                };
-                            }
-                        }
-                    }
-                })
-                .catch(() => {});
+        if (profileData && networkState.isOnline && apiBaseUrl.current) {
+            serverPing.ping({ force: true });
         }
     });
 </script>

@@ -15,6 +15,7 @@ import "$src/routes/apiSidebar";
 import "$src/routes/apiSyncJobs";
 import "$src/routes/apiStream";
 import "$src/routes/apiRate";
+import "$src/routes/apiPing";
 import { prisma } from "$src/prisma";
 
 // Ensure database schema columns exist
