@@ -198,7 +198,7 @@
                     subtitleTitle: bestSub?.label ?? 'English',
                 });
             } else {
-                const playerUrl = buildPlayerUrl(data.streamUrl, player, bestSub?.url);
+                const playerUrl = buildPlayerUrl(data.streamUrl, player, data.subtitles?.length ? data.subtitles : bestSub?.url);
                 if (player === 'copy' || player === 'mpv') {
                     await navigator.clipboard.writeText(playerUrl);
                     snackbar.success(player === 'mpv' ? 'mpv command copied to clipboard!' : 'Stream URL copied to clipboard!');

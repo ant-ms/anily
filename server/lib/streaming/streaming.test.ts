@@ -363,5 +363,70 @@ describe("Streaming Providers & Quality Benchmarks", () => {
       expect(segRes.status).toBe(200);
       expect(segRes.headers.get("content-type")).toBe("video/mp2t");
     }, 25000);
+
+    it("apiStream proxy correctly injects subtitles into master playlist and sets correct DEFAULT track", async () => {
+      const { app } = await import("$src/app");
+      await import("$src/routes/apiStream");
+
+      const masterUrl = "https://hls2.aniwatchtv.uk/v/scxqicy/huanbc9tmy/nyvrcjopy8/xaprjusg9l2rwy/master.m3u8";
+      const referer = "https://zokoanime.video/";
+      const subs = [
+        { l: "Arabic", lang: "ar", u: "https://example.com/ar.vtt", d: false },
+        { l: "English", lang: "en", u: "https://example.com/en.vtt", d: true },
+        { l: "Spanish", lang: "es", u: "https://example.com/es.vtt", d: false },
+      ];
+
+      const proxyUrl = `/api/stream/proxy?url=${encodeURIComponent(masterUrl)}&ref=${encodeURIComponent(referer)}&subs=${encodeURIComponent(JSON.stringify(subs))}`;
+      const res = await app.request(proxyUrl);
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      // Ensure subtitle media tags are injected
+      expect(body).toContain('#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Arabic",DEFAULT=NO,AUTOSELECT=NO,FORCED=NO,LANGUAGE="ar"');
+      expect(body).toContain('#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",DEFAULT=YES,AUTOSELECT=YES,FORCED=NO,LANGUAGE="en"');
+      expect(body).toContain('#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Spanish",DEFAULT=NO,AUTOSELECT=NO,FORCED=NO,LANGUAGE="es"');
+
+      // Ensure variant stream lines reference SUBTITLES="subs"
+      const streamInfLines = body.split("\n").filter((l) => l.startsWith("#EXT-X-STREAM-INF"));
+      expect(streamInfLines.length).toBeGreaterThan(0);
+      for (const line of streamInfLines) {
+        expect(line).toContain('SUBTITLES="subs"');
+      }
+    }, 25000);
+
+    it("apiStream proxy wraps media playlists into master playlist when subtitles are present", async () => {
+      const { app } = await import("$src/app");
+      await import("$src/routes/apiStream");
+
+      // Child media playlist (non-master)
+      const childUrl = "https://imgcdn44.dpopdrop89.store/cdn/092e3d2d14736a0ad5386790ceacb405f2c00bf1259443f3ff8bca9c318cd299f0667764f651a8e8cf994633faa91c7b8a85a1dc91893631b78d626e62";
+      const referer = "https://play2.echovideo.ru/";
+      const subs = [
+        { l: "English", lang: "en", u: "https://example.com/en.vtt", d: true },
+      ];
+
+      // Request media playlist with subs attached - should be wrapped in master playlist
+      const masterProxyUrl = `/api/stream/proxy/media.m3u8?url=${encodeURIComponent(childUrl)}&ref=${encodeURIComponent(referer)}&subs=${encodeURIComponent(JSON.stringify(subs))}`;
+      const res = await app.request(masterProxyUrl);
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",DEFAULT=YES,AUTOSELECT=YES');
+      expect(body).toContain('#EXT-X-STREAM-INF:BANDWIDTH=5000000,SUBTITLES="subs"');
+      expect(body).toContain("/api/stream/proxy/media.m3u8?url=");
+      expect(body).toContain("&child=true");
+
+      // Now request the child media playlist
+      const childProxyUrlLine = body.split("\n").find((l) => l.includes("&child=true"));
+      expect(childProxyUrlLine).toBeDefined();
+
+      const childRes = await app.request(childProxyUrlLine!.trim());
+      expect(childRes.status).toBe(200);
+      const childBody = await childRes.text();
+      // Child media playlist has segments and not #EXT-X-STREAM-INF
+      expect(childBody).not.toContain("#EXT-X-STREAM-INF");
+      expect(childBody).toContain("#EXTM3U");
+    }, 25000);
   });
 });

@@ -15,12 +15,42 @@ export type MediaPlayer = 'mpv' | 'iina' | 'vlc' | 'copy';
 
 export type StreamLanguagePreference = 'sub' | 'dub';
 
-export const buildPlayerUrl = (mediaUrl: string, player: MediaPlayer, subtitleUrl?: string): string => {
+export interface SubtitleOption {
+  url: string;
+  default?: boolean;
+  language?: string;
+  label?: string;
+}
+
+export const buildPlayerUrl = (
+  mediaUrl: string,
+  player: MediaPlayer,
+  subtitleInput?: string | SubtitleOption[],
+): string => {
+  let subUrls: string[] = [];
+  if (Array.isArray(subtitleInput)) {
+    const sorted = [...subtitleInput].sort((a, b) => {
+      if (a.default && !b.default) return -1;
+      if (!a.default && b.default) return 1;
+      const isEnA = a.language === 'en' || a.language === 'eng' || a.label?.toLowerCase().includes('english');
+      const isEnB = b.language === 'en' || b.language === 'eng' || b.label?.toLowerCase().includes('english');
+      if (isEnA && !isEnB) return -1;
+      if (!isEnA && isEnB) return 1;
+      return 0;
+    });
+    // Take top 3 subtitles to keep URL concise and responsive
+    subUrls = sorted.map((s) => s.url).filter(Boolean).slice(0, 3);
+  } else if (typeof subtitleInput === 'string' && subtitleInput) {
+    subUrls = [subtitleInput];
+  }
+
   switch (player) {
     case 'iina': {
-      let url = `iina://open?url=${encodeURIComponent(mediaUrl)}`;
-      if (subtitleUrl) {
-        url += `&sub=${encodeURIComponent(subtitleUrl)}&mpv_sub-file=${encodeURIComponent(subtitleUrl)}`;
+      let url = `iina://open?url=${encodeURIComponent(mediaUrl)}&mpv_demuxer-lavf-o=strict=experimental&mpv_sub-visibility=yes&mpv_slang=en,eng,English`;
+      if (subUrls.length > 0) {
+        // mpv StringList treats colons as separators on Unix; colons inside URLs must be escaped as \:
+        const escapedSubFiles = subUrls.map((u) => u.replace(/:/g, '\\:')).join(':');
+        url += `&mpv_sub-files=${encodeURIComponent(escapedSubFiles)}`;
       }
       return url;
     }
@@ -31,8 +61,12 @@ export const buildPlayerUrl = (mediaUrl: string, player: MediaPlayer, subtitleUr
       const strippedUrl = mediaUrl.replace(/^https?:\/\//, '');
       return `vlc://${strippedUrl}`;
     }
-    case 'mpv':
-      return subtitleUrl ? `mpv "${mediaUrl}" --sub-file="${subtitleUrl}"` : `mpv "${mediaUrl}"`;
+    case 'mpv': {
+      const subArgs = subUrls.map((u) => `--sub-file="${u}"`).join(' ');
+      return subUrls.length > 0
+        ? `mpv "${mediaUrl}" ${subArgs} --demuxer-lavf-o=strict=experimental --sub-visibility=yes`
+        : `mpv "${mediaUrl}" --demuxer-lavf-o=strict=experimental`;
+    }
     case 'copy':
       return mediaUrl;
   }

@@ -207,18 +207,54 @@ ${vttProxiedUrl}
         const subsParam = c.req.query("subs");
 
         let parsedSubs: Array<{ l: string; lang: string; u: string; d?: boolean }> = [];
-        if (subsParam && isMasterPlaylist) {
+        if (subsParam) {
           try {
             parsedSubs = JSON.parse(subsParam);
           } catch {}
         }
 
+        const hasExplicitDefault = parsedSubs.some((s) => s.d === true);
+        const defaultIndex = hasExplicitDefault
+          ? parsedSubs.findIndex((s) => s.d === true)
+          : Math.max(
+              0,
+              parsedSubs.findIndex(
+                (s) =>
+                  (s.lang || "").toLowerCase().startsWith("en") ||
+                  (s.l || "").toLowerCase().includes("english"),
+              ),
+            );
+
         let subTagsInjected = false;
         const subTags = parsedSubs.map((s, idx) => {
           const subPlaylistUrl = `/api/stream/proxy/sub_${s.lang || idx}.m3u8?sub_vtt=${encodeURIComponent(s.u)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}`;
-          const isDef = s.d ? "YES" : idx === 0 ? "YES" : "NO";
+          const isDef = idx === defaultIndex ? "YES" : "NO";
           return `#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${(s.l || "Subtitles").replace(/"/g, "")}",DEFAULT=${isDef},AUTOSELECT=${isDef},FORCED=NO,LANGUAGE="${s.lang || "en"}",URI="${subPlaylistUrl}"`;
         });
+
+        // If upstream is a media playlist with #EXTINF segments rather than a master playlist,
+        // wrap it into a master playlist so players can bind the subtitle tracks.
+        if (!isMasterPlaylist && parsedSubs.length > 0 && c.req.query("child") !== "true") {
+          const childMediaUrl = `/api/stream/proxy/media.m3u8?url=${encodeURIComponent(targetUrl)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}&child=true`;
+          const wrapped = [
+            "#EXTM3U",
+            "#EXT-X-VERSION:3",
+            ...subTags,
+            `#EXT-X-STREAM-INF:BANDWIDTH=5000000,SUBTITLES="subs"`,
+            childMediaUrl,
+          ].join("\n");
+
+          return new Response(wrapped, {
+            status: 200,
+            headers: {
+              "Content-Type": "application/vnd.apple.mpegurl",
+              "Cache-Control": "no-cache",
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+              "Access-Control-Allow-Headers": "*",
+            },
+          });
+        }
 
         // Rewrite M3U8 playlist lines so all segments/sub-playlists route through our proxy
         const rewritten = text
@@ -228,8 +264,15 @@ ${vttProxiedUrl}
             if (!trimmed) return line;
 
             if (trimmed.startsWith("#")) {
+              // Strip upstream subtitle declarations when injecting our own to avoid conflicts
+              if (parsedSubs.length > 0 && trimmed.startsWith("#EXT-X-MEDIA") && trimmed.includes("TYPE=SUBTITLES")) {
+                return null;
+              }
+
               if (trimmed.startsWith("#EXT-X-STREAM-INF") && parsedSubs.length > 0) {
-                const withSubs = trimmed.includes("SUBTITLES=") ? trimmed : `${trimmed},SUBTITLES="subs"`;
+                const withSubs = trimmed.includes("SUBTITLES=")
+                  ? trimmed.replace(/SUBTITLES="[^"]*"/, 'SUBTITLES="subs"')
+                  : `${trimmed},SUBTITLES="subs"`;
                 if (!subTagsInjected) {
                   subTagsInjected = true;
                   return `${subTags.join("\n")}\n${withSubs}`;
@@ -258,6 +301,7 @@ ${vttProxiedUrl}
             const defaultExt = isMasterPlaylist ? "m3u8" : "ts";
             return makeProxiedUrl(trimmed, baseUrl, referer, defaultExt);
           })
+          .filter((line): line is string => line !== null)
           .join("\n");
 
         return new Response(rewritten, {
