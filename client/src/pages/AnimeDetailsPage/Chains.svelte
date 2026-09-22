@@ -21,6 +21,7 @@
     import type { ChainNode } from "../../types/AnimeGroupings";
     import { fade } from "svelte/transition";
     import { watch } from "runed";
+    import { bookmarkManager } from "../../lib/bookmark.svelte";
     import ChainTree from "./chains/ChainTree.svelte";
     import NotInChain from "./chains/NotInChain.svelte";
     import { buildGroupingCacheKey } from "../../lib/storageKeys";
@@ -34,20 +35,10 @@
     } = $props();
 
     let animeGroupings: AnimeGroupingsData | undefined = $state();
-    let isBookmarked = $state(false);
     let isDisplayAnime = $state(false);
-    let isTogglingBookmark = $state(false);
-
-    watch(
-        () => selectedAnimeAnilistId.current,
-        () => {
-            isTogglingBookmark = false;
-        },
-    );
 
     $effect(() => {
         if (animeDetails !== undefined) {
-            isBookmarked = animeDetails.groupingId != null;
             isDisplayAnime = animeDetails.isDisplayAnime;
         }
     });
@@ -140,69 +131,6 @@
         );
     };
 
-    const toggleGrouping = async () => {
-        if (
-            !animeDetails ||
-            isTogglingBookmark ||
-            !apiBaseUrl.current ||
-            selectedAnimeAnilistId.current === undefined
-        ) {
-            return;
-        }
-
-        const currentAnilistId = selectedAnimeAnilistId.current;
-        const removing = animeDetails.groupingId !== null;
-        isTogglingBookmark = true;
-
-        const url = new URL(
-            `/api/details/${currentAnilistId}/grouping`,
-            apiBaseUrl.current,
-        );
-
-        try {
-            // Remove the grouping if it exists
-            if (removing) {
-                const res = await fetch(url.toString(), {
-                    method: "DELETE",
-                    credentials: "include",
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                if (selectedAnimeAnilistId.current === currentAnilistId) {
-                    isBookmarked = false;
-                    updateSeed = Math.random();
-                }
-            } else {
-                // or add it if it doesn't
-                const res = await fetch(url.toString(), {
-                    method: "POST",
-                    credentials: "include",
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                if (selectedAnimeAnilistId.current === currentAnilistId) {
-                    isBookmarked = true;
-                    updateSeed = Math.random();
-                    sidebarDataRefreshSeed.set(Math.random());
-                }
-            }
-        } catch (err) {
-            console.error(
-                removing
-                    ? "Failed to remove anime from chain:"
-                    : "Failed to add anime to chain:",
-                err,
-            );
-            snackbar.error(
-                removing
-                    ? "Failed to remove anime from chain"
-                    : "Failed to add anime to chain",
-            );
-        } finally {
-            if (selectedAnimeAnilistId.current === currentAnilistId) {
-                isTogglingBookmark = false;
-            }
-        }
-    };
-
     const setDisplayAnime = () => {
         if (!animeDetails || isDisplayAnime) return;
 
@@ -271,12 +199,17 @@
 
 <div class="chains">
     <div class="actions">
-        <Button
-            Icon={BookmarkIcon}
-            active={isBookmarked}
-            loading={isTogglingBookmark}
-            onclick={toggleGrouping}
-        />
+        <div class="bookmark-btn-wrapper">
+            <Button
+                Icon={BookmarkIcon}
+                weight={bookmarkManager.isBookmarked ? "fill" : "regular"}
+                active={bookmarkManager.isBookmarked}
+                loading={bookmarkManager.isToggling}
+                disabled={!bookmarkManager.canToggle}
+                onclick={() => bookmarkManager.toggle()}
+                title={bookmarkManager.isBookmarked ? "Remove bookmark" : "Bookmark anime"}
+            />
+        </div>
         <Button 
             Icon={isDisplayAnime ? PushPinIcon : PushPinSlashIcon} 
             active={isDisplayAnime} 
@@ -340,6 +273,14 @@
             align-items: flex-end;
             margin: 0.5rem;
             padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+
+            .bookmark-btn-wrapper {
+                display: contents;
+
+                @media (max-width: 1024px) {
+                    display: none;
+                }
+            }
 
             .spacer {
                 flex-grow: 1;

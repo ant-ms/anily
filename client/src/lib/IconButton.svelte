@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { IconComponentProps } from "phosphor-svelte";
+    import type { IconComponentProps, IconWeight } from "phosphor-svelte";
     import type { Component } from "svelte";
 
     let {
@@ -13,6 +13,7 @@
         loading = false,
         title = undefined,
         ariaLabel = undefined,
+        weight = undefined,
     }: {
         Icon: Component<IconComponentProps, {}, "">;
         onclick?: (e: MouseEvent) => any;
@@ -24,6 +25,7 @@
         loading?: boolean;
         title?: string;
         ariaLabel?: string;
+        weight?: IconWeight;
     } = $props();
 
     let internalLoading = $state(false);
@@ -71,7 +73,7 @@
     {#if isBusy}
         <span class="icon-spinner"></span>
     {:else}
-        <Icon size={iconSizes[size]} />
+        <Icon size={iconSizes[size]} {weight} />
     {/if}
 </button>
 

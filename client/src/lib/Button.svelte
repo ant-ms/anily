@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { IconComponentProps } from "phosphor-svelte";
+    import type { IconComponentProps, IconWeight } from "phosphor-svelte";
     import type { Component, Snippet } from "svelte";
 
     let {
@@ -12,6 +12,7 @@
         disabled = false,
         loading = false,
         title = undefined,
+        weight = undefined,
         class: className = "",
     }: {
         children?: Snippet;
@@ -23,6 +24,7 @@
         disabled?: boolean;
         loading?: boolean;
         title?: string;
+        weight?: IconWeight;
         class?: string;
     } = $props();
 
@@ -45,7 +47,7 @@
     {#if loading}
         <span class="button-spinner"></span>
     {:else if Icon}
-        <Icon size={iconSize} />
+        <Icon size={iconSize} {weight} />
     {/if}
     {#if children}
         {@render children()}

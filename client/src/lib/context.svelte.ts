@@ -1,3 +1,5 @@
+import type AnimeDetailsData from "../types/AnimeDetails";
+
 class Context<T> {
   private _value: T | undefined = $state();
   constructor(initialValue?: T) {
@@ -68,6 +70,7 @@ export class AnimeContext {
 
 export const apiBaseUrl = new Context<URL>();
 export const selectedAnimeAnilistId = new AnimeContext();
+export const selectedAnimeDetails = new Context<AnimeDetailsData>();
 
 export const sidebarDataRefreshSeed = new Context<number>();
 export const isSeasonsSidebarOpen = new Context<boolean>();

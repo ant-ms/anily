@@ -21,17 +21,20 @@
     import {
         apiBaseUrl,
         selectedAnimeAnilistId,
+        selectedAnimeDetails,
         isSeasonsSidebarOpen,
         isGlobalSearchOpen,
     } from "./lib/context.svelte";
     import AnimeDetailsPage from "./pages/AnimeDetailsPage/AnimeDetailsPage.svelte";
     import TreeStructureIcon from "phosphor-svelte/lib/TreeStructureIcon";
+    import BookmarkIcon from "phosphor-svelte/lib/BookmarkIcon";
     import CaretLeftIcon from "phosphor-svelte/lib/CaretLeftIcon";
     import TelevisionIcon from "phosphor-svelte/lib/TelevisionIcon";
     import CloudSlashIcon from "phosphor-svelte/lib/CloudSlashIcon";
     import MagnifyingGlassIcon from "phosphor-svelte/lib/MagnifyingGlassIcon";
+    import { bookmarkManager } from "./lib/bookmark.svelte";
     import { networkState } from "./lib/network.svelte";
-    import { STORAGE_KEYS } from "./lib/storageKeys";
+    import { STORAGE_KEYS, buildDetailsCacheKey } from "./lib/storageKeys";
     import { isNative } from "./lib/native/anilyNative";
     import { App } from "@capacitor/app";
     import type { PluginListenerHandle } from "@capacitor/core";
@@ -172,6 +175,24 @@
         if (!isNative && !isHandlingPopState && typeof window !== "undefined") {
             if (id !== undefined && window.history.state?.anilyAnime !== id) {
                 window.history.pushState({ anilyAnime: id }, "");
+            }
+        }
+    });
+
+    $effect(() => {
+        const id = selectedAnimeAnilistId.current;
+        if (id === undefined) {
+            selectedAnimeDetails.set(undefined);
+        } else if (selectedAnimeDetails.current?.anilistId !== id) {
+            try {
+                const cached = localStorage.getItem(buildDetailsCacheKey(id));
+                if (cached) {
+                    selectedAnimeDetails.set(JSON.parse(cached));
+                } else {
+                    selectedAnimeDetails.set(undefined);
+                }
+            } catch {
+                selectedAnimeDetails.set(undefined);
             }
         }
     });
@@ -339,6 +360,16 @@
                 {/if}
                 {#if selectedAnimeAnilistId.current !== undefined}
                     <IconButton
+                        Icon={BookmarkIcon}
+                        active={bookmarkManager.isBookmarked}
+                        loading={bookmarkManager.isToggling}
+                        disabled={!bookmarkManager.canToggle}
+                        weight={bookmarkManager.isBookmarked ? "fill" : "regular"}
+                        onclick={() => bookmarkManager.toggle()}
+                        title={bookmarkManager.isBookmarked ? "Remove bookmark" : "Bookmark anime"}
+                        ariaLabel={bookmarkManager.isBookmarked ? "Remove bookmark" : "Bookmark anime"}
+                    />
+                    <IconButton
                         Icon={TreeStructureIcon}
                         active={isSeasonsSidebarOpen.current}
                         onclick={() =>
@@ -406,6 +437,16 @@
                                 <span>Offline</span>
                             </div>
                         {/if}
+                        <IconButton
+                            Icon={BookmarkIcon}
+                            active={bookmarkManager.isBookmarked}
+                            loading={bookmarkManager.isToggling}
+                            disabled={!bookmarkManager.canToggle}
+                            weight={bookmarkManager.isBookmarked ? "fill" : "regular"}
+                            onclick={() => bookmarkManager.toggle()}
+                            title={bookmarkManager.isBookmarked ? "Remove bookmark" : "Bookmark anime"}
+                            ariaLabel={bookmarkManager.isBookmarked ? "Remove bookmark" : "Bookmark anime"}
+                        />
                         <IconButton
                             Icon={TreeStructureIcon}
                             active={isSeasonsSidebarOpen.current}
