@@ -1,4 +1,5 @@
 <script lang="ts">
+    import CheckIcon from "phosphor-svelte/lib/CheckIcon";
     import type { IconComponentProps } from "phosphor-svelte";
     import type { Component } from "svelte";
 
@@ -22,7 +23,7 @@
     }: {
         items: SegmentOption[];
         value: any;
-        variant?: "connected" | "pills";
+        variant?: "connected" | "pills" | "chips";
         disabled?: boolean;
         ariaLabel?: string;
         onchange?: (value: any) => void;
@@ -39,6 +40,7 @@
     class="segmented-control"
     class:variant-connected={variant === "connected"}
     class:variant-pills={variant === "pills"}
+    class:variant-chips={variant === "chips"}
     role="radiogroup"
     aria-label={ariaLabel}
 >
@@ -60,7 +62,9 @@
             {disabled}
             onclick={() => select(item.value)}
         >
-            {#if item.Icon}
+            {#if isSelected && (variant === "pills" || variant === "chips")}
+                <CheckIcon size="1rem" weight="bold" class="chip-check-icon" />
+            {:else if item.Icon}
                 <item.Icon
                     size="1.15rem"
                     weight={isSelected && item.activeIconWeight ? item.activeIconWeight : (item.iconWeight || "regular")}
@@ -145,41 +149,68 @@
             }
         }
 
-        &.variant-pills {
+        &.variant-pills,
+        &.variant-chips {
             gap: 8px;
             overflow-x: auto;
             padding-bottom: 2px;
+            align-items: center;
+            border: none;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+
+            &::-webkit-scrollbar {
+                display: none;
+            }
 
             .segment-item {
-                background: hsl(20, 17.6%, 10%);
-                border: 1px solid hsl(36, 5.7%, 20%);
-                color: #a09890;
-                font-size: 0.8rem;
+                background: transparent;
+                border: 1px solid var(--m3-outline-variant, #4b4541);
+                color: var(--m3-on-surface-variant, #cdc4be);
+                font-size: 0.8125rem;
                 font-weight: 500;
-                padding: 5px 12px;
-                border-radius: 9999px;
+                padding: 0 16px;
+                height: 32px;
+                min-height: 32px;
+                box-sizing: border-box;
+                border-radius: 8px;
                 cursor: pointer;
-                transition: all 0.15s ease;
+                transition:
+                    background 0.15s ease,
+                    border-color 0.15s ease,
+                    color 0.15s ease;
                 white-space: nowrap;
                 display: inline-flex;
                 align-items: center;
-                gap: 6px;
+                gap: 8px;
+                user-select: none;
 
                 &:hover:not(:disabled) {
-                    background: hsl(20, 17.6%, 14%);
-                    color: #e8e4df;
+                    background: var(--m3-state-hover, rgba(231, 225, 222, 0.08));
+                    color: var(--m3-on-surface, #e7e1de);
                 }
 
                 &:disabled {
-                    opacity: 0.5;
+                    opacity: 0.38;
                     cursor: not-allowed;
                 }
 
                 &.active {
-                    background: rgba(255, 213, 44, 0.12);
-                    border-color: rgba(255, 213, 44, 0.4);
-                    color: #ffd52c;
+                    background: var(--m3-secondary-container, #5c4728);
+                    border: 1px solid transparent;
+                    color: var(--m3-on-secondary-container, #ffe082);
                     font-weight: 600;
+                    padding-left: 10px;
+
+                    :global(.chip-check-icon) {
+                        color: var(--m3-on-secondary-container, #ffe082);
+                        flex-shrink: 0;
+                    }
+
+                    &:hover:not(:disabled) {
+                        background: #6a5330;
+                        color: #ffffff;
+                    }
                 }
             }
         }

@@ -17,9 +17,9 @@
     }: {
         Icon: Component<IconComponentProps, {}, "">;
         onclick?: (e: MouseEvent) => any;
-        variant?: "normal" | "ghost" | "danger";
+        variant?: "normal" | "ghost" | "danger" | "tonal" | "standard";
         shape?: "square" | "rounded" | "circle";
-        size?: "sm" | "md" | "lg";
+        size?: "sm" | "md" | "lg" | "standard";
         active?: boolean;
         disabled?: boolean;
         loading?: boolean;
@@ -48,6 +48,7 @@
         sm: "1rem",
         md: "1.25rem",
         lg: "1.4rem",
+        standard: "1.25rem",
     };
 </script>
 
@@ -61,12 +62,15 @@
     class:variant-normal={variant === "normal"}
     class:variant-ghost={variant === "ghost"}
     class:variant-danger={variant === "danger"}
+    class:variant-tonal={variant === "tonal"}
+    class:variant-standard={variant === "standard"}
     class:shape-square={shape === "square"}
     class:shape-rounded={shape === "rounded"}
     class:shape-circle={shape === "circle"}
     class:size-sm={size === "sm"}
     class:size-md={size === "md"}
     class:size-lg={size === "lg"}
+    class:size-standard={size === "standard"}
     class:active
     class:is-busy={isBusy}
 >
@@ -119,6 +123,13 @@
             height: 44px;
         }
 
+        &.size-standard {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            min-height: 40px;
+        }
+
         /* Shapes */
         &.shape-square {
             border-radius: 0;
@@ -145,6 +156,47 @@
             &.active {
                 background: #ffd52c18;
                 border-color: #ffd52c;
+                color: #ffd52c;
+            }
+        }
+
+        &.variant-tonal {
+            background: var(--m3-surface-container-high, #2c2825);
+            border: 1px solid transparent;
+            color: var(--m3-on-surface, #e7e1de);
+
+            &:hover:not(:disabled) {
+                background: var(--m3-surface-container-highest, #383430);
+                color: #ffffff;
+            }
+
+            &:active:not(:disabled) {
+                background: rgba(255, 255, 255, 0.14);
+            }
+
+            &.active {
+                background: rgba(255, 213, 44, 0.16);
+                border-color: #ffd52c;
+                color: #ffd52c;
+            }
+        }
+
+        &.variant-standard {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--m3-on-surface-variant, #cdc4be);
+
+            &:hover:not(:disabled) {
+                background: var(--m3-state-hover, rgba(231, 225, 222, 0.08));
+                color: var(--m3-on-surface, #e7e1de);
+            }
+
+            &:active:not(:disabled) {
+                background: rgba(231, 225, 222, 0.14);
+            }
+
+            &.active {
+                background: rgba(255, 213, 44, 0.12);
                 color: #ffd52c;
             }
         }

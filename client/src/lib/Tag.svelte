@@ -75,8 +75,11 @@
         }
 
         &.size-md {
-            font-size: 0.8rem;
-            padding: 4px 10px;
+            font-size: 0.75rem;
+            padding: 0 12px;
+            height: 32px;
+            min-height: 32px;
+            border-radius: 8px;
         }
 
         &.variant-default {

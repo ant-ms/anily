@@ -325,7 +325,7 @@
 {#if profileData}
     <main>
         <!-- Single Unified Mobile Top App Bar for Phones (<= 768px) -->
-        <header class="mobile-topbar">
+        <header class="mobile-topbar" class:no-border={activeTab?.id === "logs"}>
             <div class="topbar-left">
                 {#if selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads"}
                     <IconButton
@@ -674,6 +674,11 @@
             padding-bottom: 0;
             background: #1d1a17;
             border-bottom: 1px solid #2e2c29;
+
+            &.no-border {
+                border-bottom: none;
+            }
+
             flex-shrink: 0;
             z-index: 20;
 
