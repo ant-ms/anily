@@ -451,8 +451,8 @@
 
             @container episodes-pane (min-width: 540px) {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-                gap: 1rem;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 0.75rem;
                 align-items: stretch;
             }
         }
@@ -525,16 +525,16 @@
                 .skeleton-content {
                     flex-direction: column;
                     align-items: stretch;
-                    padding: 12px 14px 12px 14px;
-                    gap: 8px;
+                    padding: 10px 12px 8px 12px;
+                    gap: 6px;
 
                     .titles {
-                        gap: 0.4rem;
+                        gap: 0.35rem;
                     }
 
                     .actions-skeleton {
                         justify-content: flex-end;
-                        padding-top: 4px;
+                        padding-top: 2px;
                         border-top: none;
                     }
                 }

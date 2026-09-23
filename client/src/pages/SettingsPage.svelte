@@ -7,10 +7,16 @@
         type MediaPlayer,
         type StreamLanguagePreference,
     } from "../types/Media";
+    import {
+        getStoredFoldableCreaseSplit,
+        setStoredFoldableCreaseSplit,
+    } from "../lib/context.svelte";
     import Select from "../lib/Select.svelte";
+    import Switch from "../lib/Switch.svelte";
 
     let player: MediaPlayer = $state(getStoredPlayer());
     let languagePreference: StreamLanguagePreference = $state(getStoredLanguagePreference());
+    let foldableCreaseSplit: boolean = $state(getStoredFoldableCreaseSplit());
 
     function onPlayerChange() {
         setStoredPlayer(player);
@@ -18,6 +24,10 @@
 
     function onLanguagePreferenceChange() {
         setStoredLanguagePreference(languagePreference);
+    }
+
+    function onFoldableCreaseSplitChange(enabled: boolean) {
+        setStoredFoldableCreaseSplit(enabled);
     }
 
     const playerOptions = [
@@ -54,6 +64,20 @@
             options={languageOptions}
             onchange={onLanguagePreferenceChange}
         />
+    </section>
+
+    <section>
+        <div class="setting-row">
+            <div class="setting-info">
+                <h3>Foldable Crease Split</h3>
+                <p>On medium devices (such as foldables), expand the navigation rail and sidebar combined to exactly 50% of the screen width so the split aligns with the fold crease.</p>
+            </div>
+            <Switch
+                bind:checked={foldableCreaseSplit}
+                onchange={onFoldableCreaseSplitChange}
+                ariaLabel="Foldable Crease Split"
+            />
+        </div>
     </section>
 </div>
 
@@ -94,6 +118,20 @@
                 color: #777;
                 margin: 0;
                 line-height: 1.5;
+            }
+
+            .setting-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1.5rem;
+
+                .setting-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.35rem;
+                    flex: 1;
+                }
             }
         }
     }

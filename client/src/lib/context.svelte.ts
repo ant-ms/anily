@@ -71,8 +71,29 @@ export class AnimeContext {
 export const apiBaseUrl = new Context<URL>();
 export const selectedAnimeAnilistId = new AnimeContext();
 export const selectedAnimeDetails = new Context<AnimeDetailsData>();
-
 export const sidebarDataRefreshSeed = new Context<number>();
 export const isSeasonsSidebarOpen = new Context<boolean>();
 export const isMobileNavOpen = new Context<boolean>(false);
 export const isGlobalSearchOpen = new Context<boolean>(false);
+
+import { STORAGE_KEYS } from "./storageKeys";
+
+export const getStoredFoldableCreaseSplit = (): boolean => {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.FOLDABLE_CREASE_SPLIT) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const setStoredFoldableCreaseSplit = (enabled: boolean): void => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.FOLDABLE_CREASE_SPLIT, String(enabled));
+  } catch {}
+  isFoldableCreaseSplit.set(enabled);
+};
+
+export const isFoldableCreaseSplit = new Context<boolean>(
+  typeof window !== "undefined" ? getStoredFoldableCreaseSplit() : false
+);
+

@@ -205,7 +205,7 @@
 
 <style lang="scss">
     #sidebar {
-        width: 320px;
+        width: 100%;
         height: 100vh;
         height: 100dvh;
         max-height: 100dvh;
@@ -216,13 +216,7 @@
         border-right: 1px solid #2e2c29;
         overflow: hidden;
 
-        @media (max-width: 1024px) {
-            width: 280px;
-        }
-
         @media (max-width: 768px) {
-            width: 100%;
-            height: 100%;
             border-right: none;
         }
 

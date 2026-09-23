@@ -24,6 +24,7 @@
         selectedAnimeDetails,
         isSeasonsSidebarOpen,
         isGlobalSearchOpen,
+        isFoldableCreaseSplit,
     } from "./lib/context.svelte";
     import AnimeDetailsPage from "./pages/AnimeDetailsPage/AnimeDetailsPage.svelte";
     import TreeStructureIcon from "phosphor-svelte/lib/TreeStructureIcon";
@@ -345,7 +346,7 @@
 </script>
 
 {#if profileData}
-    <main>
+    <main class:foldable-crease-split={isFoldableCreaseSplit.current}>
         <!-- Single Unified Mobile Top App Bar for Phones (<= 768px) -->
         <header class="mobile-topbar" class:no-border={activeTab?.id === "logs"}>
             <div class="topbar-left">
@@ -531,6 +532,14 @@
         width: 100vw;
         overflow: hidden;
         position: relative;
+
+        &.foldable-crease-split {
+            @media (min-width: 769px) and (max-width: 1024px), (horizontal-viewport-segments: 2) {
+                .sidebar-container {
+                    width: calc(50vw - 80px);
+                }
+            }
+        }
     }
 
     .rail-container {

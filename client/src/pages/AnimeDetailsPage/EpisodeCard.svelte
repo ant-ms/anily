@@ -511,11 +511,11 @@
                 border-bottom-right-radius: 0;
 
                 .episode-badge {
-                    top: 8px;
-                    left: 8px;
+                    top: 6px;
+                    left: 6px;
                     bottom: auto;
-                    font-size: 11px;
-                    padding: 2.5px 7px;
+                    font-size: 10.5px;
+                    padding: 2px 6px;
                     border: 1px solid rgba(255, 255, 255, 0.15);
                 }
 
@@ -525,8 +525,8 @@
                     background: rgba(0, 0, 0, 0.38);
 
                     .play-icon-circle {
-                        width: 44px;
-                        height: 44px;
+                        width: 38px;
+                        height: 38px;
                         background: rgba(255, 213, 44, 0.92);
                         color: #13100e;
                     }
@@ -545,32 +545,37 @@
             .card-content {
                 flex-direction: column;
                 align-items: stretch;
-                padding: 12px 14px 12px 14px;
-                gap: 8px;
+                padding: 10px 12px 8px 12px;
+                gap: 6px;
                 flex: 1;
 
                 .titles {
-                    gap: 3px;
+                    gap: 2px;
                     flex-grow: 1;
 
                     .title-1 {
-                        font-size: 14px;
-                        line-height: 1.35;
+                        font-size: 13px;
+                        line-height: 1.3;
+                    }
+
+                    .title-2 {
+                        font-size: 11.5px;
                     }
 
                     .date {
                         margin-top: auto;
-                        padding-top: 2px;
+                        padding-top: 1px;
+                        font-size: 10.5px;
                     }
                 }
 
                 .actions {
                     width: 100%;
                     border-top: none; /* M3: no divider line between card content and actions */
-                    padding-top: 4px;
+                    padding-top: 2px;
                     margin-top: auto;
                     justify-content: flex-end;
-                    gap: 4px;
+                    gap: 2px;
                 }
             }
         }
