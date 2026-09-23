@@ -1,5 +1,6 @@
 stages:
   - build
+  - deploy
 
 docker-build:
   stage: build
@@ -46,3 +47,18 @@ android-build:
     expire_in: 30 days
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+pages:
+  stage: deploy
+  image: alpine:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  needs:
+    - job: android-build
+      artifacts: true
+  script:
+    - sh public/generate.sh
+  artifacts:
+    paths:
+      - public
+

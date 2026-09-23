@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anily - Android App Download</title>
+  <meta name="description" content="Download the latest build of Anily for Android, or track releases automatically with Obtainium.">
+  <meta name="version" content="{{APP_VERSION}}-{{COMMIT_SHA}}">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+  <meta name="theme-color" content="#121316">
+  <style>
+    :root {
+      --bg: #0e1015;
+      --card-bg: #171922;
+      --card-border: #252837;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --green: #22c55e;
+      --green-hover: #16a34a;
+      --btn-secondary: #242735;
+      --btn-secondary-hover: #313547;
+      --code-bg: #10121a;
+      --code-border: #1f2230;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 0.5rem 0;
+    }
+    .app-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      background: var(--card-bg);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .header-text h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .header-text p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-top: 0.25rem;
+    }
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: var(--btn-secondary);
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+    }
+    .badge.badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+    .card h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      width: 100%;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease-in-out;
+    }
+    .btn-download {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    .btn-download:hover {
+      background: var(--accent-hover);
+    }
+    .btn-obtainium {
+      background: var(--green);
+      color: #ffffff;
+    }
+    .btn-obtainium:hover {
+      background: var(--green-hover);
+    }
+    .btn-secondary {
+      background: var(--btn-secondary);
+      color: var(--text);
+      border: 1px solid var(--card-border);
+    }
+    .btn-secondary:hover {
+      background: var(--btn-secondary-hover);
+    }
+    .sub-links {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.5rem;
+      font-size: 0.825rem;
+      color: var(--text-muted);
+    }
+    .sub-links a {
+      color: var(--text-muted);
+      text-decoration: underline;
+    }
+    .sub-links a:hover {
+      color: var(--text);
+    }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .step-item {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--btn-secondary);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .step-content {
+      flex: 1;
+    }
+    .step-content strong {
+      color: var(--text);
+    }
+    .url-box {
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+    }
+    .url-box code {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      overflow-x: auto;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .btn-copy {
+      background: var(--btn-secondary);
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .btn-copy:hover {
+      background: var(--btn-secondary-hover);
+    }
+    .btn-copy.copied {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--green);
+      border-color: var(--green);
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      font-size: 0.85rem;
+    }
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .info-label {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .info-value {
+      font-family: var(--font-mono);
+      color: var(--text);
+      word-break: break-all;
+    }
+    .info-value a {
+      color: #a5b4fc;
+      text-decoration: none;
+    }
+    .info-value a:hover {
+      text-decoration: underline;
+    }
+    .checksum-box {
+      margin-top: 1rem;
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+    .checksum-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.35rem;
+    }
+    .checksum-header span {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .checksum-value {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      word-break: break-all;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 1rem 0;
+    }
+    footer a {
+      color: var(--text-muted);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <img src="icon.png" alt="Anily Logo" class="app-icon" onerror="this.style.display='none'">
+      <div class="header-text">
+        <h1 id="app-title">{{APP_NAME}}</h1>
+        <p>Anime streaming client for Android</p>
+        <div class="badges">
+          <span class="badge badge-primary">v{{APP_VERSION}} ({{COMMIT_SHA}})</span>
+          <span class="badge">{{COMMIT_REF}}</span>
+          <span class="badge">{{APK_SIZE}}</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>Install & Updates</h2>
+      <div class="actions">
+        <a id="download-apk-link" href="{{APK_FILENAME}}" class="btn btn-download">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download APK (v{{APP_VERSION}}-{{COMMIT_SHA}})
+        </a>
+
+        <a id="obtainium-direct-btn" href="{{STATIC_OBTAINIUM_DIRECT}}" class="btn btn-obtainium">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          Add to Obtainium
+        </a>
+
+        <a id="obtainium-redirect-btn" href="{{STATIC_OBTAINIUM_REDIRECT}}" class="btn btn-secondary">
+          Add via Obtainium Web Redirect
+        </a>
+      </div>
+
+      <div class="sub-links">
+        <span>Direct permalink: <code>anily.apk</code></span>
+        <a href="obtainium.json">obtainium.json</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Obtainium Instructions</h2>
+      <div class="steps">
+        <div class="step-item">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <strong>Automatic Setup:</strong> Tap the <em>Add to Obtainium</em> button above while on your Android device. Obtainium will automatically launch with this source preconfigured.
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <strong>Manual Setup:</strong> Open Obtainium, tap <strong>Add App</strong>, and paste this page's URL:
+            <div class="url-box">
+              <code id="pages-url">{{PAGES_URL}}</code>
+              <button id="copy-url-btn" type="button" class="btn-copy">Copy URL</button>
+            </div>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <strong>Automatic Updates:</strong> Obtainium will scrape this page and notify you whenever a new APK is published!
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Build Information</h2>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Version</span>
+          <span class="info-value">{{APP_VERSION}}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Commit</span>
+          <span class="info-value"><a href="{{PROJECT_URL}}/-/commit/{{COMMIT_SHA}}" target="_blank" rel="noopener">{{COMMIT_SHA}}</a></span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Branch</span>
+          <span class="info-value">{{COMMIT_REF}}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Build Date</span>
+          <span class="info-value">{{COMMIT_DATE}}</span>
+        </div>
+      </div>
+
+      <div class="checksum-box">
+        <div class="checksum-header">
+          <span>SHA-256 Checksum</span>
+          <button id="copy-sha-btn" type="button" class="btn-copy" data-sha="{{APK_SHA256}}">Copy</button>
+        </div>
+        <div class="checksum-value">{{APK_SHA256}}</div>
+      </div>
+    </section>
+
+    <footer>
+      <p>Built with GitLab CI & Pages &bull; <a href="{{PROJECT_URL}}" target="_blank" rel="noopener">Source Code</a></p>
+    </footer>
+  </main>
+
+  <script>
+    (function() {
+      try {
+        var rawUrl = window.location.href.split('?')[0].split('#')[0];
+        var pageUrl = rawUrl.endsWith('/') ? rawUrl : rawUrl + '/';
+
+        var urlEl = document.getElementById('pages-url');
+        if (urlEl) urlEl.textContent = pageUrl;
+
+        var config = {
+          id: "ms.ant.anily",
+          url: pageUrl,
+          author: "ant.ms",
+          name: "Anily",
+          additionalSettings: JSON.stringify({
+            versionExtractionRegEx: "anily-(.+)\\\\.apk",
+            matchGroupToUse: "1"
+          })
+        };
+
+        var encoded = encodeURIComponent(JSON.stringify(config));
+        var directDeepLink = "obtainium://app/" + encoded;
+        var redirectLink = "https://apps.obtainium.imranr.dev/redirect?r=" + encodeURIComponent(directDeepLink);
+
+        var btnDirect = document.getElementById('obtainium-direct-btn');
+        if (btnDirect) btnDirect.href = directDeepLink;
+
+        var btnRedirect = document.getElementById('obtainium-redirect-btn');
+        if (btnRedirect) btnRedirect.href = redirectLink;
+
+        var copyBtn = document.getElementById('copy-url-btn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', function() {
+            var textToCopy = pageUrl;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(textToCopy).then(function() {
+                copyBtn.textContent = 'Copied!';
+                copyBtn.classList.add('copied');
+                setTimeout(function() {
+                  copyBtn.textContent = 'Copy URL';
+                  copyBtn.classList.remove('copied');
+                }, 2000);
+              });
+            } else {
+              var ta = document.createElement('textarea');
+              ta.value = textToCopy;
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand('copy');
+              document.body.removeChild(ta);
+              copyBtn.textContent = 'Copied!';
+              setTimeout(function() { copyBtn.textContent = 'Copy URL'; }, 2000);
+            }
+          });
+        }
+
+        var copyShaBtn = document.getElementById('copy-sha-btn');
+        if (copyShaBtn) {
+          copyShaBtn.addEventListener('click', function() {
+            var sha = copyShaBtn.getAttribute('data-sha');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(sha).then(function() {
+                copyShaBtn.textContent = 'Copied!';
+                setTimeout(function() { copyShaBtn.textContent = 'Copy'; }, 2000);
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Dynamic URL update error:", err);
+      }
+    })();
+  </script>
+</body>
+</html>

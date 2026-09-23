@@ -1,2 +1,8 @@
 node_modules
 server/dist/
+public/*.apk
+public/*.sha256
+public/index.html
+public/obtainium.json
+public/icon.png
+public/favicon.ico
