@@ -317,17 +317,26 @@
 
 <div class="episodes">
     {#if episodesState.loading}
-        {#each Array(6) as _}
-            <div class="episode-card-skeleton">
-                <div class="number"><Skeleton width="35px" height="35px" /></div>
-                <Skeleton width="160px" height="90px" radius="0" />
-                <div class="titles">
-                    <Skeleton width="55%" height="14px" />
-                    <Skeleton width="40%" height="14px" />
-                    <Skeleton width="25%" height="13px" />
+        <div class="episodes-list">
+            {#each Array(8) as _}
+                <div class="episode-card-skeleton">
+                    <div class="thumb-skeleton">
+                        <Skeleton width="100%" height="100%" radius="8px" />
+                    </div>
+                    <div class="skeleton-content">
+                        <div class="titles">
+                            <Skeleton width="80%" height="14px" />
+                            <Skeleton width="55%" height="12px" />
+                            <Skeleton width="35%" height="11px" />
+                        </div>
+                        <div class="actions-skeleton">
+                            <Skeleton width="36px" height="36px" radius="50%" />
+                            <Skeleton width="36px" height="36px" radius="50%" />
+                        </div>
+                    </div>
                 </div>
-            </div>
-        {/each}
+            {/each}
+        </div>
     {:else}
         {#if episodesState.episodes.length > 0 || !episodesState.loading}
             <div class="toolbar" transition:fade={{ duration: 200 }}>
@@ -362,24 +371,26 @@
             </div>
         {/if}
 
-        {#each episodesState.episodes as episode (episode.number)}
-            <EpisodeCard
-                {episode}
-                {player}
-                {animeName}
-                isDropdownOpen={dropdownOpenEpisodeId === episode.id}
-                {servicesCache}
-                selectedService={selectedServices[episode.id]}
-                {checkingEpisodeId}
-                {autoPlayingEpisodeId}
-                {resolvingEpisodeId}
-                onToggleWatch={toggleWatch}
-                onPromptDelete={promptDeleteDownload}
-                onToggleDropdown={handleToggleDropdown}
-                onPlayService={resolveAndPlay}
-                onPlay={handlePlay}
-            />
-        {/each}
+        <div class="episodes-list">
+            {#each episodesState.episodes as episode (episode.number)}
+                <EpisodeCard
+                    {episode}
+                    {player}
+                    {animeName}
+                    isDropdownOpen={dropdownOpenEpisodeId === episode.id}
+                    {servicesCache}
+                    selectedService={selectedServices[episode.id]}
+                    {checkingEpisodeId}
+                    {autoPlayingEpisodeId}
+                    {resolvingEpisodeId}
+                    onToggleWatch={toggleWatch}
+                    onPromptDelete={promptDeleteDownload}
+                    onToggleDropdown={handleToggleDropdown}
+                    onPlayService={resolveAndPlay}
+                    onPlay={handlePlay}
+                />
+            {/each}
+        </div>
     {/if}
 </div>
 
@@ -399,10 +410,14 @@
         padding: 0.85rem 1.25rem;
         flex: 1 1 0;
         min-height: 0;
+        width: 100%;
+        box-sizing: border-box;
+        container-type: inline-size;
+        container-name: episodes-pane;
 
         @media (max-width: 768px) {
-            padding: 0.65rem 0.75rem;
-            gap: 0.6rem;
+            padding: 0.5rem 0.85rem;
+            gap: 0.5rem;
         }
 
         .toolbar {
@@ -410,6 +425,7 @@
             gap: 0.5rem;
             align-items: center;
             flex-shrink: 0;
+            margin-bottom: 0.25rem;
 
             .mark-all-text {
                 font-size: 13px;
@@ -428,19 +444,100 @@
             }
         }
 
+        .episodes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem; /* M3 whitespace separation between list items */
+
+            @container episodes-pane (min-width: 540px) {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                gap: 1rem;
+                align-items: stretch;
+            }
+        }
+
         .episode-card-skeleton {
             display: flex;
             gap: 0.85rem;
             align-items: center;
+            padding: 0.5rem 0.35rem;
+            border-radius: 10px;
 
-            .number {
-                flex-shrink: 0;
+            @media (max-width: 640px) {
+                gap: 0.65rem;
+                padding: 0.45rem 0.2rem;
             }
 
-            .titles {
+            .thumb-skeleton {
+                width: 114px;
+                aspect-ratio: 16 / 9;
+                height: auto;
+                flex-shrink: 0;
+                border-radius: 8px;
+                overflow: hidden;
+
+                @media (max-width: 480px) {
+                    width: 104px;
+                }
+            }
+
+            .skeleton-content {
                 display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex: 1;
+                min-width: 0;
+                gap: 0.5rem;
+
+                .titles {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.35rem;
+                    flex: 1;
+                    min-width: 0;
+                }
+
+                .actions-skeleton {
+                    display: flex;
+                    gap: 4px;
+                    flex-shrink: 0;
+                }
+            }
+
+            @container episodes-pane (min-width: 540px) {
                 flex-direction: column;
-                gap: 0.25rem;
+                align-items: stretch;
+                background: #1c1917;
+                border: 1px solid #36322e;
+                border-radius: 12px;
+                padding: 0;
+                gap: 0;
+                overflow: hidden;
+
+                .thumb-skeleton {
+                    width: 100%;
+                    height: auto;
+                    aspect-ratio: 16 / 9;
+                    border-radius: 0;
+                }
+
+                .skeleton-content {
+                    flex-direction: column;
+                    align-items: stretch;
+                    padding: 12px 14px 12px 14px;
+                    gap: 8px;
+
+                    .titles {
+                        gap: 0.4rem;
+                    }
+
+                    .actions-skeleton {
+                        justify-content: flex-end;
+                        padding-top: 4px;
+                        border-top: none;
+                    }
+                }
             }
         }
     }
