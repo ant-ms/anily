@@ -288,12 +288,15 @@ describe("Streaming Providers & Quality Benchmarks", () => {
     it("apiStream proxy rewrites master and child m3u8 playlists correctly", async () => {
       const { app } = await import("$src/app");
       await import("$src/routes/apiStream");
+      const { generateStreamSignature } = await import("./hmac");
 
       const masterUrl = "https://hls2.aniwatchtv.uk/v/scxqicy/huanbc9tmy/nyvrcjopy8/xaprjusg9l2rwy/master.m3u8";
       const referer = "https://zokoanime.video/";
+      const expires = Math.floor(Date.now() / 1000) + 3600;
+      const sig = generateStreamSignature(masterUrl, expires);
 
       // 1. Request master playlist via proxy
-      const proxyUrl = `/api/stream/proxy?url=${encodeURIComponent(masterUrl)}&ref=${encodeURIComponent(referer)}`;
+      const proxyUrl = `/api/stream/proxy?url=${encodeURIComponent(masterUrl)}&ref=${encodeURIComponent(referer)}&expires=${expires}&sig=${sig}`;
       const res = await app.request(proxyUrl);
 
       expect(res.status).toBe(200);
@@ -328,9 +331,14 @@ describe("Streaming Providers & Quality Benchmarks", () => {
     it("apiStream proxy serves virtual WebVTT subtitle playlist", async () => {
       const { app } = await import("../../src/app");
       await import("../../src/routes/apiStream");
+      const { generateStreamSignature } = await import("./hmac");
+
+      const subUrl = "https://example.com/subs/eng.vtt";
+      const expires = Math.floor(Date.now() / 1000) + 3600;
+      const sig = generateStreamSignature(subUrl, expires);
 
       const subPlaylistRes = await app.request(
-        `/api/stream/proxy/sub_en.m3u8?sub_vtt=${encodeURIComponent("https://example.com/subs/eng.vtt")}&ref=${encodeURIComponent("https://example.com")}`,
+        `/api/stream/proxy/sub_en.m3u8?sub_vtt=${encodeURIComponent(subUrl)}&ref=${encodeURIComponent("https://example.com")}&expires=${expires}&sig=${sig}`,
       );
       expect(subPlaylistRes.status).toBe(200);
       expect(subPlaylistRes.headers.get("content-type")).toContain("mpegurl");
@@ -342,11 +350,14 @@ describe("Streaming Providers & Quality Benchmarks", () => {
     it("apiStream proxy handles disguised Content-Type (image/jpeg) child playlists and segment types", async () => {
       const { app } = await import("$src/app");
       await import("$src/routes/apiStream");
+      const { generateStreamSignature } = await import("./hmac");
 
       const childUrl = "https://imgcdn44.dpopdrop89.store/cdn/092e3d2d14736a0ad5386790ceacb405f2c00bf1259443f3ff8bca9c318cd299f0667764f651a8e8cf994633faa91c7b8a85a1dc91893631b78d626e62";
       const referer = "https://play2.echovideo.ru/";
+      const expires = Math.floor(Date.now() / 1000) + 3600;
+      const sig = generateStreamSignature(childUrl, expires);
 
-      const childProxyUrl = `/api/stream/proxy/media.m3u8?url=${encodeURIComponent(childUrl)}&ref=${encodeURIComponent(referer)}`;
+      const childProxyUrl = `/api/stream/proxy/media.m3u8?url=${encodeURIComponent(childUrl)}&ref=${encodeURIComponent(referer)}&expires=${expires}&sig=${sig}`;
       const res = await app.request(childProxyUrl);
 
       expect(res.status).toBe(200);
@@ -367,6 +378,7 @@ describe("Streaming Providers & Quality Benchmarks", () => {
     it("apiStream proxy correctly injects subtitles into master playlist and sets correct DEFAULT track", async () => {
       const { app } = await import("$src/app");
       await import("$src/routes/apiStream");
+      const { generateStreamSignature } = await import("./hmac");
 
       const masterUrl = "https://hls2.aniwatchtv.uk/v/scxqicy/huanbc9tmy/nyvrcjopy8/xaprjusg9l2rwy/master.m3u8";
       const referer = "https://zokoanime.video/";
@@ -375,8 +387,10 @@ describe("Streaming Providers & Quality Benchmarks", () => {
         { l: "English", lang: "en", u: "https://example.com/en.vtt", d: true },
         { l: "Spanish", lang: "es", u: "https://example.com/es.vtt", d: false },
       ];
+      const expires = Math.floor(Date.now() / 1000) + 3600;
+      const sig = generateStreamSignature(masterUrl, expires);
 
-      const proxyUrl = `/api/stream/proxy?url=${encodeURIComponent(masterUrl)}&ref=${encodeURIComponent(referer)}&subs=${encodeURIComponent(JSON.stringify(subs))}`;
+      const proxyUrl = `/api/stream/proxy?url=${encodeURIComponent(masterUrl)}&ref=${encodeURIComponent(referer)}&subs=${encodeURIComponent(JSON.stringify(subs))}&expires=${expires}&sig=${sig}`;
       const res = await app.request(proxyUrl);
 
       expect(res.status).toBe(200);
@@ -398,6 +412,7 @@ describe("Streaming Providers & Quality Benchmarks", () => {
     it("apiStream proxy wraps media playlists into master playlist when subtitles are present", async () => {
       const { app } = await import("$src/app");
       await import("$src/routes/apiStream");
+      const { generateStreamSignature } = await import("./hmac");
 
       // Child media playlist (non-master)
       const childUrl = "https://imgcdn44.dpopdrop89.store/cdn/092e3d2d14736a0ad5386790ceacb405f2c00bf1259443f3ff8bca9c318cd299f0667764f651a8e8cf994633faa91c7b8a85a1dc91893631b78d626e62";
@@ -405,9 +420,11 @@ describe("Streaming Providers & Quality Benchmarks", () => {
       const subs = [
         { l: "English", lang: "en", u: "https://example.com/en.vtt", d: true },
       ];
+      const expires = Math.floor(Date.now() / 1000) + 3600;
+      const sig = generateStreamSignature(childUrl, expires);
 
       // Request media playlist with subs attached - should be wrapped in master playlist
-      const masterProxyUrl = `/api/stream/proxy/media.m3u8?url=${encodeURIComponent(childUrl)}&ref=${encodeURIComponent(referer)}&subs=${encodeURIComponent(JSON.stringify(subs))}`;
+      const masterProxyUrl = `/api/stream/proxy/media.m3u8?url=${encodeURIComponent(childUrl)}&ref=${encodeURIComponent(referer)}&subs=${encodeURIComponent(JSON.stringify(subs))}&expires=${expires}&sig=${sig}`;
       const res = await app.request(masterProxyUrl);
 
       expect(res.status).toBe(200);

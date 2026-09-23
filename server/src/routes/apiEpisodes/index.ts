@@ -6,6 +6,8 @@ import { updateEpisodeWatchStatus } from "./updateEpisodeWatchStatus";
 import { updateAllEpisodesWatchStatus } from "./updateAllEpisodesWatchStatus";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { getAuthenticatedUser } from "$src/auth";
+import { prisma } from "$src/prisma";
 
 export const apiEpisodesAnilistIdGetRoute = app.get(
   "/api/episodes/:anilistId",
@@ -14,12 +16,22 @@ export const apiEpisodesAnilistIdGetRoute = app.get(
     const params = c.req.valid("param");
 
     try {
+      const user = await getAuthenticatedUser(c);
       const episodes = await getEpisodes(params.anilistId);
+
+      const userProgress = await prisma.userEpisodeProgress.findMany({
+        where: {
+          userId: user.id,
+          episodeId: { in: episodes.map((e) => e.id) },
+        },
+      });
+      const progressMap = new Map(userProgress.map((p) => [p.episodeId, p.watched]));
+
       const filteredEpisodes = episodes.map((episode) => ({
         id: episode.id,
         number: episode.number,
         airingAt: episode.airingAt,
-        watched: episode.watched,
+        watched: progressMap.has(episode.id) ? progressMap.get(episode.id)! : episode.watched,
         titleEnglish: episode.titleEnglish,
         titleNative: episode.titleNative,
         titleRomanji: episode.titleRomanji,
@@ -77,7 +89,12 @@ export const apiEpisodesWatchPutRoute = app.put(
     const body = c.req.valid("json");
 
     try {
-      await updateEpisodeWatchStatus(params.episodeId, body.watched);
+      const user = await getAuthenticatedUser(c);
+      await updateEpisodeWatchStatus(
+        params.episodeId,
+        body.watched,
+        user.id,
+      );
       return c.body(null, 200);
     } catch (error) {
       return c.json(
@@ -105,7 +122,12 @@ export const apiEpisodesWatchAllPutRoute = app.put(
     const body = c.req.valid("json");
 
     try {
-      await updateAllEpisodesWatchStatus(params.anilistId, body.watched);
+      const user = await getAuthenticatedUser(c);
+      await updateAllEpisodesWatchStatus(
+        params.anilistId,
+        body.watched,
+        user.id,
+      );
       return c.body(null, 200);
     } catch (error) {
       return c.json(

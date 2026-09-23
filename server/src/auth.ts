@@ -141,6 +141,90 @@ export const setupAuthHandlers = (app: Hono) => {
     if (!auth) {
       return c.json({ error: "Unauthorized" }, 401);
     }
-    return c.json(auth);
+    const user = await getAuthenticatedUser(c);
+    return c.json({
+      ...auth,
+      userId: user.id,
+    });
   });
 };
+
+export type AuthUser = {
+  id: string;
+  email: string;
+  name?: string | null;
+  sub?: string | null;
+};
+
+export const getAuthenticatedUser = async (c: any): Promise<AuthUser> => {
+  const existing = c.get("user" as any) as AuthUser | undefined;
+  if (existing) return existing;
+
+  const { prisma } = await import("./prisma");
+
+  let email: string | undefined;
+  let name: string | undefined;
+  let sub: string | undefined;
+
+  try {
+    const auth = await getAuth(c);
+    if (auth?.email) email = auth.email;
+    if (auth?.name) name = auth.name;
+    if (auth?.sub) sub = auth.sub;
+  } catch {}
+
+  let user: AuthUser | null = null;
+
+  if (email || sub) {
+    user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          ...(email ? [{ email }] : []),
+          ...(sub ? [{ sub }] : []),
+        ],
+      },
+    });
+
+    if (!user && email) {
+      user = await prisma.user.upsert({
+        where: { email },
+        create: {
+          email,
+          sub: sub ?? null,
+          name: name ?? null,
+        },
+        update: {
+          ...(sub ? { sub } : {}),
+          ...(name ? { name } : {}),
+        },
+      });
+    }
+  }
+
+  // Fallback for single-tenant / local development mode when unauthenticated
+  if (!user) {
+    const fallbackEmail = process.env.DEFAULT_USER_EMAIL;
+    if (fallbackEmail) {
+      user = await prisma.user.findUnique({ where: { email: fallbackEmail } });
+    }
+    if (!user) {
+      // Resolve the primary user in the database
+      user = await prisma.user.findFirst({
+        orderBy: { createdAt: "asc" },
+      });
+    }
+    if (!user) {
+      const defaultEmail = fallbackEmail || "owner@anily.local";
+      user = await prisma.user.create({
+        data: {
+          email: defaultEmail,
+          name: "Owner",
+        },
+      });
+    }
+  }
+
+  c.set("user" as any, user);
+  return user;
+};
+

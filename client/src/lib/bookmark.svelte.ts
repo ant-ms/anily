@@ -7,6 +7,7 @@ import {
 import { snackbar } from "./snackbar.svelte";
 import { buildDetailsCacheKey } from "./storageKeys";
 import type AnimeDetailsData from "../types/AnimeDetails";
+import { api } from "./api";
 
 class BookmarkManager {
     private _isToggling = $state(false);
@@ -38,17 +39,12 @@ class BookmarkManager {
         const removing = details.groupingId !== null;
         this._isToggling = true;
 
-        const url = new URL(
-            `/api/details/${anilistId}/grouping`,
-            apiBaseUrl.current,
-        );
-
         try {
-            const res = await fetch(url.toString(), {
-                method: removing ? "DELETE" : "POST",
-                credentials: "include",
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (removing) {
+                await api.removeGrouping(anilistId);
+            } else {
+                await api.addGrouping(anilistId);
+            }
 
             if (selectedAnimeAnilistId.current === anilistId) {
                 const updatedDetails: AnimeDetailsData = {

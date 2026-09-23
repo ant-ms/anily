@@ -2,6 +2,10 @@ import { prisma } from "$src/prisma";
 import { registry } from "$lib/streaming/registry";
 import { extractFilename } from "$lib/streaming/proxy";
 import type { StreamLanguage } from "$lib/streaming/types";
+import {
+  generateStreamSignature,
+  DEFAULT_STREAM_EXPIRY_SECONDS,
+} from "$lib/streaming/hmac";
 
 export interface PlayStreamResult {
   streamUrl?: string;
@@ -55,6 +59,10 @@ export async function resolvePlayStream(
     ? `&ref=${encodeURIComponent(streamSource.headers.Referer)}`
     : "";
 
+  const nowUnix = Math.floor(Date.now() / 1000);
+  const streamExpires = nowUnix + DEFAULT_STREAM_EXPIRY_SECONDS;
+  const streamSig = generateStreamSignature(streamSource.url, streamExpires);
+
   let subsParam = "";
   if (streamSource.subtitles && streamSource.subtitles.length > 0) {
     const subsPayload = streamSource.subtitles.map((s) => ({
@@ -68,13 +76,14 @@ export async function resolvePlayStream(
 
   const streamUrl = `${origin}/api/stream/proxy/${filename}?url=${encodeURIComponent(
     streamSource.url,
-  )}${refParam}${subsParam}`;
+  )}${refParam}${subsParam}&expires=${streamExpires}&sig=${streamSig}`;
 
   const subtitles = (streamSource.subtitles || []).map((sub) => {
     const subFilename = `sub_${sub.language || "en"}.vtt`;
+    const subSig = generateStreamSignature(sub.url, streamExpires);
     const subUrl = `${origin}/api/stream/proxy/${subFilename}?url=${encodeURIComponent(
       sub.url,
-    )}${refParam}`;
+    )}${refParam}&expires=${streamExpires}&sig=${subSig}`;
     return {
       label: sub.label,
       language: sub.language,

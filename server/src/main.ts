@@ -16,47 +16,6 @@ import "$src/routes/apiSyncJobs";
 import "$src/routes/apiStream";
 import "$src/routes/apiRate";
 import "$src/routes/apiPing";
-import { prisma } from "$src/prisma";
-
-// Ensure database schema columns exist
-const ensureSchema = async () => {
-  try {
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaPath" TEXT;
-      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaSelectedTorrent" JSONB;
-      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaSize" BIGINT;
-      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaTorrentHash" TEXT;
-      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaLastSearchAt" TIMESTAMP(3);
-      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaFailedTorrents" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
-      DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MediaStatus') THEN
-          CREATE TYPE "MediaStatus" AS ENUM ('NONE', 'QUEUED', 'DOWNLOADING', 'AVAILABLE');
-        END IF;
-      END $$;
-      ALTER TABLE "Episode" ADD COLUMN IF NOT EXISTS "mediaStatus" "MediaStatus" NOT NULL DEFAULT 'NONE';
-      CREATE INDEX IF NOT EXISTS "Episode_mediaTorrentHash_idx" ON "Episode"("mediaTorrentHash");
-
-      DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SyncJobType') THEN
-          CREATE TYPE "SyncJobType" AS ENUM ('ANILIST_SYNC', 'EPISODE_METADATA');
-        END IF;
-      END $$;
-      ALTER TABLE "SyncJob" ADD COLUMN IF NOT EXISTS "type" "SyncJobType" NOT NULL DEFAULT 'ANILIST_SYNC';
-      ALTER TABLE "SyncJob" ADD COLUMN IF NOT EXISTS "details" JSONB;
-
-      DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Rating') THEN
-          CREATE TYPE "Rating" AS ENUM ('LIKE', 'NEUTRAL', 'DISLIKE');
-        END IF;
-      END $$;
-      ALTER TABLE "AnimeDetails" ADD COLUMN IF NOT EXISTS "rating" "Rating" NOT NULL DEFAULT 'NEUTRAL';
-    `);
-    logger.info("Database schema verified");
-  } catch (err) {
-    logger.warn({ err }, "Schema migration check skipped or failed");
-  }
-};
-ensureSchema().catch(() => {});
 
 app.get("/info", (c) => {
   return c.json({

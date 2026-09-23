@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "pnpm dlx tsx src/main.ts",
+    "migrate": "prisma migrate deploy",
     "build": "tsup",
     "codegen": "graphql-codegen",
     "test": "vitest"

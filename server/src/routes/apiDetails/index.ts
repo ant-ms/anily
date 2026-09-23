@@ -10,6 +10,8 @@ import { logger } from "$src/logger";
 
 const log = logger.child({ route: "apiDetails" });
 
+import { getAuthenticatedUser } from "$src/auth";
+
 export const apiDetailsAnilistIdGetRoute = app.get(
   "/api/details/:anilistId",
   anilistParamValidator,
@@ -17,7 +19,30 @@ export const apiDetailsAnilistIdGetRoute = app.get(
     const params = c.req.valid("param");
 
     try {
+      const user = await getAuthenticatedUser(c);
       const details = await getAnimeDetails(params.anilistId);
+
+      const [userRating, userBookmark] = await Promise.all([
+        prisma.userAnimeRating.findUnique({
+          where: {
+            userId_anilistId: {
+              userId: user.id,
+              anilistId: params.anilistId,
+            },
+          },
+        }),
+        prisma.userBookmark.findUnique({
+          where: {
+            userId_anilistId: {
+              userId: user.id,
+              anilistId: params.anilistId,
+            },
+          },
+        }),
+      ]);
+
+      const isBookmarked = Boolean(userBookmark || (details.baseAnime.groupings && details.baseAnime.groupings.length > 0));
+
       const filteredDetails = {
         anilistId: details.baseAnime.anilistId,
         titleEnglish: details.baseAnime.titleEnglish,
@@ -25,9 +50,9 @@ export const apiDetailsAnilistIdGetRoute = app.get(
         titleNative: details.baseAnime.titleNative,
         description: details.description,
         thumbnailUrl: details.thumbnailUrl,
-        groupingId: details.baseAnime.groupings?.[0]?.id || null,
+        groupingId: isBookmarked ? (details.baseAnime.groupings?.[0]?.id ?? 1) : null,
         isDisplayAnime: details.baseAnime.groupings?.[0]?.displayAnimeId === details.baseAnime.anilistId,
-        rating: details.rating ?? "NEUTRAL",
+        rating: userRating?.rating ?? details.rating ?? "NEUTRAL",
       };
       return c.json(filteredDetails);
     } catch (error) {
@@ -66,6 +91,21 @@ export const apiDetailsAnilistIdGroupingPostRoute = app.post(
   anilistParamValidator,
   async (c) => {
     const params = c.req.valid("param");
+
+    const user = await getAuthenticatedUser(c);
+    await prisma.userBookmark.upsert({
+      where: {
+        userId_anilistId: {
+          userId: user.id,
+          anilistId: params.anilistId,
+        },
+      },
+      create: {
+        userId: user.id,
+        anilistId: params.anilistId,
+      },
+      update: {},
+    });
 
     const numberOfAnimeGroupings = await getNumberOfAnimeGroupings(
       params.anilistId,
@@ -107,13 +147,11 @@ export const apiDetailsAnilistIdGroupingDeleteRoute = app.delete(
   async (c) => {
     const params = c.req.valid("param");
 
-    await prisma.animeGrouping.deleteMany({
+    const user = await getAuthenticatedUser(c);
+    await prisma.userBookmark.deleteMany({
       where: {
-        items: {
-          some: {
-            anilistId: params.anilistId,
-          }
-        }
+        userId: user.id,
+        anilistId: params.anilistId,
       },
     });
 

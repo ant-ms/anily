@@ -71,6 +71,8 @@
 
     // ── Watch status ─────────────────────────────────────────────────────────────
 
+    import { api } from '../../lib/api';
+
     const toggleWatch = async (episode: EpisodeData): Promise<void> => {
         const newStatus = !episode.watched;
         episode.watched = newStatus;
@@ -85,7 +87,17 @@
         for (const episode of episodesState.episodes) {
             if (!isFuture(episode.airingAt)) {
                 episode.watched = newStatus;
-                await syncQueue.recordWatchStatus(episode.id, newStatus);
+            }
+        }
+
+        try {
+            await api.setAllEpisodesWatch(anilistId, newStatus);
+            sidebarDataRefreshSeed.set((sidebarDataRefreshSeed.current ?? 0) + 1);
+        } catch {
+            for (const episode of episodesState.episodes) {
+                if (!isFuture(episode.airingAt)) {
+                    await syncQueue.recordWatchStatus(episode.id, newStatus);
+                }
             }
         }
     };
@@ -103,23 +115,15 @@
 
     const setRating = async (nextRating: Rating): Promise<void> => {
         if (isUpdatingRating || currentRating === nextRating) return;
+        const anilistId = selectedAnimeAnilistId.current;
+        if (anilistId === undefined) return;
 
         const previousRating = currentRating;
         currentRating = nextRating;
         isUpdatingRating = true;
 
         try {
-            const url = new URL(
-                `/api/details/${selectedAnimeAnilistId.current}/rating`,
-                apiBaseUrl.current,
-            );
-            const res = await fetch(url.toString(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rating: nextRating }),
-                credentials: 'include',
-            });
-            if (!res.ok) throw new Error('Failed to update rating');
+            await api.setRating(anilistId, nextRating);
             if (animeDetails) animeDetails.rating = nextRating;
         } catch (err) {
             console.error('Failed to update rating:', err);

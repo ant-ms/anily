@@ -45,11 +45,13 @@ model BaseAnime {
   season       AnimeSeason?
   seasonYear   Int?
 
-  relationsOut        AnimeRelation[] @relation("RelationFrom")
-  relationsIn         AnimeRelation[] @relation("RelationTo")
+  relationsOut        AnimeRelation[]   @relation("RelationFrom")
+  relationsIn         AnimeRelation[]   @relation("RelationTo")
   animeDetails        AnimeDetails?
-  groupings           AnimeGrouping[] @relation("GroupingItems")
-  displayForGroupings AnimeGrouping[] @relation("GroupingDisplayAnime")
+  groupings           AnimeGrouping[]   @relation("GroupingItems")
+  displayForGroupings AnimeGrouping[]   @relation("GroupingDisplayAnime")
+  bookmarks           UserBookmark[]
+  ratings             UserAnimeRating[]
 
   @@index([titleEnglish(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([titleRomanji(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -169,6 +171,7 @@ model Episode {
   thumbnailUrl String?
 
   watched Boolean @default(false)
+  userProgress UserEpisodeProgress[]
 
   mediaStatus          MediaStatus @default(NONE)
   mediaPath            String?     // relative path within media volume, e.g. "21234/ep01/[SubsPlease] Show - 01.mkv"
@@ -182,3 +185,59 @@ model Episode {
   @@index([animeDetailsId])
   @@index([mediaTorrentHash])
 }
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  sub       String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  episodeProgress UserEpisodeProgress[]
+  bookmarks       UserBookmark[]
+  ratings         UserAnimeRating[]
+}
+
+model UserEpisodeProgress {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  episodeId Int
+  watched   Boolean  @default(true)
+  watchedAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, episodeId])
+  @@index([userId])
+  @@index([episodeId])
+}
+
+model UserBookmark {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  anilistId Int
+  createdAt DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baseAnime BaseAnime @relation(fields: [anilistId], references: [anilistId], onDelete: Cascade)
+
+  @@unique([userId, anilistId])
+  @@index([userId])
+  @@index([anilistId])
+}
+
+model UserAnimeRating {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  anilistId Int
+  rating    Rating   @default(NEUTRAL)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baseAnime BaseAnime @relation(fields: [anilistId], references: [anilistId], onDelete: Cascade)
+
+  @@unique([userId, anilistId])
+  @@index([userId])
+  @@index([anilistId])
+}
+

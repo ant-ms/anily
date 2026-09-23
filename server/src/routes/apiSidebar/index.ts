@@ -40,41 +40,78 @@ function getEpisodeStats(items: GroupingItem[], now: Date) {
   return { watched, releasedUnwatched, unreleasedUnwatched };
 }
 
-const getSidebarAnimesFromDB = async (tab: string): Promise<SidebarCardData[]> => {
-  const animeGroupings = await prisma.animeGrouping.findMany({
-    include: {
-      items: {
-        select: {
-          anilistId: true,
-          relationsOut: {
-            select: {
-              relationType: true,
-              toAnimeId: true,
+import { getAuthenticatedUser } from "$src/auth";
+
+const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<SidebarCardData[]> => {
+  const [animeGroupings, userProgress, userBookmarks] = await Promise.all([
+    prisma.animeGrouping.findMany({
+      include: {
+        items: {
+          select: {
+            anilistId: true,
+            relationsOut: {
+              select: {
+                relationType: true,
+                toAnimeId: true,
+              },
             },
-          },
-          animeDetails: {
-            select: {
-              episodes: {
-                select: {
-                  watched: true,
-                  airingAt: true,
+            animeDetails: {
+              select: {
+                episodes: {
+                  select: {
+                    id: true,
+                    watched: true,
+                    airingAt: true,
+                  },
                 },
               },
             },
           },
         },
-      },
-      displayAnime: {
-        include: {
-          animeDetails: true,
+        displayAnime: {
+          include: {
+            animeDetails: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.userEpisodeProgress.findMany({
+      where: { userId },
+      select: { episodeId: true, watched: true },
+    }),
+    prisma.userBookmark.findMany({
+      where: { userId },
+      select: { anilistId: true },
+    }),
+  ]);
+
+  const watchedMap = new Map(userProgress.map((p) => [p.episodeId, p.watched]));
+  const bookmarkedSet = new Set(userBookmarks.map((b) => b.anilistId));
+
+  // Map each episode's watched status to this user
+  const userScopedGroupings = animeGroupings
+    .filter((grouping) =>
+      grouping.items.some((item) => bookmarkedSet.has(item.anilistId)),
+    )
+    .map((grouping) => ({
+      ...grouping,
+      items: grouping.items.map((item) => ({
+        ...item,
+        animeDetails: item.animeDetails
+          ? {
+              ...item.animeDetails,
+              episodes: item.animeDetails.episodes.map((ep) => ({
+                ...ep,
+                watched: watchedMap.get(ep.id) ?? false,
+              })),
+            }
+          : null,
+      })),
+    }));
 
   const now = new Date();
 
-  const filteredGroupings = animeGroupings.filter((grouping) => {
+  const filteredGroupings = userScopedGroupings.filter((grouping) => {
     const { watched, releasedUnwatched, unreleasedUnwatched } = getEpisodeStats(grouping.items, now);
 
     switch (tab) {
@@ -145,7 +182,8 @@ export const apiSidebarGetRoute = app.get(
   "/api/sidebar/:tab",
   async (c) => {
     const tab = c.req.param("tab");
-    const data = await getSidebarAnimesFromDB(tab);
+    const user = await getAuthenticatedUser(c);
+    const data = await getSidebarAnimesFromDB(tab, user.id);
     return c.json(data);
   },
 );

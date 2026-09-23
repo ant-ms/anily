@@ -2,6 +2,7 @@ import { Network } from "@capacitor/network";
 import { apiBaseUrl, sidebarDataRefreshSeed } from "../context.svelte";
 import { snackbar } from "../snackbar.svelte";
 import { STORAGE_KEYS } from "../storageKeys";
+import { api } from "../api";
 
 export interface PendingWatch {
   episodeId: number;
@@ -81,21 +82,9 @@ class SyncQueue {
   ): Promise<boolean> {
     if (this.isOnline && apiBaseUrl.current) {
       try {
-        const url = new URL(
-          `/api/episodes/${episodeId}/watch`,
-          apiBaseUrl.current,
-        );
-        const res = await fetch(url.toString(), {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ watched }),
-          credentials: "include",
-        });
-
-        if (res.ok) {
-          sidebarDataRefreshSeed.set((sidebarDataRefreshSeed.current ?? 0) + 1);
-          return true;
-        }
+        await api.setEpisodeWatch(episodeId, watched);
+        sidebarDataRefreshSeed.set((sidebarDataRefreshSeed.current ?? 0) + 1);
+        return true;
       } catch {
         // Network failed, fall through to queue
       }
@@ -120,7 +109,6 @@ class SyncQueue {
         retryCount: 0,
       });
     }
-
     this.setQueue(queue);
     snackbar.info("Saved offline. Will sync watch status when reconnected.");
     return false;
@@ -138,29 +126,16 @@ class SyncQueue {
 
     for (const item of queue) {
       try {
-        const url = new URL(
-          `/api/episodes/${item.episodeId}/watch`,
-          apiBaseUrl.current,
-        );
-        const res = await fetch(url.toString(), {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ watched: item.watched }),
-          credentials: "include",
-        });
-
-        if (res.ok) {
-          syncedCount++;
-        } else if (res.status >= 400 && res.status < 500) {
+        await api.setEpisodeWatch(item.episodeId, item.watched);
+        syncedCount++;
+      } catch (err: any) {
+        if (err?.status >= 400 && err?.status < 500) {
           // Client error, discard
-          console.warn(`Watch sync dropped for episode ${item.episodeId}: HTTP ${res.status}`);
+          console.warn(`Watch sync dropped for episode ${item.episodeId}: HTTP ${err.status}`);
         } else {
           item.retryCount++;
           remaining.push(item);
         }
-      } catch {
-        item.retryCount++;
-        remaining.push(item);
       }
     }
 

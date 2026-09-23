@@ -40,6 +40,11 @@
     import type { PluginListenerHandle } from "@capacitor/core";
     import { executeBackHandler } from "./lib/navigation/backHandler";
     import { serverPing } from "./lib/serverPing.svelte";
+    import {
+        parseCurrentRoute,
+        syncUrlWithState,
+        KNOWN_TABS,
+    } from "./lib/navigation/router.svelte";
 
     const loadCachedProfile = (): ProfileData | undefined => {
         try {
@@ -72,16 +77,21 @@
         } catch {}
     }
 
-    let activeTab: Tab | undefined = $state({
-        id: "inbox",
-        name: "Inbox",
-        default: true,
-    });
-    let previousAnimeTab: Tab | undefined = $state({
-        id: "inbox",
-        name: "Inbox",
-        default: true,
-    });
+    const initialRoute =
+        typeof window !== "undefined"
+            ? parseCurrentRoute()
+            : { tab: KNOWN_TABS.inbox };
+    let activeTab: Tab | undefined = $state(initialRoute.tab);
+    let previousAnimeTab: Tab | undefined = $state(
+        initialRoute.tab.id !== "settings" &&
+            initialRoute.tab.id !== "logs" &&
+            initialRoute.tab.id !== "downloads"
+            ? initialRoute.tab
+            : { id: "inbox", name: "Inbox", default: true }
+    );
+    if (typeof window !== "undefined" && initialRoute.animeId !== undefined) {
+        selectedAnimeAnilistId.set(initialRoute.animeId);
+    }
     let isMobileUserMenuOpen = $state(false);
 
     let sidebarAnimeCount = $state(0);
@@ -163,7 +173,7 @@
     }
 
     function onBackClick() {
-        if (!isNative && typeof window !== "undefined" && window.history.state?.anilyAnime) {
+        if (!isNative && typeof window !== "undefined" && window.history.state?.hasPrev && window.history.length > 1) {
             window.history.back();
         } else {
             handleBack();
@@ -172,10 +182,9 @@
 
     $effect(() => {
         const id = selectedAnimeAnilistId.current;
+        const currentTab = activeTab;
         if (!isNative && !isHandlingPopState && typeof window !== "undefined") {
-            if (id !== undefined && window.history.state?.anilyAnime !== id) {
-                window.history.pushState({ anilyAnime: id }, "");
-            }
+            syncUrlWithState(currentTab, id);
         }
     });
 
@@ -212,18 +221,30 @@
             });
         }
 
-        // Web browser back gesture handling
-        const handlePopState = () => {
+        // Initial URL sync without polluting history
+        if (!isNative && typeof window !== "undefined") {
+            syncUrlWithState(activeTab, selectedAnimeAnilistId.current, true);
+        }
+
+        // Web browser back gesture and URL change handling
+        const handleLocationChange = () => {
             isHandlingPopState = true;
             try {
-                handleBack();
+                const route = parseCurrentRoute();
+                if (route.animeId !== selectedAnimeAnilistId.current) {
+                    selectedAnimeAnilistId.set(route.animeId);
+                }
+                if (route.tab && route.tab.id !== activeTab?.id) {
+                    activeTab = route.tab;
+                }
             } finally {
                 isHandlingPopState = false;
             }
         };
 
         if (!isNative && typeof window !== "undefined") {
-            window.addEventListener("popstate", handlePopState);
+            window.addEventListener("popstate", handleLocationChange);
+            window.addEventListener("hashchange", handleLocationChange);
         }
 
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -303,7 +324,8 @@
                 backListenerHandle.remove();
             }
             if (!isNative && typeof window !== "undefined") {
-                window.removeEventListener("popstate", handlePopState);
+                window.removeEventListener("popstate", handleLocationChange);
+                window.removeEventListener("hashchange", handleLocationChange);
             }
             window.removeEventListener("keydown", handleKeyDown);
             window.removeEventListener(
