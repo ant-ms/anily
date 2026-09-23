@@ -17,6 +17,8 @@
     import SettingsPage from "./pages/SettingsPage.svelte";
     import DownloadsPage from "./pages/DownloadsPage.svelte";
     import GlobalSearchModal from "./lib/search/GlobalSearchModal.svelte";
+    import VideoPlayer from "./lib/player/VideoPlayer.svelte";
+    import { videoPlayerState } from "./lib/player/videoPlayer.svelte";
     import type ProfileData from "./types/ProfileData";
     import {
         apiBaseUrl,
@@ -130,6 +132,12 @@
     let isHandlingPopState = false;
 
     function handleBack(): boolean {
+        // 0. If video player is expanded, minimize to mini-player
+        if (videoPlayerState.mode === "expanded") {
+            videoPlayerState.minimize();
+            return true;
+        }
+
         // 1. Dismiss any open BottomSheets / Popovers / overlays
         if (executeBackHandler()) {
             return true;
@@ -522,6 +530,7 @@
 
 <Snackbar />
 <GlobalSearchModal />
+<VideoPlayer />
 
 <style lang="scss">
     main {
@@ -767,9 +776,11 @@
             flex: 1 1 0;
             min-height: 0;
             width: 100vw;
+            display: flex;
+            flex-direction: column;
             padding-bottom: calc(80px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
             box-sizing: border-box;
-            overflow-y: auto;
+            overflow: hidden;
 
             &.mobile-hidden {
                 display: none !important;

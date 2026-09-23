@@ -31,6 +31,7 @@
     }
 
     const playerOptions = [
+        { value: "builtin", label: "In-App Player (Default)" },
         { value: "iina", label: "IINA (macOS)" },
         { value: "mpv", label: "mpv (copy URL to terminal)" },
         { value: "vlc", label: "VLC" },

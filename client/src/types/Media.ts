@@ -11,7 +11,7 @@ export interface AvailableService {
   identifier: string;
 }
 
-export type MediaPlayer = 'mpv' | 'iina' | 'vlc' | 'copy';
+export type MediaPlayer = 'builtin' | 'mpv' | 'iina' | 'vlc' | 'copy';
 
 export type StreamLanguagePreference = 'sub' | 'dub';
 
@@ -45,6 +45,8 @@ export const buildPlayerUrl = (
   }
 
   switch (player) {
+    case 'builtin':
+      return mediaUrl;
     case 'iina': {
       let url = `iina://open?url=${encodeURIComponent(mediaUrl)}&mpv_demuxer-lavf-o=strict=experimental&mpv_sub-visibility=yes&mpv_slang=en,eng,English`;
       if (subUrls.length > 0) {
@@ -73,7 +75,7 @@ export const buildPlayerUrl = (
 };
 
 export const getStoredPlayer = (): MediaPlayer => {
-  return (localStorage.getItem(STORAGE_KEYS.MEDIA_PLAYER) as MediaPlayer) ?? 'iina';
+  return (localStorage.getItem(STORAGE_KEYS.MEDIA_PLAYER) as MediaPlayer) ?? 'builtin';
 };
 
 export const setStoredPlayer = (player: MediaPlayer): void => {

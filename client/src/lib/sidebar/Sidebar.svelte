@@ -206,10 +206,9 @@
 <style lang="scss">
     #sidebar {
         width: 100%;
-        height: 100vh;
-        height: 100dvh;
-        max-height: 100dvh;
+        height: 100%;
         min-height: 0;
+        flex: 1 1 0;
         display: flex;
         flex-direction: column;
         background: #1d1a17;
@@ -268,7 +267,7 @@
             .cards {
                 display: flex;
                 flex-direction: column;
-                padding: 6px 0;
+                padding: 6px 0 16px 0;
             }
 
             .logs-sidebar-nav {

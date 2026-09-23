@@ -363,6 +363,9 @@
               <code id="pages-url">{{PAGES_URL}}</code>
               <button id="copy-url-btn" type="button" class="btn-copy">Copy URL</button>
             </div>
+            <p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+              Under <em>Additional Settings</em>, set <strong>Version Extraction Regex</strong> to <code>anily-([^/]+)\.apk</code> (Match Group: <code>1</code>).
+            </p>
           </div>
         </div>
         <div class="step-item">
@@ -424,7 +427,7 @@
           author: "ant.ms",
           name: "Anily",
           additionalSettings: JSON.stringify({
-            versionExtractionRegEx: "anily-(.+)\\\\.apk",
+            versionExtractionRegEx: "anily-([^/]+)\\.apk",
             matchGroupToUse: "1"
           })
         };

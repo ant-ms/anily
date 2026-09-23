@@ -87,18 +87,9 @@ if [ -f "$ROOT_DIR/client/public/favicon.ico" ]; then
   cp "$ROOT_DIR/client/public/favicon.ico" "$OUTPUT_DIR/favicon.ico"
 fi
 
-cat <<EOF > "$OUTPUT_DIR/obtainium.json"
-{
-  "id": "$APP_ID",
-  "url": "$PAGES_URL",
-  "author": "ant.ms",
-  "name": "$APP_NAME",
-  "additionalSettings": "{\"versionExtractionRegEx\":\"anily-(.+)\\\\\\\\.apk\",\"matchGroupToUse\":\"1\"}"
-}
-EOF
-
-# Static pre-encoded Obtainium deep link for fallback
-STATIC_CONFIG="{\"id\":\"$APP_ID\",\"url\":\"$PAGES_URL\",\"author\":\"ant.ms\",\"name\":\"$APP_NAME\",\"additionalSettings\":\"{\\\"versionExtractionRegEx\\\":\\\"anily-(.+)\\\\\\\\.apk\\\",\\\"matchGroupToUse\\\":\\\"1\\\"}\"}"
+# Obtainium configuration and deep link
+STATIC_CONFIG="{\"id\":\"$APP_ID\",\"url\":\"$PAGES_URL\",\"author\":\"ant.ms\",\"name\":\"$APP_NAME\",\"additionalSettings\":\"{\\\"versionExtractionRegEx\\\":\\\"anily-([^/]+)\\\\\\\\.apk\\\",\\\"matchGroupToUse\\\":\\\"1\\\"}\"}"
+printf '%s\n' "$STATIC_CONFIG" > "$OUTPUT_DIR/obtainium.json"
 STATIC_CONFIG_ENCODED="$(urlencode "$STATIC_CONFIG")"
 STATIC_OBTAINIUM_DIRECT="obtainium://app/$STATIC_CONFIG_ENCODED"
 STATIC_OBTAINIUM_REDIRECT="https://apps.obtainium.imranr.dev/redirect?r=$STATIC_OBTAINIUM_DIRECT"

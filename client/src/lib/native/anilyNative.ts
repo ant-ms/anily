@@ -54,6 +54,12 @@ export interface AnilyNativePlugin {
     usedByApp: number;
     files: Array<{ filename: string; size: number }>;
   }>;
+
+  setBrightness(options: { brightness: number }): Promise<{ success: boolean }>;
+  getBrightness(): Promise<{ brightness: number }>;
+  enterPip(): Promise<{ success: boolean }>;
+  setAutoPip(options: { enabled: boolean }): Promise<{ success: boolean }>;
+  getLocalEpisodePath(options: { filename: string }): Promise<{ path: string; exists: boolean }>;
 }
 
 export const AnilyNative = registerPlugin<AnilyNativePlugin>("AnilyNative", {
@@ -78,6 +84,11 @@ export const AnilyNative = registerPlugin<AnilyNativePlugin>("AnilyNative", {
       usedByApp: 0,
       files: [],
     }),
+    setBrightness: async () => ({ success: true }),
+    getBrightness: async () => ({ brightness: 1.0 }),
+    enterPip: async () => ({ success: false }),
+    setAutoPip: async () => ({ success: true }),
+    getLocalEpisodePath: async () => ({ path: "", exists: false }),
   },
 });
 

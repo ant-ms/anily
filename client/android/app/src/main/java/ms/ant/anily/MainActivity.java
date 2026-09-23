@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
             if (getBridge() != null && getBridge().getWebView() != null) {
                 WebView webView = getBridge().getWebView();
                 WebSettings settings = webView.getSettings();
+                settings.setMediaPlaybackRequiresUserGesture(false);
                 String ua = settings.getUserAgentString();
                 if (ua != null) {
                     settings.setUserAgentString(ua.replace("; wv", "").replaceAll("Version/[0-9.]+", ""));
@@ -48,5 +49,28 @@ public class MainActivity extends BridgeActivity {
             }
         } catch (Exception ignored) {
         }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, android.content.res.Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        try {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                String js = String.format("window.dispatchEvent(new CustomEvent('anily:pip-changed', { detail: { inPip: %b } }));", isInPictureInPictureMode);
+                getBridge().getWebView().evaluateJavascript(js, null);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        try {
+            if (AnilyNativePlugin.isAutoPipEnabled() && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                android.app.PictureInPictureParams.Builder builder = new android.app.PictureInPictureParams.Builder()
+                    .setAspectRatio(new android.util.Rational(16, 9));
+                enterPictureInPictureMode(builder.build());
+            }
+        } catch (Exception ignored) {}
     }
 }

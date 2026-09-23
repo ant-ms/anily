@@ -4,6 +4,9 @@
     import { downloadManager, type DownloadState } from "$lib/download/downloadManager.svelte";
     import { selectedAnimeAnilistId } from "$lib/context.svelte";
     import { isNative, AnilyNative } from "$lib/native/anilyNative";
+    import { Capacitor } from "@capacitor/core";
+    import { getStoredPlayer } from "../types/Media";
+    import { videoPlayerState } from "$lib/player/videoPlayer.svelte";
     import { buildDetailsCacheKey } from "$lib/storageKeys";
     import Button from "$lib/Button.svelte";
     import IconButton from "$lib/IconButton.svelte";
@@ -211,7 +214,32 @@
         await refreshStorage();
     }
 
-    async function playEpisodeOffline(episodeId: number, episodeNumber?: number) {
+    async function playEpisodeOffline(episodeId: number, episodeNumber?: number, animeTitle?: string, anilistId?: number) {
+        if (getStoredPlayer() === "builtin") {
+            const filename = `anily_ep_${episodeId}_num_${episodeNumber ?? 0}.mp4`;
+            try {
+                const res = await AnilyNative.getLocalEpisodePath({ filename });
+                if (res.exists && res.path) {
+                    const localUrl = Capacitor.convertFileSrc(res.path);
+                    const epData: any = {
+                        id: episodeId,
+                        number: episodeNumber ?? 1,
+                        titleNative: `Episode ${episodeNumber ?? 1}`,
+                        watched: true,
+                    };
+                    await videoPlayerState.playOfflineEpisode(
+                        epData,
+                        animeTitle || "Downloaded Anime",
+                        anilistId,
+                        [epData],
+                        localUrl,
+                    );
+                    return;
+                }
+            } catch (err) {
+                console.warn("Failed to get local episode path for in-app player:", err);
+            }
+        }
         await downloadManager.playOffline(episodeId, episodeNumber);
     }
 
@@ -437,7 +465,7 @@
                                                 <Button
                                                     Icon={PlayIcon}
                                                     style="ghost"
-                                                    onclick={() => playEpisodeOffline(ep.episodeId, ep.episodeNumber)}
+                                                    onclick={() => playEpisodeOffline(ep.episodeId, ep.episodeNumber, group.title, group.anilistId)}
                                                     title="Play offline"
                                                 >
                                                     Play

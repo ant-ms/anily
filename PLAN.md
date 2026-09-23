@@ -11,13 +11,6 @@
 - [x] Quick Switch like seach instead of homescreen search
 - [ ] Automatic and manual update triggers for episode releases and anime updates
 - [x] More robust and integrated job system (with dashboard, cron schedules, etc)
-- [x] External clients (settings global and per-device)
+- [x] In-UI video player (Web & Android, gestures, mini-player, Android PiP & playback notification) and external clients (settings global and per-device)
 - [x] Frontend mobile support & PWA/Tauri
 - [ ] Improve or replace gitlab pages page
-
----
-
-1. Anilist scraper (including updates at anime release time **and related anime franchise grouping / season processing**)
-2. Basic frontend to get started + gRPC or other way to RPC via Websocket
-3. (meby?) Absolute episode numbers to season number translation (TheXEM (Cross Entity Map) and similar open-source lists (like the Fribb/ScudLee mappings))
-4. Only for added anime: TMDB per-episode metadata gathering for historic and recently released episodes

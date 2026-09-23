@@ -23,6 +23,8 @@
     import ThumbsDownIcon from 'phosphor-svelte/lib/ThumbsDownIcon';
     import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
     import { AnilyNative, isNative } from '../../lib/native/anilyNative';
+    import { Capacitor } from '@capacitor/core';
+    import { videoPlayerState } from '../../lib/player/videoPlayer.svelte';
     import { syncQueue } from '../../lib/sync/syncQueue.svelte';
     import { downloadManager } from '../../lib/download/downloadManager.svelte';
     import { networkState } from '../../lib/network.svelte';
@@ -194,6 +196,21 @@
                 data.subtitles?.find((s) => s.language === 'en' || s.language === 'eng') ||
                 data.subtitles?.[0];
 
+            if (player === 'builtin') {
+                await videoPlayerState.playOnlineEpisode(
+                    episode,
+                    animeName,
+                    selectedAnimeAnilistId.current,
+                    episodesState.episodes,
+                    {
+                        streamUrl: data.streamUrl,
+                        container: data.container,
+                        subtitles: data.subtitles,
+                    },
+                );
+                return true;
+            }
+
             if (isNative) {
                 await AnilyNative.openExternalPlayer({
                     url: data.streamUrl,
@@ -224,6 +241,25 @@
         if (dropdownOpenEpisodeId === episode.id) dropdownOpenEpisodeId = null;
 
         if (isNative && downloadManager.states[episode.id]?.status === 'completed') {
+            if (player === 'builtin') {
+                const filename = `anily_ep_${episode.id}_num_${episode.number ?? 0}.mp4`;
+                try {
+                    const res = await AnilyNative.getLocalEpisodePath({ filename });
+                    if (res.exists && res.path) {
+                        const localUrl = Capacitor.convertFileSrc(res.path);
+                        await videoPlayerState.playOfflineEpisode(
+                            episode,
+                            animeName,
+                            selectedAnimeAnilistId.current,
+                            episodesState.episodes,
+                            localUrl,
+                        );
+                        return;
+                    }
+                } catch (err) {
+                    console.warn("Failed to get local episode path for in-app player:", err);
+                }
+            }
             await downloadManager.playOffline(episode.id, episode.number);
             return;
         }

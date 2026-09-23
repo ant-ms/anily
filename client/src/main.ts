@@ -11,6 +11,18 @@ const getUrlString = (input: RequestInfo | URL): string => {
   return '';
 };
 
+const isCoreApiRequest = (urlStr: string): boolean => {
+  if (
+    !urlStr ||
+    urlStr.includes('/api/stream/proxy') ||
+    urlStr.includes('/api/login') ||
+    urlStr.includes('/info')
+  ) {
+    return false;
+  }
+  return urlStr.includes('/api/');
+};
+
 const originalFetch = window.fetch;
 window.fetch = async (input, init) => {
   const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
@@ -27,9 +39,12 @@ window.fetch = async (input, init) => {
     } else {
       res = await originalFetch(input, init);
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw err;
+    }
     const urlStr = getUrlString(input);
-    const isApi = urlStr.includes('/api/') && !urlStr.includes('/api/login') && !urlStr.includes('/info');
+    const isApi = isCoreApiRequest(urlStr);
     const hasAuthData = !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || !!localStorage.getItem(STORAGE_KEYS.PROFILE_DATA);
     if (isApi && hasAuthData && typeof navigator !== 'undefined' && navigator.onLine) {
       try {
@@ -44,7 +59,7 @@ window.fetch = async (input, init) => {
   }
 
   const urlStr = getUrlString(input);
-  const isApi = urlStr.includes('/api/') && !urlStr.includes('/api/login') && !urlStr.includes('/info');
+  const isApi = isCoreApiRequest(urlStr);
   const hasAuthData = !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || !!localStorage.getItem(STORAGE_KEYS.PROFILE_DATA);
 
   if (hasAuthData && isApi) {

@@ -500,4 +500,101 @@ public class AnilyNativePlugin extends Plugin {
             call.reject("Failed to get storage info: " + e.getMessage(), e);
         }
     }
+
+    private static volatile boolean autoPipEnabled = false;
+
+    public static boolean isAutoPipEnabled() {
+        return autoPipEnabled;
+    }
+
+    @PluginMethod
+    public void setAutoPip(PluginCall call) {
+        Boolean enabled = call.getBoolean("enabled", false);
+        autoPipEnabled = Boolean.TRUE.equals(enabled);
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void enterPip(PluginCall call) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
+            call.reject("Picture-in-Picture requires Android 8.0 or higher");
+            return;
+        }
+
+        getActivity().runOnUiThread(() -> {
+            try {
+                android.app.PictureInPictureParams.Builder builder = new android.app.PictureInPictureParams.Builder()
+                    .setAspectRatio(new android.util.Rational(16, 9));
+                boolean success = getActivity().enterPictureInPictureMode(builder.build());
+                JSObject ret = new JSObject();
+                ret.put("success", success);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("Failed to enter Picture-in-Picture: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void setBrightness(PluginCall call) {
+        Double brightness = call.getDouble("brightness");
+        if (brightness == null) {
+            call.reject("brightness value is required");
+            return;
+        }
+
+        getActivity().runOnUiThread(() -> {
+            try {
+                android.view.Window window = getActivity().getWindow();
+                android.view.WindowManager.LayoutParams lp = window.getAttributes();
+                if (brightness < 0) {
+                    lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+                } else {
+                    lp.screenBrightness = (float) Math.max(0.01, Math.min(1.0, brightness));
+                }
+                window.setAttributes(lp);
+                JSObject ret = new JSObject();
+                ret.put("success", true);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("Failed to set brightness: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void getBrightness(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try {
+                android.view.Window window = getActivity().getWindow();
+                android.view.WindowManager.LayoutParams lp = window.getAttributes();
+                float current = lp.screenBrightness;
+                JSObject ret = new JSObject();
+                ret.put("brightness", current);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("Failed to get brightness: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void getLocalEpisodePath(PluginCall call) {
+        String filename = call.getString("filename");
+        if (filename == null || filename.isEmpty()) {
+            call.reject("filename is required");
+            return;
+        }
+
+        Context context = getContext();
+        File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+        File file = new File(moviesDir, filename);
+
+        JSObject ret = new JSObject();
+        ret.put("exists", file.exists() && file.length() > 0);
+        ret.put("path", file.getAbsolutePath());
+        call.resolve(ret);
+    }
 }

@@ -19,7 +19,7 @@
         onclick?: (e: MouseEvent) => any;
         variant?: "normal" | "ghost" | "danger" | "tonal" | "standard";
         shape?: "square" | "rounded" | "circle";
-        size?: "sm" | "md" | "lg" | "standard";
+        size?: "sm" | "md" | "lg" | "standard" | "player";
         active?: boolean;
         disabled?: boolean;
         loading?: boolean;
@@ -49,6 +49,7 @@
         md: "1.25rem",
         lg: "1.4rem",
         standard: "1.25rem",
+        player: "1.5rem",
     };
 </script>
 
@@ -71,6 +72,7 @@
     class:size-md={size === "md"}
     class:size-lg={size === "lg"}
     class:size-standard={size === "standard"}
+    class:size-player={size === "player"}
     class:active
     class:is-busy={isBusy}
 >
@@ -102,6 +104,15 @@
             cursor: not-allowed;
         }
 
+        &:focus-visible {
+            outline: 2px solid var(--color-accent, #ffd52c);
+            outline-offset: 2px;
+        }
+
+        &:active:not(:disabled):not(.is-busy) {
+            transform: scale(0.92);
+        }
+
         &.is-busy {
             opacity: 0.85;
             cursor: wait;
@@ -128,6 +139,13 @@
             height: 40px;
             min-width: 40px;
             min-height: 40px;
+        }
+
+        &.size-player {
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            min-height: 48px;
         }
 
         /* Shapes */
