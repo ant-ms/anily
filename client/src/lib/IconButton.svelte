@@ -14,6 +14,7 @@
         title = undefined,
         ariaLabel = undefined,
         weight = undefined,
+        class: className = "",
     }: {
         Icon: Component<IconComponentProps, {}, "">;
         onclick?: (e: MouseEvent) => any;
@@ -26,6 +27,7 @@
         title?: string;
         ariaLabel?: string;
         weight?: IconWeight;
+        class?: string;
     } = $props();
 
     let internalLoading = $state(false);
@@ -59,7 +61,7 @@
     aria-label={ariaLabel || title}
     onclick={handleClick}
     disabled={disabled || isBusy}
-    class="icon-button"
+    class="icon-button {className}"
     class:variant-normal={variant === "normal"}
     class:variant-ghost={variant === "ghost"}
     class:variant-danger={variant === "danger"}
@@ -146,6 +148,13 @@
             height: 48px;
             min-width: 48px;
             min-height: 48px;
+
+            @media (max-width: 640px) {
+                width: 40px;
+                height: 40px;
+                min-width: 40px;
+                min-height: 40px;
+            }
         }
 
         /* Shapes */

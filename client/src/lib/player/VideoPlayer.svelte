@@ -930,6 +930,17 @@
                 </div>
 
                 <div class="topbar-right">
+                    <!-- Picture in Picture -->
+                    <IconButton
+                        size="player"
+                        variant="standard"
+                        shape="circle"
+                        Icon={PictureInPictureIcon}
+                        onclick={enterPip}
+                        title="Picture in Picture (P)"
+                        ariaLabel="Picture in Picture"
+                    />
+
                     <!-- Close -->
                     <IconButton
                         size="player"
@@ -1008,6 +1019,7 @@
                             size="player"
                             variant="standard"
                             shape="circle"
+                            class="hide-mobile"
                             Icon={ArrowCounterClockwiseIcon}
                             onclick={() => seekRelative(-10)}
                             title="Rewind 10s (J / Left Arrow)"
@@ -1018,6 +1030,7 @@
                             size="player"
                             variant="standard"
                             shape="circle"
+                            class="hide-mobile"
                             Icon={ArrowClockwiseIcon}
                             onclick={() => seekRelative(10)}
                             title="Fast Forward 10s (L / Right Arrow)"
@@ -1090,11 +1103,14 @@
                                 />
                                 {#if isSubtitleMenuOpen}
                                     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <div
                                         class="m3-popup-menu"
                                         transition:fade={{ duration: 120 }}
                                         onclick={(e) => e.stopPropagation()}
+                                        onkeydown={(e) => e.stopPropagation()}
                                         role="dialog"
+                                        tabindex="-1"
                                         aria-label="Subtitle settings"
                                     >
                                         <div class="menu-section-header">Subtitles</div>
@@ -1149,17 +1165,6 @@
                                 {/if}
                             </div>
                         {/if}
-
-                        <!-- Picture in Picture -->
-                        <IconButton
-                            size="player"
-                            variant="standard"
-                            shape="circle"
-                            Icon={PictureInPictureIcon}
-                            onclick={enterPip}
-                            title="Picture in Picture (P)"
-                            ariaLabel="Picture in Picture"
-                        />
 
                         <!-- Fullscreen -->
                         <IconButton
@@ -1307,6 +1312,12 @@
         }
     }
 
+    :global(.hide-mobile) {
+        @media (max-width: 640px) {
+            display: none !important;
+        }
+    }
+
     /* ── Top Bar ─────────────────────────────────────────────────────────── */
     .player-topbar {
         position: absolute;
@@ -1324,6 +1335,12 @@
         transition: opacity 0.25s cubic-bezier(0.2, 0, 0, 1);
         z-index: 20;
 
+        @media (max-width: 768px) {
+            padding-top: calc(10px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+            padding-left: calc(12px + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+            padding-right: calc(12px + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+        }
+
         &.visible {
             opacity: 1;
             pointer-events: auto;
@@ -1332,8 +1349,12 @@
         .topbar-left {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 14px;
             min-width: 0;
+
+            @media (max-width: 640px) {
+                gap: 8px;
+            }
 
             .meta-titles {
                 display: flex;
@@ -1349,6 +1370,10 @@
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+
+                    @media (max-width: 640px) {
+                        font-size: 14px;
+                    }
                 }
 
                 .meta-episode {
@@ -1359,6 +1384,10 @@
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+
+                    @media (max-width: 640px) {
+                        font-size: 12px;
+                    }
                 }
             }
         }
@@ -1366,8 +1395,12 @@
         .topbar-right {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             flex-shrink: 0;
+
+            @media (max-width: 640px) {
+                gap: 4px;
+            }
         }
     }
 
@@ -1388,8 +1421,8 @@
             0 2px 8px rgba(0, 0, 0, 0.4);
         display: flex;
         flex-direction: column;
-        min-width: 230px;
-        max-width: 320px;
+        min-width: 220px;
+        max-width: min(320px, calc(100vw - 24px));
         z-index: 30;
         user-select: none;
 
@@ -1534,6 +1567,13 @@
         transition: opacity 0.25s cubic-bezier(0.2, 0, 0, 1);
         z-index: 20;
 
+        @media (max-width: 768px) {
+            padding-bottom: calc(10px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+            padding-left: calc(12px + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+            padding-right: calc(12px + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+            gap: 4px;
+        }
+
         &.visible {
             opacity: 1;
             pointer-events: auto;
@@ -1627,17 +1667,31 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
 
             .controls-left {
                 display: flex;
                 align-items: center;
                 gap: 6px;
+                min-width: 0;
+                flex-shrink: 1;
+
+                @media (max-width: 640px) {
+                    gap: 3px;
+                }
             }
 
             .controls-right {
                 display: flex;
                 align-items: center;
                 gap: 6px;
+                flex-shrink: 0;
+
+                @media (max-width: 640px) {
+                    gap: 3px;
+                }
             }
         }
     }
@@ -1646,6 +1700,11 @@
         display: flex;
         align-items: center;
         gap: 2px;
+        flex-shrink: 0;
+
+        @media (max-width: 380px) {
+            display: none !important;
+        }
 
         .volume-slider-wrapper {
             display: flex;
@@ -1681,6 +1740,14 @@
         margin-left: 8px;
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
+        flex-shrink: 1;
+        overflow: hidden;
+
+        @media (max-width: 640px) {
+            font-size: 11px;
+            margin-left: 2px;
+            letter-spacing: -0.2px;
+        }
 
         .time-sep {
             color: rgba(255, 255, 255, 0.45);
