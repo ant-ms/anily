@@ -21,6 +21,7 @@
     "vite": "^8.0.16"
   },
   "dependencies": {
+    "@ant.ms/anily-providers": "^1.0.0",
     "@capacitor/android": "^8.5.2",
     "@capacitor/app": "^8.1.1",
     "@capacitor/app-launcher": "^8.0.1",

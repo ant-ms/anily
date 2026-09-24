@@ -1,15 +1,9 @@
 import { STORAGE_KEYS } from '../lib/storageKeys';
+import type { AvailableService, StreamLanguage } from '@ant.ms/anily-providers';
+import { getServiceScore as getQualityScore } from '@ant.ms/anily-providers';
 
-export type StreamLanguage = 'sub' | 'dub';
-
-export interface AvailableService {
-  providerId: string;
-  providerName: string;
-  serverName: string;
-  serverId: string;
-  language: StreamLanguage;
-  identifier: string;
-}
+export type { AvailableService, StreamLanguage };
+export { getQualityScore };
 
 export type MediaPlayer = 'builtin' | 'mpv' | 'iina' | 'vlc' | 'copy';
 
@@ -95,62 +89,6 @@ export const isHdService = (service: AvailableService): boolean => {
     /\b(hd|1080p|720p|hq|megaplay)\b/i.test(service.serverName) ||
     /\b(hd|1080p|720p|hq)\b/i.test(service.providerName)
   );
-};
-
-/**
- * Scoring weights for sorting streaming servers by reliability and quality.
- *
- * Rationale:
- * - MegaPlay (+12): 100% success rate, ultra-high CDN throughput (50-200+ Mbps), pristine 1080p full HD.
- * - ZokoAnime (+8): High speed (~60-260 Mbps), <150ms start time, robust multi-source coverage.
- * - Resolution bonuses: 1080p (+4), 720p (+2), generic HD/HQ (+1).
- * - Provider reliability: JustAnime (+3), HiAnime (+2).
- * - Penalize throttled CDNs: AnimeHub F5-HQ / No Ads (-5 penalty) due to high latency/timeouts.
- */
-const SCORE_WEIGHT_MEGAPLAY = 12;
-const SCORE_WEIGHT_ZOKOANIME = 8;
-const SCORE_WEIGHT_1080P = 4;
-const SCORE_WEIGHT_720P = 2;
-const SCORE_WEIGHT_GENERIC_HD = 1;
-const SCORE_WEIGHT_JUSTANIME = 3;
-const SCORE_WEIGHT_HIANIME = 2;
-const PENALTY_THROTTLED_SERVERS = -5;
-
-export const getQualityScore = (service: AvailableService): number => {
-  const serverText = (service.serverName || "").toLowerCase();
-  const providerText = (service.providerName || "").toLowerCase();
-  const combined = `${serverText} ${providerText}`;
-  let score = 0;
-
-  // 1. Reliability & Latency Priority (Empirical benchmarks)
-  if (serverText.includes("megaplay") || serverText.includes("mega")) {
-    score += SCORE_WEIGHT_MEGAPLAY;
-  } else if (serverText.includes("zoko")) {
-    score += SCORE_WEIGHT_ZOKOANIME;
-  }
-
-  // 2. Penalize historically slow/throttled CDNs
-  if (serverText.includes("f5 - hq") || serverText.includes("no ads")) {
-    score += PENALTY_THROTTLED_SERVERS;
-  }
-
-  // 3. Provider stability
-  if (providerText.includes("justanime")) {
-    score += SCORE_WEIGHT_JUSTANIME;
-  } else if (providerText.includes("hianime")) {
-    score += SCORE_WEIGHT_HIANIME;
-  }
-
-  // 4. Video Resolution & Fidelity Priority
-  if (/\b1080p\b/i.test(combined)) {
-    score += SCORE_WEIGHT_1080P;
-  } else if (/\b720p\b/i.test(combined)) {
-    score += SCORE_WEIGHT_720P;
-  } else if (/\b(hd|hq)\b/i.test(combined)) {
-    score += SCORE_WEIGHT_GENERIC_HD;
-  }
-
-  return score;
 };
 
 export const sortServicesWithHdFirst = (services: AvailableService[]): AvailableService[] => {

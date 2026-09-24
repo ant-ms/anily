@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { AnimeHubProvider } from "./providers/animehub";
-import { HiAnimeProvider } from "./providers/hianime";
-import { JustAnimeProvider } from "./providers/justanime";
-import { ProviderRegistry } from "./registry";
-import { getServiceScore } from "./qualityScore";
-import { probeStreamHealth } from "./healthCheck";
-import type { AvailableService } from "./types";
+import {
+  AnimeHubProvider,
+  HiAnimeProvider,
+  JustAnimeProvider,
+  ProviderRegistry,
+  getServiceScore,
+  probeStreamHealth,
+  type AvailableService,
+} from "@ant.ms/anily-providers";
 
 describe("Streaming Providers & Quality Benchmarks", () => {
   describe("Quality Score & Server Prioritization", () => {

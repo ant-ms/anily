@@ -3,7 +3,7 @@ import { logger } from "$src/logger";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { handleStreamProxy } from "$lib/streaming/proxy";
-import type { StreamLanguage } from "$lib/streaming/types";
+import type { StreamLanguage } from "@ant.ms/anily-providers";
 import { getPublicOrigin } from "./helpers";
 import { getAvailableStreamServices } from "./getServices";
 import { resolvePlayStream } from "./getPlayStream";

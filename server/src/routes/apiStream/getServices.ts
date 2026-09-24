@@ -1,7 +1,9 @@
 import { prisma } from "$src/prisma";
-import { registry } from "$lib/streaming/registry";
-import { probeStreamHealth } from "$lib/streaming/healthCheck";
-import type { AvailableService } from "$lib/streaming/types";
+import {
+  registry,
+  probeStreamHealth,
+  type AvailableService,
+} from "@ant.ms/anily-providers";
 import { logger } from "$src/logger";
 
 const log = logger.child({ module: "getServices" });

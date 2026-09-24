@@ -2,10 +2,13 @@ import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import type { Context } from 'hono';
 import { prisma } from '$src/prisma';
-import { registry } from '$lib/streaming/registry';
+import {
+  registry,
+  getServiceScore,
+  type StreamLanguage,
+  type SubtitleTrack,
+} from "@ant.ms/anily-providers";
 import { logger } from '$src/logger';
-import type { StreamLanguage, SubtitleTrack } from '$lib/streaming/types';
-import { getServiceScore } from '$lib/streaming/qualityScore';
 
 const log = logger.child({ module: "downloadStream" });
 

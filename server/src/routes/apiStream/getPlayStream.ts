@@ -1,7 +1,6 @@
 import { prisma } from "$src/prisma";
-import { registry } from "$lib/streaming/registry";
+import { registry, type StreamLanguage } from "@ant.ms/anily-providers";
 import { extractFilename } from "$lib/streaming/proxy";
-import type { StreamLanguage } from "$lib/streaming/types";
 import {
   generateStreamSignature,
   DEFAULT_STREAM_EXPIRY_SECONDS,

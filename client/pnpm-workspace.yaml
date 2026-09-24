@@ -1,2 +1,4 @@
 allowBuilds:
   '@parcel/watcher': true
+minimumReleaseAgeExclude:
+  - '@ant.ms/anily-providers@1.0.0'
