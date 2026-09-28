@@ -10,7 +10,7 @@
         updateMediaSessionPosition,
         setupMediaSessionActionHandlers,
     } from "./mediaSession";
-    import { AnilyNative, isNative } from "../native/anilyNative";
+    import { AnilyNative, isNative, isAndroid } from "../native/anilyNative";
     import { apiBaseUrl } from "../context.svelte";
     import IconButton from "../IconButton.svelte";
     import SegmentedControl from "../SegmentedControl.svelte";
@@ -489,6 +489,9 @@
         }
 
         updateOverlayRect();
+        if (isAndroid) {
+            videoPlayerState.syncBrightness();
+        }
 
         return () => {
             unbindMediaSession();
@@ -602,7 +605,14 @@
                 if (Math.abs(dx) > Math.abs(dy)) {
                     activeGesture = "seek";
                 } else {
-                    activeGesture = touchStartX < rect.left + rect.width * 0.5 ? "brightness" : "volume";
+                    const isLeftHalf = touchStartX < rect.left + rect.width * 0.5;
+                    if (isLeftHalf) {
+                        if (isAndroid) {
+                            activeGesture = "brightness";
+                        }
+                    } else {
+                        activeGesture = "volume";
+                    }
                 }
             }
         }
@@ -612,9 +622,9 @@
             gestureSeekDelta = Math.round(dragRatio * 90);
             const target = Math.max(0, Math.min(videoPlayerState.duration || 9999, touchInitialVideoTime + gestureSeekDelta));
             gestureSeekTarget = target;
-        } else if (activeGesture === "brightness") {
+        } else if (activeGesture === "brightness" && isAndroid) {
             const deltaBrightness = -dy / (rect.height * 0.65);
-            const nextBrightness = Math.max(0.05, Math.min(1.0, touchInitialBrightness + deltaBrightness));
+            const nextBrightness = Math.max(0.01, Math.min(1.0, touchInitialBrightness + deltaBrightness));
             videoPlayerState.setBrightness(nextBrightness);
         } else if (activeGesture === "volume") {
             const deltaVolume = -dy / (rect.height * 0.65);
@@ -844,7 +854,6 @@
         <video
             bind:this={videoEl}
             class="video-element"
-            style="filter: brightness({videoPlayerState.brightness});"
             playsinline
             crossorigin="anonymous"
             onplay={handlePlay}
@@ -946,7 +955,7 @@
                         <span class="hud-dur">/ {formatTime(videoPlayerState.duration)}</span>
                     </div>
                 </div>
-            {:else if activeGesture === "brightness"}
+            {:else if activeGesture === "brightness" && isAndroid}
                 <div class="gesture-hud vertical-hud left-side" transition:fade={{ duration: 150 }}>
                     <SunIcon size={24} weight="fill" />
                     <div class="hud-bar-track">

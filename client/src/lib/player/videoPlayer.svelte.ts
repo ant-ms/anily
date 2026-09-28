@@ -1,4 +1,4 @@
-import { AnilyNative, isNative } from "../native/anilyNative";
+import { AnilyNative, isNative, isAndroid } from "../native/anilyNative";
 import { syncQueue } from "../sync/syncQueue.svelte";
 import { sidebarDataRefreshSeed, apiBaseUrl } from "../context.svelte";
 import { getStoredLanguagePreference } from "../../types/Media";
@@ -163,6 +163,10 @@ class VideoPlayerState {
         await AnilyNative.setAutoPip({ enabled: true });
       } catch {}
     }
+
+    if (isAndroid) {
+      this.syncBrightness();
+    }
   }
 
   public async playOfflineEpisode(
@@ -201,6 +205,10 @@ class VideoPlayerState {
     if (isNative) {
       try {
         await AnilyNative.setAutoPip({ enabled: false });
+      } catch {}
+    }
+    if (isAndroid) {
+      try {
         await AnilyNative.setBrightness({ brightness: -1.0 });
       } catch {}
     }
@@ -267,13 +275,22 @@ class VideoPlayerState {
   }
 
   public async setBrightness(level: number) {
-    const clamped = Math.max(0.05, Math.min(1.0, level));
+    if (!isAndroid) return;
+    const clamped = Math.max(0.01, Math.min(1.0, level));
     this.brightness = clamped;
-    if (isNative) {
-      try {
-        await AnilyNative.setBrightness({ brightness: clamped });
-      } catch {}
-    }
+    try {
+      await AnilyNative.setBrightness({ brightness: clamped });
+    } catch {}
+  }
+
+  public async syncBrightness() {
+    if (!isAndroid) return;
+    try {
+      const res = await AnilyNative.getBrightness();
+      if (typeof res?.brightness === "number" && res.brightness >= 0) {
+        this.brightness = Math.max(0.01, Math.min(1.0, res.brightness));
+      }
+    } catch {}
   }
 
   public setSubtitle(index: number) {

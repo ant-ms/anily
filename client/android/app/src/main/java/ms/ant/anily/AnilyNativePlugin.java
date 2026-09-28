@@ -571,6 +571,17 @@ public class AnilyNativePlugin extends Plugin {
                 android.view.Window window = getActivity().getWindow();
                 android.view.WindowManager.LayoutParams lp = window.getAttributes();
                 float current = lp.screenBrightness;
+                if (current < 0) {
+                    try {
+                        int sysBrightness = android.provider.Settings.System.getInt(
+                            getActivity().getContentResolver(),
+                            android.provider.Settings.System.SCREEN_BRIGHTNESS
+                        );
+                        current = (float) Math.max(0.01, Math.min(1.0, sysBrightness / 255.0));
+                    } catch (Exception ex) {
+                        current = 0.5f;
+                    }
+                }
                 JSObject ret = new JSObject();
                 ret.put("brightness", current);
                 call.resolve(ret);
