@@ -2,9 +2,7 @@
     import { onMount, onDestroy } from "svelte";
     import { fade, scale } from "svelte/transition";
     import Hls from "hls.js";
-    import "media-captions/styles/captions.css";
-    import "media-captions/styles/regions.css";
-    import { CaptionsRenderer, parseResponse } from "media-captions";
+    import { parseResponse, renderVTTCueString, type VTTCue } from "media-captions";
     import { videoPlayerState } from "./videoPlayer.svelte";
     import {
         updateMediaSessionMetadata,
@@ -42,10 +40,95 @@
     // References
     let videoEl: HTMLVideoElement | null = $state(null);
     let containerEl: HTMLElement | null = $state(null);
+    interface SubtitleDisplayItem {
+        id: string;
+        html: string;
+        isTop: boolean;
+        align: "start" | "center" | "end";
+    }
+
     let captionsOverlayEl: HTMLElement | null = $state(null);
-    let captionsRenderer: CaptionsRenderer | null = null;
     let currentSubtitleAbortController: AbortController | null = null;
-    let overlayStyle = $state<string>("position: absolute; inset: 0;");
+    let overlayStyle = $state<string>("position: absolute; inset: 0; --overlay-height: 100vh;");
+    let loadedCues = $state<VTTCue[]>([]);
+    let activeTopCues = $state<SubtitleDisplayItem[]>([]);
+    let activeBottomCues = $state<SubtitleDisplayItem[]>([]);
+
+    const areCuesEqual = (a: SubtitleDisplayItem[], b: SubtitleDisplayItem[]) => {
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+            if (a[i].id !== b[i].id || a[i].html !== b[i].html || a[i].align !== b[i].align) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    const updateActiveCues = (time: number) => {
+        if (!loadedCues.length || videoPlayerState.selectedSubtitleIndex < 0) {
+            if (activeTopCues.length) activeTopCues = [];
+            if (activeBottomCues.length) activeBottomCues = [];
+            return;
+        }
+
+        const matching: Array<{ cue: VTTCue; index: number }> = [];
+        for (let i = 0; i < loadedCues.length; i++) {
+            const c = loadedCues[i];
+            if (time >= c.startTime && time <= c.endTime) {
+                matching.push({ cue: c, index: i });
+            }
+        }
+
+        matching.sort((a, b) =>
+            a.cue.startTime !== b.cue.startTime
+                ? a.cue.startTime - b.cue.startTime
+                : a.index - b.index
+        );
+
+        const top: SubtitleDisplayItem[] = [];
+        const bottom: SubtitleDisplayItem[] = [];
+
+        for (const { cue, index } of matching) {
+            const line = cue.line;
+            const isTop =
+                (typeof line === "number" && line >= 0 && line < 50) ||
+                (typeof line === "string" && parseFloat(line) < 50 && line.endsWith("%"));
+
+            let align: "start" | "center" | "end" = "center";
+            if (cue.align === "left" || cue.align === "start") align = "start";
+            else if (cue.align === "right" || cue.align === "end") align = "end";
+
+            let html = "";
+            try {
+                html = renderVTTCueString(cue, time);
+            } catch {
+                html = (cue.text || "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+            }
+
+            const item: SubtitleDisplayItem = {
+                id: cue.id ? `${cue.id}_${index}` : `${cue.startTime}_${cue.endTime}_${index}`,
+                html,
+                isTop,
+                align,
+            };
+
+            if (isTop) {
+                top.push(item);
+            } else {
+                bottom.push(item);
+            }
+        }
+
+        if (!areCuesEqual(activeTopCues, top)) {
+            activeTopCues = top;
+        }
+        if (!areCuesEqual(activeBottomCues, bottom)) {
+            activeBottomCues = bottom;
+        }
+    };
     let hlsInstance: Hls | null = null;
     let wakeLockSentinel: any = null;
 
@@ -122,9 +205,7 @@
         const clamped = Math.max(0, Math.min(dur, time));
         v.currentTime = clamped;
         videoPlayerState.currentTime = clamped;
-        if (captionsRenderer) {
-            captionsRenderer.currentTime = clamped;
-        }
+        updateActiveCues(clamped);
         restartControlsTimer();
     };
 
@@ -277,14 +358,14 @@
 
     // Responsive WebVTT subtitle overlay positioning matching the active video rect
     const updateOverlayRect = () => {
-        if (!containerEl || !captionsOverlayEl) return;
+        if (!containerEl) return;
         const cw = containerEl.clientWidth;
         const ch = containerEl.clientHeight;
         const vw = videoEl?.videoWidth || 0;
         const vh = videoEl?.videoHeight || 0;
 
         if (!vw || !vh || !cw || !ch) {
-            overlayStyle = "position: absolute; top: 0px; left: 0px; width: 100%; height: 100%;";
+            overlayStyle = "position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; --overlay-height: 100vh;";
             return;
         }
 
@@ -305,7 +386,7 @@
             left = (cw - width) / 2;
         }
 
-        overlayStyle = `position: absolute; top: ${Math.round(top)}px; left: ${Math.round(left)}px; width: ${Math.round(width)}px; height: ${Math.round(height)}px;`;
+        overlayStyle = `position: absolute; top: ${Math.round(top)}px; left: ${Math.round(left)}px; width: ${Math.round(width)}px; height: ${Math.round(height)}px; --overlay-height: ${Math.round(height)}px;`;
     };
 
     const resolveSubUrl = (rawUrl: string): string => {
@@ -317,19 +398,21 @@
     };
 
     const loadActiveSubtitle = async () => {
-        if (!captionsRenderer) return;
-
         const stream = videoPlayerState.streamSource;
         const subIdx = videoPlayerState.selectedSubtitleIndex;
 
         if (!stream?.subtitles || subIdx < 0 || subIdx >= stream.subtitles.length) {
-            captionsRenderer.reset();
+            loadedCues = [];
+            activeTopCues = [];
+            activeBottomCues = [];
             return;
         }
 
         const sub = stream.subtitles[subIdx];
         if (!sub?.url) {
-            captionsRenderer.reset();
+            loadedCues = [];
+            activeTopCues = [];
+            activeBottomCues = [];
             return;
         }
 
@@ -344,63 +427,34 @@
             const res = await fetch(fullUrl, { signal: ac.signal });
             if (!res.ok) {
                 console.warn("Failed to load subtitle track:", res.statusText);
-                captionsRenderer.reset();
+                loadedCues = [];
+                activeTopCues = [];
+                activeBottomCues = [];
                 return;
             }
 
             const parsed = await parseResponse(res);
             if (ac.signal.aborted) return;
 
-            captionsRenderer.changeTrack({
-                cues: parsed.cues,
-                regions: parsed.regions,
-            });
+            loadedCues = (parsed.cues || []) as VTTCue[];
 
             if (videoEl) {
-                captionsRenderer.currentTime = videoEl.currentTime;
+                updateActiveCues(videoEl.currentTime);
             }
         } catch (err: any) {
             if (err.name !== "AbortError") {
                 console.warn("Error parsing subtitles:", err);
-                captionsRenderer?.reset();
+                loadedCues = [];
+                activeTopCues = [];
+                activeBottomCues = [];
             }
         }
-    };
-
-    const captionsOverlayAction = (node: HTMLElement) => {
-        captionsOverlayEl = node;
-        captionsRenderer = new CaptionsRenderer(node);
-        updateOverlayRect();
-        loadActiveSubtitle();
-
-        return {
-            destroy() {
-                if (currentSubtitleAbortController) {
-                    currentSubtitleAbortController.abort();
-                    currentSubtitleAbortController = null;
-                }
-                if (captionsRenderer) {
-                    captionsRenderer.destroy();
-                    captionsRenderer = null;
-                }
-                captionsOverlayEl = null;
-            },
-        };
     };
 
     $effect(() => {
         const _ = videoPlayerState.selectedSubtitleIndex;
         const _s = videoPlayerState.streamSource;
-        if (captionsRenderer) {
-            loadActiveSubtitle();
-        }
-    });
-
-    $effect(() => {
-        const _ = videoPlayerState.subtitleSize;
-        if (captionsRenderer) {
-            captionsRenderer.update(true);
-        }
+        loadActiveSubtitle();
     });
 
     // MediaSession action registration
@@ -426,18 +480,25 @@
         const onWinResize = () => updateOverlayRect();
         window.addEventListener("resize", onWinResize);
 
+        let resizeObserver: ResizeObserver | null = null;
+        if (typeof ResizeObserver !== "undefined" && containerEl) {
+            resizeObserver = new ResizeObserver(() => {
+                updateOverlayRect();
+            });
+            resizeObserver.observe(containerEl);
+        }
+
+        updateOverlayRect();
+
         return () => {
             unbindMediaSession();
             window.removeEventListener("anily:pip-changed", onPipChanged);
             window.removeEventListener("resize", onWinResize);
+            resizeObserver?.disconnect();
             releaseWakeLock();
             if (currentSubtitleAbortController) {
                 currentSubtitleAbortController.abort();
                 currentSubtitleAbortController = null;
-            }
-            if (captionsRenderer) {
-                captionsRenderer.destroy();
-                captionsRenderer = null;
             }
             if (hlsInstance) {
                 hlsInstance.destroy();
@@ -465,9 +526,7 @@
         if (!videoEl) return;
         const current = videoEl.currentTime;
         const dur = videoEl.duration || 0;
-        if (captionsRenderer) {
-            captionsRenderer.currentTime = current;
-        }
+        updateActiveCues(current);
         videoPlayerState.onTimeUpdate(current, dur);
         updateMediaSessionPosition(current, dur, videoPlayerState.playbackRate);
 
@@ -796,23 +855,52 @@
             onloadedmetadata={updateOverlayRect}
             onresize={updateOverlayRect}
             onseeking={() => {
-                if (videoEl && captionsRenderer) captionsRenderer.currentTime = videoEl.currentTime;
+                if (videoEl) updateActiveCues(videoEl.currentTime);
             }}
             onseeked={() => {
-                if (videoEl && captionsRenderer) captionsRenderer.currentTime = videoEl.currentTime;
+                if (videoEl) updateActiveCues(videoEl.currentTime);
             }}
         ></video>
 
-        <!-- Media Captions Overlay (spec-compliant 2D coordinates & completely transparent background) -->
+        <!-- Custom Subtitles Overlay (Native Svelte flex layout: stable reading order, non-overlapping, zero DOM recreation churn) -->
         <div
-            use:captionsOverlayAction
-            class="media-captions-overlay"
-            class:controls-visible={areControlsVisible || !videoPlayerState.isPlaying}
+            bind:this={captionsOverlayEl}
+            class="custom-subtitles-overlay"
             class:size-small={videoPlayerState.subtitleSize === "small"}
             class:size-medium={videoPlayerState.subtitleSize === "medium"}
             class:size-large={videoPlayerState.subtitleSize === "large"}
             style={overlayStyle}
-        ></div>
+        >
+            {#if activeTopCues.length > 0}
+                <div class="subtitles-container top">
+                    {#each activeTopCues as item (item.id)}
+                        <div
+                            class="subtitle-cue-wrapper"
+                            style:justify-content={item.align === "start" ? "flex-start" : item.align === "end" ? "flex-end" : "center"}
+                            style:text-align={item.align}
+                        >
+                            <span class="subtitle-cue">{@html item.html}</span>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+            {#if activeBottomCues.length > 0}
+                <div
+                    class="subtitles-container bottom"
+                    class:controls-visible={areControlsVisible || !videoPlayerState.isPlaying}
+                >
+                    {#each activeBottomCues as item (item.id)}
+                        <div
+                            class="subtitle-cue-wrapper"
+                            style:justify-content={item.align === "start" ? "flex-start" : item.align === "end" ? "flex-end" : "center"}
+                            style:text-align={item.align}
+                        >
+                            <span class="subtitle-cue">{@html item.html}</span>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+        </div>
 
         <!-- ══════════════════════════════════════════════════════════════════════ -->
         <!-- EXPANDED MODE PRESENTATION                                            -->
@@ -1981,50 +2069,80 @@
         }
     }
 
-    /* ── Subtitle Styling via media-captions ───────────────────────────── */
-    .media-captions-overlay {
+    /* ── Subtitle Styling (Native Svelte Layout) ────────────────────────── */
+    .custom-subtitles-overlay {
         position: absolute;
         pointer-events: none;
         user-select: none;
         z-index: 6;
-        contain: layout size;
         box-sizing: border-box;
-        margin: 0 !important;
-        padding: 0 2% 28px 2%;
-        transition: padding 0.2s cubic-bezier(0.2, 0, 0, 1);
+        overflow: hidden;
 
-        --cue-bg-color: transparent !important;
-        --cue-color: #ffffff;
-        --cue-font-size: clamp(16px, calc(var(--overlay-height) / 100 * 4.4), 32px);
+        --cue-font-size: clamp(16px, calc(var(--overlay-height, 100vh) / 100 * 4.4), 32px);
         --cue-line-height: 1.35;
-        --cue-padding-x: 0px;
-        --cue-padding-y: 0px;
 
         &.size-small {
-            --cue-font-size: clamp(13px, calc(var(--overlay-height) / 100 * 3.3), 24px);
+            --cue-font-size: clamp(13px, calc(var(--overlay-height, 100vh) / 100 * 3.3), 24px);
         }
 
         &.size-medium {
-            --cue-font-size: clamp(16px, calc(var(--overlay-height) / 100 * 4.4), 32px);
+            --cue-font-size: clamp(16px, calc(var(--overlay-height, 100vh) / 100 * 4.4), 32px);
         }
 
         &.size-large {
-            --cue-font-size: clamp(20px, calc(var(--overlay-height) / 100 * 5.8), 44px);
+            --cue-font-size: clamp(20px, calc(var(--overlay-height, 100vh) / 100 * 5.8), 44px);
         }
 
-        &.controls-visible {
-            padding: 0 2% 84px 2%;
+        .subtitles-container {
+            position: absolute;
+            left: 2%;
+            right: 2%;
+            max-height: 45%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            pointer-events: none;
+            gap: 6px;
+
+            &.top {
+                top: 24px;
+                align-items: center;
+                justify-content: flex-start;
+            }
+
+            &.bottom {
+                bottom: 24px;
+                align-items: center;
+                justify-content: flex-end;
+                transition: bottom 0.2s cubic-bezier(0.2, 0, 0, 1);
+
+                &.controls-visible {
+                    bottom: 84px;
+                }
+            }
         }
 
-        :global([part='cue']) {
-            background-color: transparent !important;
-            background: transparent !important;
-            color: #ffffff !important;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif !important;
-            font-weight: 700 !important;
-            text-rendering: optimizeLegibility !important;
-            -webkit-font-smoothing: antialiased !important;
-            -moz-osx-font-smoothing: grayscale !important;
+        .subtitle-cue-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .subtitle-cue {
+            display: inline-block;
+            max-width: 90%;
+            white-space: pre-line;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
+            font-size: var(--cue-font-size);
+            line-height: var(--cue-line-height);
+            font-weight: 700;
+            color: #ffffff;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             text-shadow:
                 -1.5px -1.5px 0 #000000,
                  1.5px -1.5px 0 #000000,
@@ -2038,19 +2156,18 @@
                  1px 0 0 #000000,
                  0 -1px 0 #000000,
                  0  1px 0 #000000,
-                 0 2px 4px rgba(0, 0, 0, 0.95) !important;
+                 0 2px 4px rgba(0, 0, 0, 0.95);
             letter-spacing: 0.3px;
-        }
-
-        :global([part='cue'] *) {
-            background-color: transparent !important;
             background: transparent !important;
-            color: inherit;
-            text-shadow: inherit;
+
+            :global(*) {
+                background: transparent !important;
+                text-shadow: inherit;
+            }
         }
     }
 
-    .video-player-container.is-minimized .media-captions-overlay {
+    .video-player-container.is-minimized .custom-subtitles-overlay {
         display: none !important;
     }
 </style>
