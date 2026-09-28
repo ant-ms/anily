@@ -1328,8 +1328,9 @@
             align-items: center;
             justify-content: center;
 
-            &.controls-hidden {
-                cursor: none;
+            &.controls-hidden,
+            &.controls-hidden * {
+                cursor: none !important;
             }
         }
 
