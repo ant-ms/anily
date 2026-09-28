@@ -4,7 +4,13 @@ set -eu
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-APK_SRC="${1:-$ROOT_DIR/client/android/app/build/outputs/apk/debug/app-debug.apk}"
+if [ -n "${1:-}" ]; then
+  APK_SRC="$1"
+elif [ -f "$ROOT_DIR/client/android/app/build/outputs/apk/release/app-release.apk" ]; then
+  APK_SRC="$ROOT_DIR/client/android/app/build/outputs/apk/release/app-release.apk"
+else
+  APK_SRC="$ROOT_DIR/client/android/app/build/outputs/apk/debug/app-debug.apk"
+fi
 OUTPUT_DIR="${2:-$SCRIPT_DIR}"
 TEMPLATE_FILE="$SCRIPT_DIR/index.template.html"
 
@@ -73,6 +79,7 @@ echo "Copying APKs to $OUTPUT_DIR..."
 cp "$APK_SRC" "$OUTPUT_DIR/$APK_FILENAME"
 cp "$APK_SRC" "$OUTPUT_DIR/anily-${COMMIT_SHA}.apk"
 cp "$APK_SRC" "$OUTPUT_DIR/anily.apk"
+cp "$APK_SRC" "$OUTPUT_DIR/app-release.apk"
 cp "$APK_SRC" "$OUTPUT_DIR/app-debug.apk"
 
 APK_SHA256="$(sha256sum "$APK_SRC" | awk '{print $1}')"

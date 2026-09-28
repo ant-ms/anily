@@ -6,3 +6,5 @@ public/index.html
 public/obtainium.json
 public/icon.png
 public/favicon.ico
+.env
+.env.*

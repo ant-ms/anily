@@ -1,5 +1,31 @@
 apply plugin: 'com.android.application'
 
+def getEnvValue(String key) {
+    if (System.getenv(key)) {
+        return System.getenv(key)
+    }
+    def envFiles = [
+        rootProject.file("../.env"),
+        rootProject.file("../../.env"),
+        rootProject.file(".env"),
+        file(".env")
+    ]
+    for (File f : envFiles) {
+        if (f.exists()) {
+            for (String line : f.readLines()) {
+                line = line.trim()
+                if (line && !line.startsWith("#") && line.contains("=")) {
+                    def parts = line.split("=", 2)
+                    if (parts[0].trim() == key) {
+                        return parts[1].trim().replaceAll('^["\']|["\']$', '')
+                    }
+                }
+            }
+        }
+    }
+    return null
+}
+
 android {
     namespace = "ms.ant.anily"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,7 +33,7 @@ android {
         applicationId "ms.ant.anily"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        versionCode (System.getenv("CI_PIPELINE_IID") ? System.getenv("CI_PIPELINE_IID").toInteger() : 1)
         versionName "1.0"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -15,8 +41,25 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    signingConfigs {
+        release {
+            def keystoreFile = file('signing.keystore')
+            def keystorePassword = getEnvValue('KEYSTORE_PASSWORD')
+            if (keystoreFile.exists() && keystorePassword) {
+                storeFile keystoreFile
+                storePassword keystorePassword
+                keyAlias (getEnvValue('KEY_ALIAS') ?: 'anily')
+                keyPassword keystorePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

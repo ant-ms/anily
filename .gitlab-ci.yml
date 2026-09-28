@@ -39,11 +39,11 @@ android-build:
     - pnpm build
     - npx cap sync android
     - cd android
-    - bash ./gradlew assembleDebug
+    - bash ./gradlew assembleRelease
   artifacts:
     name: "anily-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
     paths:
-      - client/android/app/build/outputs/apk/debug/app-debug.apk
+      - client/android/app/build/outputs/apk/release/app-release.apk
     expire_in: 30 days
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
