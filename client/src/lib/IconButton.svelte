@@ -95,6 +95,8 @@
         color: #ddd;
         flex-shrink: 0;
         user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
         transition:
             background 0.15s ease,
             border-color 0.15s ease,

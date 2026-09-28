@@ -61,6 +61,9 @@
         gap: 4px;
         padding: 6px;
         border-radius: 6px;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
         transition:
             background 0.2s,
             border 0.2s;

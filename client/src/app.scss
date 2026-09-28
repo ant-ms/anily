@@ -6,12 +6,19 @@
     --safe-area-inset-right: env(safe-area-inset-right, 0px);
 }
 
+*,
+*::before,
+*::after {
+    -webkit-tap-highlight-color: transparent;
+}
+
 html,
 body {
     height: 100vh;
     height: 100dvh;
     width: 100vw;
     overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
 }
 
 html {

@@ -64,7 +64,12 @@ async function request<T>(
     return null as T;
   }
 
-  return res.json() as Promise<T>;
+  const text = await res.text();
+  if (!text || text.trim() === "") {
+    return null as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export const api = {

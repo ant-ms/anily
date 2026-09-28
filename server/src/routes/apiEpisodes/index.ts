@@ -57,7 +57,7 @@ export const apiEpisodesAnilistIdRefreshPostRoute = app.post(
 
     try {
       await upsertEpisodesForAnime(params.anilistId);
-      return c.body(null, 200);
+      return c.body(null, 204);
     } catch (error) {
       return c.json(
         {
@@ -95,7 +95,7 @@ export const apiEpisodesWatchPutRoute = app.put(
         body.watched,
         user.id,
       );
-      return c.body(null, 200);
+      return c.body(null, 204);
     } catch (error) {
       return c.json(
         {
@@ -128,7 +128,7 @@ export const apiEpisodesWatchAllPutRoute = app.put(
         body.watched,
         user.id,
       );
-      return c.body(null, 200);
+      return c.body(null, 204);
     } catch (error) {
       return c.json(
         {

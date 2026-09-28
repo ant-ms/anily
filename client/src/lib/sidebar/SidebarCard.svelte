@@ -85,6 +85,9 @@
         margin: 2px 12px;
         border-radius: 12px;
         cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
 
         transition: background 0.2s cubic-bezier(0.2, 0, 0, 1);
 

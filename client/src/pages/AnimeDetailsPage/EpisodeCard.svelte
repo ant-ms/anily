@@ -276,21 +276,24 @@
 </div>
 
 <style lang="scss">
-    /* ── Mobile Layout: M3 List Item (Default / < 540px) ───────────────── */
     .episode-card {
         display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 0.85rem;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
         position: relative;
-        padding: 0.5rem 0.35rem;
-        background: transparent;
-        border: none;
-        border-radius: 10px;
+        padding: 0;
+        background: #1c1917; /* M3 surface-container-low */
+        border: 1px solid #36322e; /* M3 outline-variant */
+        border-radius: 12px; /* M3 shape.corner.medium */
+        overflow: visible;
         user-select: none;
         -webkit-user-select: none;
         -webkit-tap-highlight-color: transparent;
-        transition: background 0.15s ease;
+        transition:
+            background 0.15s ease,
+            border-color 0.15s ease,
+            box-shadow 0.15s ease;
 
         &.is-future {
             opacity: 0.65;
@@ -298,38 +301,51 @@
 
         &.dropdown-open {
             z-index: 50;
+            border-color: rgba(255, 213, 44, 0.4);
         }
 
-        @media (max-width: 640px) {
-            gap: 0.65rem;
-            padding: 0.45rem 0.2rem;
+        &:active {
+            background: #24201d;
         }
 
         @media (hover: hover) and (pointer: fine) {
             &:hover {
-                background: rgba(255, 255, 255, 0.03);
-            }
-        }
+                background: #24201d; /* M3 surface-container */
+                border-color: #4e4842;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+                z-index: 2;
 
-        &:active {
-            background: rgba(255, 255, 255, 0.06);
+                .thumbnail-container.clickable .episode-thumbnail {
+                    transform: scale(1.03);
+                }
+
+                .thumbnail-container.clickable .thumb-play-overlay {
+                    opacity: 1;
+                }
+            }
         }
 
         .thumbnail-container {
             position: relative;
-            width: 114px;
+            width: 100%;
             aspect-ratio: 16 / 9;
             height: auto;
-            border-radius: 8px; /* M3 corner-small */
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
             overflow: hidden;
             flex-shrink: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
 
             &.clickable {
                 cursor: pointer;
-            }
 
-            @media (max-width: 480px) {
-                width: 104px;
+                &:active .thumb-play-overlay:not(.is-loading) {
+                    opacity: 1;
+                }
             }
 
             .placeholder {
@@ -352,37 +368,40 @@
 
             .episode-badge {
                 position: absolute;
-                bottom: 5px;
-                left: 5px;
+                top: 6px;
+                left: 6px;
+                bottom: auto;
                 z-index: 2;
                 background: rgba(0, 0, 0, 0.78);
                 backdrop-filter: blur(4px);
                 -webkit-backdrop-filter: blur(4px);
                 color: #ffffff;
-                font-size: 10px;
+                font-size: 10.5px;
                 font-weight: 700;
                 letter-spacing: 0.03em;
-                padding: 1.5px 5px;
+                padding: 2px 6px;
                 border-radius: 4px;
                 line-height: 1.2;
+                border: 1px solid rgba(255, 255, 255, 0.15);
                 pointer-events: none;
             }
 
             .thumb-play-overlay {
-                display: none;
+                display: flex;
                 position: absolute;
                 inset: 0;
-                background: rgba(0, 0, 0, 0.55);
+                opacity: 0;
+                background: rgba(0, 0, 0, 0.38);
                 align-items: center;
                 justify-content: center;
                 transition: opacity 0.2s ease;
 
                 .play-icon-circle {
-                    width: 32px;
-                    height: 32px;
+                    width: 38px;
+                    height: 38px;
                     border-radius: 50%;
-                    background: rgba(28, 25, 23, 0.95);
-                    color: #ffd52c;
+                    background: rgba(255, 213, 44, 0.92);
+                    color: #13100e;
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -390,26 +409,29 @@
                 }
 
                 &.is-loading {
-                    display: flex;
                     opacity: 1;
+                    background: rgba(0, 0, 0, 0.65);
+
+                    .play-icon-circle {
+                        background: rgba(28, 25, 23, 0.95);
+                    }
                 }
             }
         }
 
         .card-content {
             display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
+            flex-direction: column;
+            align-items: stretch;
+            padding: 10px 12px 8px 12px;
+            gap: 6px;
             flex: 1;
-            min-width: 0;
-            gap: 0.5rem;
 
             .titles {
                 display: flex;
                 flex-direction: column;
-                gap: 0.15rem;
-                flex: 1;
+                gap: 2px;
+                flex-grow: 1;
                 min-width: 0;
                 user-select: none;
                 -webkit-user-select: none;
@@ -424,7 +446,7 @@
                 }
 
                 .title-1 {
-                    font-size: 13.5px;
+                    font-size: 13px;
                     font-weight: 600;
                     line-height: 1.3;
                     color: #f5efe9; /* M3 on-surface (15:1 contrast) */
@@ -441,7 +463,7 @@
                 }
 
                 .title-2 {
-                    font-size: 12px;
+                    font-size: 11.5px;
                     color: #d4ccc5; /* M3 on-surface-variant (11.5:1 contrast) */
                     white-space: nowrap;
                     overflow: hidden;
@@ -449,7 +471,9 @@
                 }
 
                 .date {
-                    font-size: 11px;
+                    margin-top: auto;
+                    padding-top: 1px;
+                    font-size: 10.5px;
                     color: #b0a8a0; /* High-contrast tertiary metadata */
                 }
             }
@@ -459,123 +483,15 @@
                 align-items: center;
                 gap: 2px;
                 flex-shrink: 0;
+                width: 100%;
+                border-top: none; /* M3: no divider line between card content and actions */
+                padding-top: 2px;
+                margin-top: auto;
+                justify-content: flex-end;
 
                 .more-menu-container {
                     position: relative;
                     display: inline-flex;
-                }
-            }
-        }
-
-        /* ── Desktop Layout: M3 Media Card Grid (@container >= 540px) ───── */
-        @container episodes-pane (min-width: 540px) {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 0;
-            padding: 0;
-            background: #1c1917; /* M3 surface-container-low */
-            border: 1px solid #36322e; /* M3 outline-variant */
-            border-radius: 12px; /* M3 shape.corner.medium */
-            overflow: visible;
-            transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-
-            @media (hover: hover) and (pointer: fine) {
-                &:hover {
-                    background: #24201d; /* M3 surface-container */
-                    border-color: #4e4842;
-                    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-                    z-index: 2;
-
-                    .thumbnail-container.clickable .episode-thumbnail {
-                        transform: scale(1.03);
-                    }
-
-                    .thumbnail-container.clickable .thumb-play-overlay {
-                        opacity: 1;
-                    }
-                }
-            }
-
-            &.dropdown-open {
-                z-index: 50;
-                border-color: rgba(255, 213, 44, 0.4);
-            }
-
-            .thumbnail-container {
-                width: 100%;
-                aspect-ratio: 16 / 9;
-                height: auto;
-                border-top-left-radius: 12px;
-                border-top-right-radius: 12px;
-                border-bottom-left-radius: 0;
-                border-bottom-right-radius: 0;
-
-                .episode-badge {
-                    top: 6px;
-                    left: 6px;
-                    bottom: auto;
-                    font-size: 10.5px;
-                    padding: 2px 6px;
-                    border: 1px solid rgba(255, 255, 255, 0.15);
-                }
-
-                .thumb-play-overlay {
-                    display: flex;
-                    opacity: 0; /* Hidden by default on desktop, appears on hover or loading */
-                    background: rgba(0, 0, 0, 0.38);
-
-                    .play-icon-circle {
-                        width: 38px;
-                        height: 38px;
-                        background: rgba(255, 213, 44, 0.92);
-                        color: #13100e;
-                    }
-
-                    &.is-loading {
-                        opacity: 1;
-                        background: rgba(0, 0, 0, 0.65);
-
-                        .play-icon-circle {
-                            background: rgba(28, 25, 23, 0.95);
-                        }
-                    }
-                }
-            }
-
-            .card-content {
-                flex-direction: column;
-                align-items: stretch;
-                padding: 10px 12px 8px 12px;
-                gap: 6px;
-                flex: 1;
-
-                .titles {
-                    gap: 2px;
-                    flex-grow: 1;
-
-                    .title-1 {
-                        font-size: 13px;
-                        line-height: 1.3;
-                    }
-
-                    .title-2 {
-                        font-size: 11.5px;
-                    }
-
-                    .date {
-                        margin-top: auto;
-                        padding-top: 1px;
-                        font-size: 10.5px;
-                    }
-                }
-
-                .actions {
-                    width: 100%;
-                    border-top: none; /* M3: no divider line between card content and actions */
-                    padding-top: 2px;
-                    margin-top: auto;
-                    justify-content: flex-end;
-                    gap: 2px;
                 }
             }
         }

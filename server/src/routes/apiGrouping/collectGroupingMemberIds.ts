@@ -1,5 +1,5 @@
 import { prisma } from "$src/prisma";
-import { AnimeRelationType } from "generated/prisma/enums";
+import { AnimeRelationType } from "../../../generated/prisma/enums";
 
 // Relation types whose edges stay inside a single franchise. CHARACTER / OTHER /
 // ADAPTATION / SOURCE are excluded so cameos and crossovers don't merge

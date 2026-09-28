@@ -481,98 +481,53 @@
         }
 
         .episodes-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem; /* M3 whitespace separation between list items */
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+            gap: 0.75rem;
+            align-items: stretch;
 
-            @container episodes-pane (min-width: 540px) {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                gap: 0.75rem;
-                align-items: stretch;
+            @media (max-width: 640px) {
+                gap: 0.6rem;
             }
         }
 
         .episode-card-skeleton {
             display: flex;
-            gap: 0.85rem;
-            align-items: center;
-            padding: 0.5rem 0.35rem;
-            border-radius: 10px;
-
-            @media (max-width: 640px) {
-                gap: 0.65rem;
-                padding: 0.45rem 0.2rem;
-            }
+            flex-direction: column;
+            align-items: stretch;
+            background: #1c1917;
+            border: 1px solid #36322e;
+            border-radius: 12px;
+            padding: 0;
+            gap: 0;
+            overflow: hidden;
 
             .thumb-skeleton {
-                width: 114px;
-                aspect-ratio: 16 / 9;
+                width: 100%;
                 height: auto;
-                flex-shrink: 0;
-                border-radius: 8px;
-                overflow: hidden;
-
-                @media (max-width: 480px) {
-                    width: 104px;
-                }
+                aspect-ratio: 16 / 9;
+                border-radius: 0;
             }
 
             .skeleton-content {
                 display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex: 1;
-                min-width: 0;
-                gap: 0.5rem;
+                flex-direction: column;
+                align-items: stretch;
+                padding: 10px 12px 8px 12px;
+                gap: 6px;
 
                 .titles {
                     display: flex;
                     flex-direction: column;
                     gap: 0.35rem;
-                    flex: 1;
-                    min-width: 0;
                 }
 
                 .actions-skeleton {
                     display: flex;
                     gap: 4px;
-                    flex-shrink: 0;
-                }
-            }
-
-            @container episodes-pane (min-width: 540px) {
-                flex-direction: column;
-                align-items: stretch;
-                background: #1c1917;
-                border: 1px solid #36322e;
-                border-radius: 12px;
-                padding: 0;
-                gap: 0;
-                overflow: hidden;
-
-                .thumb-skeleton {
-                    width: 100%;
-                    height: auto;
-                    aspect-ratio: 16 / 9;
-                    border-radius: 0;
-                }
-
-                .skeleton-content {
-                    flex-direction: column;
-                    align-items: stretch;
-                    padding: 10px 12px 8px 12px;
-                    gap: 6px;
-
-                    .titles {
-                        gap: 0.35rem;
-                    }
-
-                    .actions-skeleton {
-                        justify-content: flex-end;
-                        padding-top: 2px;
-                        border-top: none;
-                    }
+                    justify-content: flex-end;
+                    padding-top: 2px;
+                    border-top: none;
                 }
             }
         }

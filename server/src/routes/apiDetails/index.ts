@@ -73,7 +73,7 @@ export const apiDetailsAnilistIdRefreshPostRoute = app.post(
     try {
       // Force a fresh fetch from AniList and upsert into the database.
       await getAnimeDetailsFromApiAndUpsert(params.anilistId);
-      return c.body(null, 200);
+      return c.body(null, 204);
     } catch (error) {
       return c.json(
         {
@@ -92,52 +92,63 @@ export const apiDetailsAnilistIdGroupingPostRoute = app.post(
   async (c) => {
     const params = c.req.valid("param");
 
-    const user = await getAuthenticatedUser(c);
-    await prisma.userBookmark.upsert({
-      where: {
-        userId_anilistId: {
-          userId: user.id,
-          anilistId: params.anilistId,
-        },
-      },
-      create: {
-        userId: user.id,
-        anilistId: params.anilistId,
-      },
-      update: {},
-    });
-
-    const numberOfAnimeGroupings = await getNumberOfAnimeGroupings(
-      params.anilistId,
-    );
-
-    // If the anime is already grouped, update the display anime to this one
-    if (numberOfAnimeGroupings.length > 0) {
-      await prisma.animeGrouping.updateMany({
-        where: { items: { some: { anilistId: params.anilistId } } },
-        data: { displayAnimeId: params.anilistId }
-      });
-      return c.body(null, 200);
-    }
-
-    // Make sure all members have details
-    const groupingMemberIds = await collectGroupingMemberIds(params.anilistId);
-    await fillAnimeGroupingDetails(groupingMemberIds);
-
-    await prisma.animeGrouping.create({
-      data: {
-        items: {
-          connect: groupingMemberIds.map((id) => ({ anilistId: id })),
-        },
-        displayAnime: {
-          connect: {
+    try {
+      const user = await getAuthenticatedUser(c);
+      await prisma.userBookmark.upsert({
+        where: {
+          userId_anilistId: {
+            userId: user.id,
             anilistId: params.anilistId,
           },
         },
-      },
-    });
+        create: {
+          userId: user.id,
+          anilistId: params.anilistId,
+        },
+        update: {},
+      });
 
-    return c.body(null, 200);
+      const numberOfAnimeGroupings = await getNumberOfAnimeGroupings(
+        params.anilistId,
+      );
+
+      // If the anime is already grouped, update the display anime to this one
+      if (numberOfAnimeGroupings.length > 0) {
+        await prisma.animeGrouping.updateMany({
+          where: { items: { some: { anilistId: params.anilistId } } },
+          data: { displayAnimeId: params.anilistId },
+        });
+        return c.body(null, 204);
+      }
+
+      // Make sure all members have details
+      const groupingMemberIds = await collectGroupingMemberIds(params.anilistId);
+      await fillAnimeGroupingDetails(groupingMemberIds);
+
+      await prisma.animeGrouping.create({
+        data: {
+          items: {
+            connect: groupingMemberIds.map((id) => ({ anilistId: id })),
+          },
+          displayAnime: {
+            connect: {
+              anilistId: params.anilistId,
+            },
+          },
+        },
+      });
+
+      return c.body(null, 204);
+    } catch (error) {
+      log.error({ anilistId: params.anilistId, error }, "Failed to bookmark anime");
+      return c.json(
+        {
+          error: "Failed to bookmark anime",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
+    }
   },
 );
 
@@ -147,14 +158,25 @@ export const apiDetailsAnilistIdGroupingDeleteRoute = app.delete(
   async (c) => {
     const params = c.req.valid("param");
 
-    const user = await getAuthenticatedUser(c);
-    await prisma.userBookmark.deleteMany({
-      where: {
-        userId: user.id,
-        anilistId: params.anilistId,
-      },
-    });
+    try {
+      const user = await getAuthenticatedUser(c);
+      await prisma.userBookmark.deleteMany({
+        where: {
+          userId: user.id,
+          anilistId: params.anilistId,
+        },
+      });
 
-    return c.body(null, 200);
+      return c.body(null, 204);
+    } catch (error) {
+      log.error({ anilistId: params.anilistId, error }, "Failed to remove bookmark");
+      return c.json(
+        {
+          error: "Failed to remove bookmark",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
+    }
   },
 );
