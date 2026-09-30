@@ -11,12 +11,18 @@
         getStoredFoldableCreaseSplit,
         setStoredFoldableCreaseSplit,
     } from "../lib/context.svelte";
+    import {
+        getStoredSkipIntroButtonEnabled,
+        setStoredSkipIntroButtonEnabled,
+    } from "../lib/player/skipSettings";
+    import { videoPlayerState } from "../lib/player/videoPlayer.svelte";
     import Select from "../lib/Select.svelte";
     import Switch from "../lib/Switch.svelte";
 
     let player: MediaPlayer = $state(getStoredPlayer());
     let languagePreference: StreamLanguagePreference = $state(getStoredLanguagePreference());
     let foldableCreaseSplit: boolean = $state(getStoredFoldableCreaseSplit());
+    let skipIntroButtonEnabled: boolean = $state(getStoredSkipIntroButtonEnabled());
 
     function onPlayerChange() {
         setStoredPlayer(player);
@@ -28,6 +34,11 @@
 
     function onFoldableCreaseSplitChange(enabled: boolean) {
         setStoredFoldableCreaseSplit(enabled);
+    }
+
+    function onSkipIntroButtonChange(enabled: boolean) {
+        setStoredSkipIntroButtonEnabled(enabled);
+        videoPlayerState.skipIntroButtonEnabled = enabled;
     }
 
     const playerOptions = [
@@ -80,6 +91,21 @@
             />
         </div>
     </section>
+
+    <section>
+        <div class="setting-row">
+            <div class="setting-info">
+                <h3>Skip Intro Button</h3>
+                <p>Display an on-screen button to quickly skip opening, ending, and recap sequences when AniSkip timestamps are available.</p>
+            </div>
+            <Switch
+                bind:checked={skipIntroButtonEnabled}
+                onchange={onSkipIntroButtonChange}
+                ariaLabel="Show Skip Intro Button"
+            />
+        </div>
+    </section>
+
 </div>
 
 <style lang="scss">

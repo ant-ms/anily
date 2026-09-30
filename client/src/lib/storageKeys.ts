@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   ACTIVE_DOWNLOADS: 'anily:active_downloads',
   DOWNLOADED_ANIME_IDS: 'anily:downloaded_anime_ids',
   FOLDABLE_CREASE_SPLIT: 'anily:foldable_crease_split',
+  SKIP_INTRO_BUTTON_ENABLED: 'anily:skip_intro_button_enabled',
   // cache keys are dynamic — use buildCacheKey helpers below
 } as const;
 

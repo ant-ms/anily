@@ -233,6 +233,7 @@
                         anilistId,
                         [epData],
                         localUrl,
+                        downloadManager.states[episodeId]?.skipTimes,
                     );
                     return;
                 }

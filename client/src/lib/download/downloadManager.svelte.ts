@@ -7,6 +7,7 @@ import {
   buildDetailsCacheKey,
   buildGroupingCacheKey,
 } from "../storageKeys";
+import type { EpisodeSkipTimes } from "../../types/SkipTimes";
 
 export interface DownloadState {
   episodeId: number;
@@ -20,6 +21,7 @@ export interface DownloadState {
   progress: number; // 0 to 100
   totalBytes: number;
   bytesDownloaded: number;
+  skipTimes?: EpisodeSkipTimes;
 }
 
 class DownloadManager {
@@ -286,6 +288,21 @@ class DownloadManager {
       };
       this.persist();
 
+      // Pre-fetch skip times in the background for offline skipping
+      if (apiBaseUrl.current) {
+        fetch(new URL(`/api/stream/skip-times/${episodeId}`, apiBaseUrl.current).toString(), {
+          credentials: "include",
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data?.found && this.states[episodeId]) {
+              this.states[episodeId].skipTimes = data;
+              this.persist();
+            }
+          })
+          .catch(() => {});
+      }
+
       const headers: Record<string, string> = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -538,6 +555,19 @@ class DownloadManager {
               state.totalBytes = status.totalBytes;
               if (state.anilistId) {
                 this.addDownloadedAnimeId(state.anilistId);
+              }
+              if (!state.skipTimes && apiBaseUrl.current) {
+                fetch(new URL(`/api/stream/skip-times/${state.episodeId}`, apiBaseUrl.current).toString(), {
+                  credentials: "include",
+                })
+                  .then((r) => (r.ok ? r.json() : null))
+                  .then((data) => {
+                    if (data?.found && this.states[epId]) {
+                      this.states[epId].skipTimes = data;
+                      this.persist();
+                    }
+                  })
+                  .catch(() => {});
               }
               snackbar.success(`Episode download completed!`);
             } else {

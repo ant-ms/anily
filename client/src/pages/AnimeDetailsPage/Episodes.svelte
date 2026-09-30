@@ -253,6 +253,7 @@
                             selectedAnimeAnilistId.current,
                             episodesState.episodes,
                             localUrl,
+                            downloadManager.states[episode.id]?.skipTimes,
                         );
                         return;
                     }

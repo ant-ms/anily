@@ -8,6 +8,7 @@ import { getPublicOrigin } from "./helpers";
 import { getAvailableStreamServices } from "./getServices";
 import { resolvePlayStream } from "./getPlayStream";
 import { handleStreamDownload } from "./downloadStream";
+import { getEpisodeSkipTimes } from "./skipTimes";
 
 const log = logger.child({ module: "apiStream" });
 
@@ -128,6 +129,39 @@ export const apiStreamDownloadGetRoute = app.get(
       return c.json(
         {
           error: "Failed to process download stream",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
+    }
+  },
+);
+
+// GET /api/stream/skip-times/:episodeId
+export const apiStreamSkipTimesGetRoute = app.get(
+  "/api/stream/skip-times/:episodeId",
+  episodeIdParamValidator,
+  zValidator(
+    "query",
+    z.object({
+      duration: z.coerce.number().optional(),
+    }),
+  ),
+  async (c) => {
+    const { episodeId } = c.req.valid("param");
+    const { duration } = c.req.valid("query");
+
+    try {
+      const result = await getEpisodeSkipTimes(episodeId, duration);
+      if (result.notFound) {
+        return c.json({ error: "Episode not found" }, 404);
+      }
+      return c.json(result);
+    } catch (error) {
+      log.error({ error, episodeId }, "Failed to fetch skip times");
+      return c.json(
+        {
+          error: "Failed to fetch skip times",
           reason: error instanceof Error ? error.message : String(error),
         },
         500,

@@ -799,6 +799,13 @@
                 e.preventDefault();
                 videoPlayerState.playPreviousEpisode();
                 break;
+            case "s":
+            case "S":
+                if (videoPlayerState.activeSkipSegment) {
+                    e.preventDefault();
+                    videoPlayerState.skipCurrentSegment();
+                }
+                break;
             case "i":
             case "I":
                 e.preventDefault();
@@ -1000,6 +1007,28 @@
                 </div>
             {/if}
 
+            <!-- Skip Intro / Outro / Recap Pill -->
+            {#if videoPlayerState.activeSkipSegment}
+                <div
+                    class="skip-segment-container"
+                    class:controls-visible={areControlsVisible || !videoPlayerState.isPlaying}
+                    class:has-next-prompt={isNearEnd && areControlsVisible}
+                    transition:fade={{ duration: 150 }}
+                >
+                    <button
+                        type="button"
+                        class="skip-segment-btn"
+                        onclick={() => videoPlayerState.skipCurrentSegment()}
+                        title="{videoPlayerState.activeSkipSegment.label} (S)"
+                        aria-label="{videoPlayerState.activeSkipSegment.label}"
+                    >
+                        <FastForwardIcon size={18} weight="bold" />
+                        <span>{videoPlayerState.activeSkipSegment.label}</span>
+                        <span class="hotkey-badge hide-mobile">S</span>
+                    </button>
+                </div>
+            {/if}
+
             <!-- ── Top Header Bar ────────────────────────────────────────── -->
             <div
                 class="player-topbar"
@@ -1081,6 +1110,22 @@
                     }}
                 >
                     <div class="scrub-track-bg"></div>
+                    {#if videoPlayerState.duration > 0}
+                        {#if videoPlayerState.skipTimes?.op}
+                            <div
+                                class="scrub-marker-segment op-marker"
+                                style="left: {(videoPlayerState.skipTimes.op.startTime / videoPlayerState.duration) * 100}%; width: {((videoPlayerState.skipTimes.op.endTime - videoPlayerState.skipTimes.op.startTime) / videoPlayerState.duration) * 100}%;"
+                                title="Opening ({formatTime(videoPlayerState.skipTimes.op.startTime)} - {formatTime(videoPlayerState.skipTimes.op.endTime)})"
+                            ></div>
+                        {/if}
+                        {#if videoPlayerState.skipTimes?.ed}
+                            <div
+                                class="scrub-marker-segment ed-marker"
+                                style="left: {(videoPlayerState.skipTimes.ed.startTime / videoPlayerState.duration) * 100}%; width: {((videoPlayerState.skipTimes.ed.endTime - videoPlayerState.skipTimes.ed.startTime) / videoPlayerState.duration) * 100}%;"
+                                title="Ending ({formatTime(videoPlayerState.skipTimes.ed.startTime)} - {formatTime(videoPlayerState.skipTimes.ed.endTime)})"
+                            ></div>
+                        {/if}
+                    {/if}
                     <div class="scrub-track-buffer" style="width: {bufferedPercent}%"></div>
                     <div
                         class="scrub-track-fill"
@@ -1719,6 +1764,25 @@
                 transition: height 0.15s ease;
             }
 
+            .scrub-marker-segment {
+                position: absolute;
+                height: 3px;
+                pointer-events: none;
+                z-index: 2;
+                border-radius: 2px;
+                transition: height 0.15s ease;
+
+                &.op-marker {
+                    background: rgba(255, 213, 44, 0.65);
+                    box-shadow: 0 0 4px rgba(255, 213, 44, 0.4);
+                }
+
+                &.ed-marker {
+                    background: rgba(140, 185, 255, 0.65);
+                    box-shadow: 0 0 4px rgba(140, 185, 255, 0.4);
+                }
+            }
+
             .scrub-thumb {
                 position: absolute;
                 width: 14px;
@@ -1735,7 +1799,8 @@
             &.is-scrubbing {
                 .scrub-track-bg,
                 .scrub-track-buffer,
-                .scrub-track-fill {
+                .scrub-track-fill,
+                .scrub-marker-segment {
                     height: 6px;
                 }
                 .scrub-thumb {
@@ -2009,6 +2074,85 @@
 
             &:hover {
                 transform: scale(1.04);
+            }
+        }
+    }
+
+    /* Skip Intro / Outro Pill */
+    .skip-segment-container {
+        position: absolute;
+        bottom: 28px;
+        right: 24px;
+        z-index: 25;
+        transition: bottom 0.25s cubic-bezier(0.2, 0, 0, 1);
+
+        &.controls-visible {
+            bottom: 84px;
+        }
+
+        &.has-next-prompt {
+            bottom: 140px;
+        }
+
+        @media (max-width: 768px) {
+            right: 16px;
+            bottom: 20px;
+
+            &.controls-visible {
+                bottom: 80px;
+            }
+
+            &.has-next-prompt {
+                bottom: 134px;
+            }
+        }
+
+        .skip-segment-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 24px;
+            background: rgba(30, 26, 20, 0.88);
+            border: 1px solid rgba(255, 213, 44, 0.45);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            user-select: none;
+
+            :global(svg) {
+                color: #ffd52c;
+            }
+
+            .hotkey-badge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 1px 6px;
+                border-radius: 6px;
+                background: rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                color: rgba(255, 255, 255, 0.85);
+                font-size: 11px;
+                font-weight: 700;
+                line-height: 1.2;
+                margin-left: 2px;
+            }
+
+            &:hover {
+                transform: scale(1.04);
+                background: rgba(45, 38, 28, 0.95);
+                border-color: #ffd52c;
+                box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75), 0 0 12px rgba(255, 213, 44, 0.25);
+            }
+
+            &:active {
+                transform: scale(0.98);
             }
         }
     }

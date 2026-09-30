@@ -3,6 +3,8 @@ import { syncQueue } from "../sync/syncQueue.svelte";
 import { sidebarDataRefreshSeed, apiBaseUrl } from "../context.svelte";
 import { getStoredLanguagePreference } from "../../types/Media";
 import type EpisodeData from "../../types/Episode";
+import type { EpisodeSkipTimes, ActiveSkipSegment } from "../../types/SkipTimes";
+import { getStoredSkipIntroButtonEnabled } from "./skipSettings";
 
 export type SubtitleSize = "small" | "medium" | "large";
 
@@ -19,6 +21,7 @@ export interface StreamPayload {
   streamUrl: string;
   container?: "hls" | "mp4";
   subtitles?: SubtitleTrackInfo[];
+  skipTimes?: EpisodeSkipTimes;
   isLocal?: boolean;
 }
 
@@ -52,9 +55,98 @@ class VideoPlayerState {
   // Auto-watch threshold flag
   private markedAsWatchedThisSession = false;
 
+  // Skip times & intro detection
+  skipTimes = $state<EpisodeSkipTimes | null>(null);
+  skipIntroButtonEnabled = $state<boolean>(getStoredSkipIntroButtonEnabled());
+  private skipTimesLoadingForEpisodeId: number | null = null;
+
   // Registered elements
   private videoEl: HTMLVideoElement | null = null;
   private containerEl: HTMLElement | null = null;
+
+  public get activeSkipSegment(): ActiveSkipSegment | null {
+    if (!this.skipIntroButtonEnabled || !this.skipTimes?.found) return null;
+    const t = this.currentTime;
+
+    // 1. Opening sequence (OP)
+    if (this.skipTimes.op && t >= this.skipTimes.op.startTime && t < this.skipTimes.op.endTime) {
+      return {
+        type: "op",
+        label: "Skip Intro",
+        startTime: this.skipTimes.op.startTime,
+        endTime: this.skipTimes.op.endTime,
+      };
+    }
+
+    // 2. Recap sequence
+    if (this.skipTimes.recap && t >= this.skipTimes.recap.startTime && t < this.skipTimes.recap.endTime) {
+      return {
+        type: "recap",
+        label: "Skip Recap",
+        startTime: this.skipTimes.recap.startTime,
+        endTime: this.skipTimes.recap.endTime,
+      };
+    }
+
+    // 3. Mixed opening
+    if (this.skipTimes.mixedOp && t >= this.skipTimes.mixedOp.startTime && t < this.skipTimes.mixedOp.endTime) {
+      return {
+        type: "mixed-op",
+        label: "Skip Intro",
+        startTime: this.skipTimes.mixedOp.startTime,
+        endTime: this.skipTimes.mixedOp.endTime,
+      };
+    }
+
+    // 4. Ending sequence (ED)
+    if (this.skipTimes.ed && t >= this.skipTimes.ed.startTime && t < this.skipTimes.ed.endTime) {
+      return {
+        type: "ed",
+        label: "Skip Outro",
+        startTime: this.skipTimes.ed.startTime,
+        endTime: this.skipTimes.ed.endTime,
+      };
+    }
+
+    // 5. Mixed ending
+    if (this.skipTimes.mixedEd && t >= this.skipTimes.mixedEd.startTime && t < this.skipTimes.mixedEd.endTime) {
+      return {
+        type: "mixed-ed",
+        label: "Skip Outro",
+        startTime: this.skipTimes.mixedEd.startTime,
+        endTime: this.skipTimes.mixedEd.endTime,
+      };
+    }
+
+    return null;
+  }
+
+  public skipCurrentSegment() {
+    const segment = this.activeSkipSegment;
+    if (!segment) return;
+    this.seek(segment.endTime);
+  }
+
+  public async loadSkipTimes(episodeId: number, duration: number) {
+    if (!apiBaseUrl.current || duration <= 0) return;
+    if (this.skipTimesLoadingForEpisodeId === episodeId) return;
+    this.skipTimesLoadingForEpisodeId = episodeId;
+
+    try {
+      const durParam = Math.round(duration);
+      const res = await fetch(
+        new URL(`/api/stream/skip-times/${episodeId}?duration=${durParam}`, apiBaseUrl.current).toString(),
+        { credentials: "include" },
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as EpisodeSkipTimes;
+      if (data && this.activeEpisode?.id === episodeId) {
+        this.skipTimes = data;
+      }
+    } catch (err) {
+      console.warn("Failed to load episode skip times:", err);
+    }
+  }
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -134,6 +226,8 @@ class VideoPlayerState {
     this.animeId = animeId ?? null;
     this.playlist = playlist;
     this.streamSource = streamData;
+    this.skipTimes = streamData.skipTimes ?? null;
+    this.skipTimesLoadingForEpisodeId = streamData.skipTimes ? episode.id : null;
     this.markedAsWatchedThisSession = Boolean(episode.watched);
     this.currentTime = 0;
     this.duration = 0;
@@ -175,12 +269,14 @@ class VideoPlayerState {
     animeId: number | undefined,
     playlist: EpisodeData[],
     localUrl: string,
+    skipTimes?: EpisodeSkipTimes,
   ) {
     await this.playOnlineEpisode(episode, animeName, animeId, playlist, {
       streamUrl: localUrl,
       container: "mp4",
       isLocal: true,
       subtitles: [],
+      skipTimes,
     });
   }
 
@@ -201,6 +297,8 @@ class VideoPlayerState {
     this.isPlaying = false;
     this.activeEpisode = null;
     this.streamSource = null;
+    this.skipTimes = null;
+    this.skipTimesLoadingForEpisodeId = null;
 
     if (isNative) {
       try {
@@ -420,6 +518,16 @@ class VideoPlayerState {
   public onTimeUpdate(currentTime: number, duration: number) {
     this.currentTime = currentTime;
     this.duration = duration;
+
+    // Trigger skip times fetch once duration is known
+    if (
+      !this.skipTimes &&
+      this.activeEpisode &&
+      duration > 0 &&
+      this.skipTimesLoadingForEpisodeId !== this.activeEpisode.id
+    ) {
+      this.loadSkipTimes(this.activeEpisode.id, duration);
+    }
 
     // Auto mark watched when passing 85% progress
     if (
