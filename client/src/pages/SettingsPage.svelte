@@ -81,13 +81,13 @@
     <section>
         <div class="setting-row">
             <div class="setting-info">
-                <h3>Foldable Crease Split</h3>
-                <p>On medium devices (such as foldables), expand the navigation rail and sidebar combined to exactly 50% of the screen width so the split aligns with the fold crease.</p>
+                <h3>Foldable Mode</h3>
+                <p>Optimizes layout for foldables: aligns with the crease when unfolded (50% split), and moves navigation and media details buttons (back, rating, sidebar trigger) to the right edge when folded to maximize vertical screen space and thumb reachability.</p>
             </div>
             <Switch
                 bind:checked={foldableCreaseSplit}
                 onchange={onFoldableCreaseSplitChange}
-                ariaLabel="Foldable Crease Split"
+                ariaLabel="Foldable Mode"
             />
         </div>
     </section>

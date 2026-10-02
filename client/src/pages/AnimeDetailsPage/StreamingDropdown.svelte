@@ -21,11 +21,26 @@
         selectedService?.providerId === service.providerId &&
         selectedService?.serverId === service.serverId &&
         selectedService?.language === service.language;
+
+    let dropdownEl = $state<HTMLDivElement | null>(null);
+
+    $effect(() => {
+        if (!dropdownEl) return;
+        const rect = dropdownEl.getBoundingClientRect();
+        if (rect.left < 8) {
+            dropdownEl.style.left = '0';
+            dropdownEl.style.right = 'auto';
+        }
+    });
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="services-dropdown" onclick={(e) => e.stopPropagation()}>
+<div
+    bind:this={dropdownEl}
+    class="services-dropdown"
+    onclick={(e) => e.stopPropagation()}
+>
     <div class="dropdown-header">
         <span>Stream Provider</span>
     </div>
@@ -70,6 +85,7 @@
         top: calc(100% + 6px);
         z-index: 100;
         min-width: 210px;
+        max-width: min(280px, calc(100vw - 16px));
         background: hsl(20, 17.6%, 11%);
         border: 1px solid hsl(36, 5.7%, 22%);
         border-radius: 7px;

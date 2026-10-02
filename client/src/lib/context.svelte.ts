@@ -11,6 +11,9 @@ class Context<T> {
   public get current(): T | undefined {
     return this._value;
   }
+  public set current(value: T | undefined) {
+    this._value = value;
+  }
 }
 
 export interface AnimeSetOptions {
@@ -75,6 +78,7 @@ export const sidebarDataRefreshSeed = new Context<number>();
 export const isSeasonsSidebarOpen = new Context<boolean>();
 export const isMobileNavOpen = new Context<boolean>(false);
 export const isGlobalSearchOpen = new Context<boolean>(false);
+export const isAnimeDescriptionOpen = new Context<boolean>(false);
 
 import { STORAGE_KEYS } from "./storageKeys";
 

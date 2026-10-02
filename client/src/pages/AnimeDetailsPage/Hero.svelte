@@ -12,6 +12,9 @@
         animeDetails: AnimeDetailsData;
     } = $props();
 
+    import { untrack } from "svelte";
+    import { isAnimeDescriptionOpen } from "../../lib/context.svelte";
+
     let isInfoOpen = $state(false);
     let isMobile = $state(
         typeof window !== "undefined" ? window.innerWidth <= 768 : false,
@@ -29,9 +32,30 @@
     });
 
     $effect(() => {
+        const val = isAnimeDescriptionOpen.current;
+        untrack(() => {
+            if (val !== undefined && val !== isInfoOpen) {
+                isInfoOpen = val;
+            }
+        });
+    });
+
+    $effect(() => {
+        const val = isInfoOpen;
+        untrack(() => {
+            if (val !== isAnimeDescriptionOpen.current) {
+                isAnimeDescriptionOpen.set(val);
+            }
+        });
+    });
+
+    $effect(() => {
         // Reset info popup/sheet when anime changes
         animeDetails.anilistId;
-        isInfoOpen = false;
+        untrack(() => {
+            isInfoOpen = false;
+            isAnimeDescriptionOpen.set(false);
+        });
     });
 
     let rawTitles = $derived([
@@ -225,6 +249,12 @@
                 .info-trigger-wrapper {
                     position: relative;
                     flex-shrink: 0;
+
+                    :global(main.foldable-crease-split) & {
+                        @media (max-width: 768px) {
+                            display: none !important;
+                        }
+                    }
                 }
             }
         }

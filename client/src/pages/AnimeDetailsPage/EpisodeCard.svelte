@@ -294,6 +294,8 @@
             background 0.15s ease,
             border-color 0.15s ease,
             box-shadow 0.15s ease;
+        container-type: inline-size;
+        container-name: episode-card;
 
         &.is-future {
             opacity: 0.65;
@@ -384,6 +386,22 @@
                 line-height: 1.2;
                 border: 1px solid rgba(255, 255, 255, 0.15);
                 pointer-events: none;
+
+                @media (max-width: 768px) {
+                    top: 4px;
+                    left: 4px;
+                    font-size: 9.5px;
+                    padding: 1.5px 5px;
+                    border-radius: 3px;
+                }
+
+                @container episode-card (max-width: 190px) {
+                    top: 4px;
+                    left: 4px;
+                    font-size: 9.5px;
+                    padding: 1.5px 5px;
+                    border-radius: 3px;
+                }
             }
 
             .thumb-play-overlay {
@@ -406,6 +424,26 @@
                     align-items: center;
                     justify-content: center;
                     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+
+                    @media (max-width: 768px) {
+                        width: 30px;
+                        height: 30px;
+
+                        :global(svg) {
+                            width: 14px;
+                            height: 14px;
+                        }
+                    }
+
+                    @container episode-card (max-width: 190px) {
+                        width: 30px;
+                        height: 30px;
+
+                        :global(svg) {
+                            width: 14px;
+                            height: 14px;
+                        }
+                    }
                 }
 
                 &.is-loading {
@@ -427,6 +465,16 @@
             gap: 6px;
             flex: 1;
 
+            @media (max-width: 768px) {
+                padding: 7px 8px 6px 8px;
+                gap: 4px;
+            }
+
+            @container episode-card (max-width: 190px) {
+                padding: 7px 8px 6px 8px;
+                gap: 4px;
+            }
+
             .titles {
                 display: flex;
                 flex-direction: column;
@@ -436,6 +484,14 @@
                 user-select: none;
                 -webkit-user-select: none;
                 -webkit-tap-highlight-color: transparent;
+
+                @media (max-width: 768px) {
+                    gap: 1px;
+                }
+
+                @container episode-card (max-width: 190px) {
+                    gap: 1px;
+                }
 
                 &.clickable {
                     cursor: pointer;
@@ -456,6 +512,16 @@
                     -webkit-box-orient: vertical;
                     overflow: hidden;
                     transition: color 0.15s ease;
+
+                    @media (max-width: 768px) {
+                        font-size: 11.5px;
+                        line-height: 1.25;
+                    }
+
+                    @container episode-card (max-width: 190px) {
+                        font-size: 11.5px;
+                        line-height: 1.25;
+                    }
                 }
 
                 &:hover .title-1 {
@@ -468,6 +534,14 @@
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+
+                    @media (max-width: 768px) {
+                        font-size: 10px;
+                    }
+
+                    @container episode-card (max-width: 190px) {
+                        font-size: 10px;
+                    }
                 }
 
                 .date {
@@ -475,6 +549,14 @@
                     padding-top: 1px;
                     font-size: 10.5px;
                     color: #b0a8a0; /* High-contrast tertiary metadata */
+
+                    @media (max-width: 768px) {
+                        font-size: 9.5px;
+                    }
+
+                    @container episode-card (max-width: 190px) {
+                        font-size: 9.5px;
+                    }
                 }
             }
 
@@ -492,6 +574,70 @@
                 .more-menu-container {
                     position: relative;
                     display: inline-flex;
+                }
+
+                @media (max-width: 768px) {
+                    padding-top: 1px;
+
+                    :global(.icon-button) {
+                        width: 30px !important;
+                        height: 30px !important;
+                        min-width: 30px !important;
+                        min-height: 30px !important;
+                    }
+
+                    :global(.icon-button svg) {
+                        width: 15px !important;
+                        height: 15px !important;
+                        font-size: 15px !important;
+                    }
+
+                    :global(button.button) {
+                        min-width: unset;
+                        height: 30px;
+                        padding: 0 4px;
+                    }
+
+                    :global(.download-progress-text) {
+                        font-size: 9.5px;
+                    }
+
+                    :global(.icon-spinner) {
+                        width: 13px;
+                        height: 13px;
+                    }
+                }
+
+                @container episode-card (max-width: 190px) {
+                    padding-top: 1px;
+
+                    :global(.icon-button) {
+                        width: 30px !important;
+                        height: 30px !important;
+                        min-width: 30px !important;
+                        min-height: 30px !important;
+                    }
+
+                    :global(.icon-button svg) {
+                        width: 15px !important;
+                        height: 15px !important;
+                        font-size: 15px !important;
+                    }
+
+                    :global(button.button) {
+                        min-width: unset;
+                        height: 30px;
+                        padding: 0 4px;
+                    }
+
+                    :global(.download-progress-text) {
+                        font-size: 9.5px;
+                    }
+
+                    :global(.icon-spinner) {
+                        width: 13px;
+                        height: 13px;
+                    }
                 }
             }
         }

@@ -2,6 +2,7 @@
     import { onMount, untrack } from "svelte";
     import NavigationRail from "$lib/navigation/NavigationRail.svelte";
     import NavigationBar from "$lib/navigation/NavigationBar.svelte";
+    import FoldableSideRail from "$lib/navigation/FoldableSideRail.svelte";
     import UserMenuModal from "$lib/navigation/UserMenuModal.svelte";
     import Sidebar from "$lib/sidebar/Sidebar.svelte";
     import IconButton from "$lib/IconButton.svelte";
@@ -354,7 +355,10 @@
 </script>
 
 {#if profileData}
-    <main class:foldable-crease-split={isFoldableCreaseSplit.current}>
+    <main
+        class:foldable-crease-split={isFoldableCreaseSplit.current}
+        class:in-details={selectedAnimeAnilistId.current !== undefined}
+    >
         <!-- Single Unified Mobile Top App Bar for Phones (<= 768px) -->
         <header class="mobile-topbar" class:no-border={activeTab?.id === "logs"}>
             <div class="topbar-left">
@@ -454,14 +458,6 @@
                         <h2 class="topbar-title">Anime Details</h2>
                     </div>
                     <div class="topbar-actions">
-                        <IconButton
-                            Icon={MagnifyingGlassIcon}
-                            variant="ghost"
-                            shape="circle"
-                            onclick={() => isGlobalSearchOpen.set(true)}
-                            title="Search anime"
-                            ariaLabel="Search anime"
-                        />
                         {#if !networkState.isOnline}
                             <div class="mobile-offline-badge" title="Offline Mode: only downloaded anime are available">
                                 <CloudSlashIcon size={14} weight="bold" />
@@ -516,6 +512,13 @@
         <div class="bar-container">
             <NavigationBar bind:activeTab />
         </div>
+
+        <!-- Foldable Right Side Rail for Foldables when Folded (<= 768px) -->
+        <FoldableSideRail
+            bind:activeTab
+            {onBackClick}
+            {profileData}
+        />
 
         <!-- Mobile User Menu Modal -->
         <UserMenuModal
@@ -687,6 +690,32 @@
             height: 100vh;
             height: 100dvh;
             position: relative;
+
+            /* Foldable Mode when folded (mobile view <= 768px) */
+            &.foldable-crease-split {
+                :global(.foldable-side-rail) {
+                    display: flex;
+                }
+
+                .bar-container {
+                    display: none !important;
+                }
+
+                .mobile-topbar {
+                    display: none !important;
+                }
+
+                .sidebar-container {
+                    width: calc(100vw - 80px - var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+                    padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+                }
+
+                #content {
+                    width: calc(100vw - 80px - var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+                    padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+                    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+                }
+            }
         }
 
         .rail-container {

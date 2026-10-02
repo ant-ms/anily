@@ -52,10 +52,14 @@
         return new Date(airingAt).getTime() > Date.now();
     };
 
-    const releasedEpisodes = $derived(episodesState.episodes.filter((e) => !isFuture(e.airingAt)));
-    const allReleasedWatched = $derived(
-        releasedEpisodes.length > 0 && releasedEpisodes.every((e) => e.watched),
-    );
+    import { watchAllManager } from '../../lib/watchAll.svelte';
+
+    $effect(() => {
+        watchAllManager.setEpisodes(episodesState.episodes);
+    });
+
+    const releasedEpisodes = $derived(watchAllManager.releasedEpisodes);
+    const allReleasedWatched = $derived(watchAllManager.allReleasedWatched);
 
     // ── Player preference ────────────────────────────────────────────────────────
 
@@ -82,58 +86,19 @@
     };
 
     const toggleAllWatch = async (): Promise<void> => {
-        const anilistId = selectedAnimeAnilistId.current;
-        if (anilistId === undefined) return;
-
-        const newStatus = !allReleasedWatched;
-        for (const episode of episodesState.episodes) {
-            if (!isFuture(episode.airingAt)) {
-                episode.watched = newStatus;
-            }
-        }
-
-        try {
-            await api.setAllEpisodesWatch(anilistId, newStatus);
-            sidebarDataRefreshSeed.set((sidebarDataRefreshSeed.current ?? 0) + 1);
-        } catch {
-            for (const episode of episodesState.episodes) {
-                if (!isFuture(episode.airingAt)) {
-                    await syncQueue.recordWatchStatus(episode.id, newStatus);
-                }
-            }
-        }
+        await watchAllManager.toggleAll();
     };
+
+    import { ratingManager } from '../../lib/rating.svelte';
 
     // ── Rating ───────────────────────────────────────────────────────────────────
 
-    let currentRating: Rating = $state('NEUTRAL');
-    let isUpdatingRating = $state(false);
-
-    $effect(() => {
-        if (animeDetails?.rating) {
-            currentRating = animeDetails.rating;
-        }
-    });
+    let currentRating: Rating = $derived(animeDetails?.rating ?? ratingManager.currentRating);
+    let isUpdatingRating = $derived(ratingManager.isUpdating);
 
     const setRating = async (nextRating: Rating): Promise<void> => {
-        if (isUpdatingRating || currentRating === nextRating) return;
-        const anilistId = selectedAnimeAnilistId.current;
-        if (anilistId === undefined) return;
-
-        const previousRating = currentRating;
-        currentRating = nextRating;
-        isUpdatingRating = true;
-
-        try {
-            await api.setRating(anilistId, nextRating);
-            if (animeDetails) animeDetails.rating = nextRating;
-        } catch (err) {
-            console.error('Failed to update rating:', err);
-            currentRating = previousRating;
-            snackbar.error('Failed to update rating');
-        } finally {
-            isUpdatingRating = false;
-        }
+        await ratingManager.setRating(nextRating);
+        if (animeDetails) animeDetails.rating = nextRating;
     };
 
     // ── Streaming & provider resolution ──────────────────────────────────────────
@@ -392,19 +357,20 @@
                         </span>
                     </Button>
                 {/if}
-                <div class="spacer"></div>
-                <SegmentedControl
-                    variant="connected"
-                    disabled={isUpdatingRating}
-                    ariaLabel="Season rating"
-                    value={currentRating}
-                    onchange={(val) => setRating(val)}
-                    items={[
-                        { value: 'DISLIKE', title: 'Thumbs down', Icon: ThumbsDownIcon, activeIconWeight: 'fill', activeColor: 'dislike' },
-                        { value: 'NEUTRAL', title: 'No rating yet', Icon: MinusIcon, iconWeight: 'bold', activeIconWeight: 'bold', activeColor: 'neutral' },
-                        { value: 'LIKE', title: 'Thumbs up', Icon: ThumbsUpIcon, activeIconWeight: 'fill', activeColor: 'like' },
-                    ]}
-                />
+                <div class="rating-control-container">
+                    <SegmentedControl
+                        variant="connected"
+                        disabled={isUpdatingRating}
+                        ariaLabel="Season rating"
+                        value={currentRating}
+                        onchange={(val) => setRating(val)}
+                        items={[
+                            { value: 'DISLIKE', title: 'Thumbs down', Icon: ThumbsDownIcon, activeIconWeight: 'fill', activeColor: 'dislike' },
+                            { value: 'NEUTRAL', title: 'No rating yet', Icon: MinusIcon, iconWeight: 'bold', activeIconWeight: 'bold', activeColor: 'neutral' },
+                            { value: 'LIKE', title: 'Thumbs up', Icon: ThumbsUpIcon, activeIconWeight: 'fill', activeColor: 'like' },
+                        ]}
+                    />
+                </div>
             </div>
         {/if}
 
@@ -453,8 +419,14 @@
         container-name: episodes-pane;
 
         @media (max-width: 768px) {
-            padding: 0.5rem 0.85rem;
+            padding: 0.5rem 0.65rem;
             gap: 0.5rem;
+        }
+
+        :global(main.foldable-crease-split) & {
+            @media (max-width: 768px) {
+                padding: 0.5rem 0.5rem;
+            }
         }
 
         .toolbar {
@@ -476,19 +448,43 @@
                 }
             }
 
-            .spacer {
-                flex-grow: 1;
+            .rating-control-container {
+                margin-left: auto;
+            }
+
+            :global(main.foldable-crease-split) & {
+                @media (max-width: 768px) {
+                    display: none !important;
+                }
             }
         }
 
         .episodes-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
             gap: 0.75rem;
             align-items: stretch;
 
-            @media (max-width: 640px) {
-                gap: 0.6rem;
+            @media (max-width: 768px) {
+                grid-template-columns: repeat(auto-fill, minmax(min(100%, 125px), 1fr));
+                gap: 0.5rem;
+            }
+
+            @media (max-width: 480px) {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.5rem;
+            }
+
+            :global(main.foldable-crease-split) & {
+                @media (max-width: 768px) {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 0.5rem;
+                }
+            }
+
+            @container episodes-pane (max-width: 440px) {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.5rem;
             }
         }
 
@@ -529,6 +525,38 @@
                     justify-content: flex-end;
                     padding-top: 2px;
                     border-top: none;
+                }
+            }
+
+            @media (max-width: 768px) {
+                .skeleton-content {
+                    padding: 7px 8px 6px 8px;
+                    gap: 4px;
+
+                    .titles {
+                        gap: 0.25rem;
+                    }
+
+                    .actions-skeleton :global(.skeleton) {
+                        width: 28px !important;
+                        height: 28px !important;
+                    }
+                }
+            }
+
+            @container episodes-pane (max-width: 440px) {
+                .skeleton-content {
+                    padding: 7px 8px 6px 8px;
+                    gap: 4px;
+
+                    .titles {
+                        gap: 0.25rem;
+                    }
+
+                    .actions-skeleton :global(.skeleton) {
+                        width: 28px !important;
+                        height: 28px !important;
+                    }
                 }
             }
         }
