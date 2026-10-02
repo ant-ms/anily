@@ -233,11 +233,7 @@
             border-bottom: 1px solid #2e2c29;
 
             @media (max-width: 768px) {
-                display: none;
-
-                :global(main.foldable-crease-split) & {
-                    display: flex !important;
-                }
+                display: none !important;
             }
 
             .header-left {

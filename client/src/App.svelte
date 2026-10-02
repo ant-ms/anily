@@ -708,6 +708,7 @@
                 .sidebar-container {
                     width: calc(100vw - 80px - var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
                     padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+                    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
                 }
 
                 #content {
