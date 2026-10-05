@@ -60,6 +60,10 @@ export interface AnilyNativePlugin {
   enterPip(): Promise<{ success: boolean }>;
   setAutoPip(options: { enabled: boolean }): Promise<{ success: boolean }>;
   getLocalEpisodePath(options: { filename: string }): Promise<{ path: string; exists: boolean }>;
+  saveSubtitleFile(options: {
+    filename: string;
+    content: string;
+  }): Promise<{ success: boolean; path: string }>;
 }
 
 export const AnilyNative = registerPlugin<AnilyNativePlugin>("AnilyNative", {
@@ -89,6 +93,7 @@ export const AnilyNative = registerPlugin<AnilyNativePlugin>("AnilyNative", {
     enterPip: async () => ({ success: false }),
     setAutoPip: async () => ({ success: true }),
     getLocalEpisodePath: async () => ({ path: "", exists: false }),
+    saveSubtitleFile: async () => ({ success: true, path: "" }),
   },
 });
 

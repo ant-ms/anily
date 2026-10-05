@@ -1,4 +1,5 @@
 import { AnilyNative, isNative } from "../native/anilyNative";
+import { Capacitor } from "@capacitor/core";
 import { apiBaseUrl } from "../context.svelte";
 import { snackbar } from "../snackbar.svelte";
 import {
@@ -8,6 +9,25 @@ import {
   buildGroupingCacheKey,
 } from "../storageKeys";
 import type { EpisodeSkipTimes } from "../../types/SkipTimes";
+import type { SubtitleTrackInfo } from "../player/videoPlayer.svelte";
+
+export interface OfflineSubtitleTrack {
+  label: string;
+  language?: string;
+  filename: string;
+  default?: boolean;
+}
+
+export function ensureWebVTT(content: string): string {
+  const trimmed = content.trim();
+  if (trimmed.startsWith("WEBVTT")) return trimmed;
+  // Convert SRT timestamps (00:00:01,000) to WebVTT (00:00:01.000)
+  const converted = trimmed.replace(
+    /(\d{2}:\d{2}:\d{2}),(\d{3})/g,
+    "$1.$2",
+  );
+  return `WEBVTT\n\n${converted}`;
+}
 
 export interface DownloadState {
   episodeId: number;
@@ -22,6 +42,7 @@ export interface DownloadState {
   totalBytes: number;
   bytesDownloaded: number;
   skipTimes?: EpisodeSkipTimes;
+  subtitles?: OfflineSubtitleTrack[];
 }
 
 class DownloadManager {
@@ -324,6 +345,70 @@ class DownloadManager {
           .catch(() => {});
       }
 
+      // Pre-fetch and save subtitles for offline playback
+      if (apiBaseUrl.current && isNative) {
+        const subApiUrl = new URL(
+          `/api/stream/subtitles/${episodeId}?language=${lang}`,
+          apiBaseUrl.current,
+        );
+        if (service?.providerId && service?.identifier) {
+          subApiUrl.searchParams.set("providerId", service.providerId);
+          subApiUrl.searchParams.set("identifier", service.identifier);
+          if (service.serverId) {
+            subApiUrl.searchParams.set("server", service.serverId);
+          }
+        }
+        if (token) {
+          subApiUrl.searchParams.set("token", token);
+        }
+
+        fetch(subApiUrl.toString(), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: "include",
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then(async (data) => {
+            if (data?.subtitles && Array.isArray(data.subtitles) && data.subtitles.length > 0) {
+              const savedTracks: OfflineSubtitleTrack[] = [];
+              for (let i = 0; i < data.subtitles.length; i++) {
+                const sub = data.subtitles[i];
+                if (!sub.url) continue;
+                try {
+                  const subRes = await fetch(sub.url);
+                  if (subRes.ok) {
+                    const rawText = await subRes.text();
+                    const vttContent = ensureWebVTT(rawText);
+                    const subFilename = (sub.default || i === 0)
+                      ? `anily_ep_${episodeId}_num_${episodeNumber}.vtt`
+                      : `anily_ep_${episodeId}_num_${episodeNumber}_${sub.language || i}.vtt`;
+
+                    await AnilyNative.saveSubtitleFile({
+                      filename: subFilename,
+                      content: vttContent,
+                    });
+
+                    savedTracks.push({
+                      label: sub.label || "English",
+                      language: sub.language || "en",
+                      filename: subFilename,
+                      default: Boolean(sub.default || i === 0),
+                    });
+                  }
+                } catch (subErr) {
+                  console.warn("Failed to download subtitle track:", sub.label, subErr);
+                }
+              }
+              if (savedTracks.length > 0 && this.states[episodeId]) {
+                this.states[episodeId].subtitles = savedTracks;
+                this.persist();
+              }
+            }
+          })
+          .catch((err) => {
+            console.warn("Failed to fetch subtitles for download:", err);
+          });
+      }
+
       const headers: Record<string, string> = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -372,6 +457,92 @@ class DownloadManager {
     }
   }
 
+  public async getOfflineSubtitles(
+    episodeId: number,
+    episodeNumber?: number,
+  ): Promise<SubtitleTrackInfo[]> {
+    if (!isNative) return [];
+
+    const tracks: SubtitleTrackInfo[] = [];
+    const state = this.states[episodeId];
+
+    // 1. Check stored subtitle tracks from state
+    if (state?.subtitles && state.subtitles.length > 0) {
+      for (const sub of state.subtitles) {
+        try {
+          const res = await AnilyNative.getLocalEpisodePath({ filename: sub.filename });
+          if (res.exists && res.path) {
+            tracks.push({
+              label: sub.label,
+              language: sub.language,
+              url: Capacitor.convertFileSrc(res.path),
+              default: sub.default,
+            });
+          }
+        } catch {}
+      }
+    }
+
+    // 2. Fallback check for default anily_ep_${episodeId}_num_${episodeNumber ?? 0}.vtt
+    if (tracks.length === 0) {
+      const defaultFilename = `anily_ep_${episodeId}_num_${episodeNumber ?? 0}.vtt`;
+      try {
+        const res = await AnilyNative.getLocalEpisodePath({ filename: defaultFilename });
+        if (res.exists && res.path) {
+          tracks.push({
+            label: "English",
+            language: "en",
+            url: Capacitor.convertFileSrc(res.path),
+            default: true,
+          });
+        }
+      } catch {}
+    }
+
+    // 3. Fallback: if no local subtitle file exists but online and backend configured, attempt on-demand fetch
+    if (tracks.length === 0 && apiBaseUrl.current && typeof navigator !== "undefined" && navigator.onLine) {
+      try {
+        const subApiUrl = new URL(`/api/stream/subtitles/${episodeId}`, apiBaseUrl.current);
+        const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        if (token) subApiUrl.searchParams.set("token", token);
+
+        const r = await fetch(subApiUrl.toString(), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: "include",
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data?.subtitles && Array.isArray(data.subtitles) && data.subtitles.length > 0) {
+            const best = data.subtitles.find((s: any) => s.default) || data.subtitles[0];
+            if (best?.url) {
+              const subRes = await fetch(best.url);
+              if (subRes.ok) {
+                const text = await subRes.text();
+                const defaultFilename = `anily_ep_${episodeId}_num_${episodeNumber ?? 0}.vtt`;
+                const saveRes = await AnilyNative.saveSubtitleFile({
+                  filename: defaultFilename,
+                  content: ensureWebVTT(text),
+                });
+                if (saveRes.path) {
+                  tracks.push({
+                    label: best.label || "English",
+                    language: best.language || "en",
+                    url: Capacitor.convertFileSrc(saveRes.path),
+                    default: true,
+                  });
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch on-demand subtitle for offline playback:", err);
+      }
+    }
+
+    return tracks;
+  }
+
   public async playOffline(episodeId: number, episodeNumber?: number) {
     const filename = this.getFilename(episodeId, episodeNumber);
 
@@ -381,10 +552,21 @@ class DownloadManager {
     }
 
     try {
+      const subFilename = `anily_ep_${episodeId}_num_${episodeNumber ?? 0}.vtt`;
+      let subUri: string | undefined;
+      try {
+        const subRes = await AnilyNative.getLocalEpisodePath({ filename: subFilename });
+        if (subRes.exists && subRes.path) {
+          subUri = Capacitor.convertFileSrc(subRes.path);
+        }
+      } catch {}
+
       await AnilyNative.openExternalPlayer({
         filename,
         isLocalFile: true,
         mimeType: "video/mp4",
+        subtitleUrl: subUri,
+        subtitleTitle: "English",
       });
     } catch (err) {
       console.error("Failed to launch offline player:", err);
@@ -430,6 +612,14 @@ class DownloadManager {
     if (isNative) {
       try {
         await AnilyNative.deleteDownloadedEpisode({ filename });
+        // Clean up any extra subtitle files if tracked
+        if (this.states[episodeId]?.subtitles) {
+          for (const sub of this.states[episodeId].subtitles!) {
+            if (sub.filename !== filename) {
+              await AnilyNative.deleteDownloadedEpisode({ filename: sub.filename }).catch(() => {});
+            }
+          }
+        }
       } catch (err) {
         console.error("Failed to delete episode file:", err);
       }

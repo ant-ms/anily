@@ -432,6 +432,31 @@ public class AnilyNativePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void saveSubtitleFile(PluginCall call) {
+        String filename = call.getString("filename");
+        String content = call.getString("content");
+        if (filename == null || content == null) {
+            call.reject("filename and content are required");
+            return;
+        }
+
+        try {
+            Context context = getContext();
+            File moviesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+            File file = new File(moviesDir, filename);
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                fos.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            ret.put("path", file.getAbsolutePath());
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to save subtitle file: " + e.getMessage(), e);
+        }
+    }
+
+    @PluginMethod
     public void deleteDownloadedEpisode(PluginCall call) {
         String filename = call.getString("filename");
         if (filename == null) {
@@ -445,6 +470,20 @@ public class AnilyNativePlugin extends Plugin {
             File file = new File(moviesDir, filename);
 
             boolean deleted = file.exists() && file.delete();
+
+            // Also clean up any associated subtitle files for this episode
+            String basePrefix = filename.endsWith(".mp4")
+                ? filename.substring(0, filename.length() - 4)
+                : filename;
+            File[] matchingSubtitles = moviesDir.listFiles((dir, name) ->
+                name.startsWith(basePrefix) && name.endsWith(".vtt")
+            );
+            if (matchingSubtitles != null) {
+                for (File subFile : matchingSubtitles) {
+                    subFile.delete();
+                }
+            }
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             ret.put("deleted", deleted);

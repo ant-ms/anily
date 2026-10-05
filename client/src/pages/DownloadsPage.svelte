@@ -227,6 +227,7 @@
                         titleNative: `Episode ${episodeNumber ?? 1}`,
                         watched: true,
                     };
+                    const offlineSubs = await downloadManager.getOfflineSubtitles(episodeId, episodeNumber);
                     await videoPlayerState.playOfflineEpisode(
                         epData,
                         animeTitle || "Downloaded Anime",
@@ -234,6 +235,7 @@
                         [epData],
                         localUrl,
                         downloadManager.states[episodeId]?.skipTimes,
+                        offlineSubs,
                     );
                     return;
                 }

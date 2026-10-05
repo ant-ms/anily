@@ -390,7 +390,14 @@
     };
 
     const resolveSubUrl = (rawUrl: string): string => {
-        if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("blob:")) {
+        if (
+            rawUrl.startsWith("http://") ||
+            rawUrl.startsWith("https://") ||
+            rawUrl.startsWith("blob:") ||
+            rawUrl.startsWith("capacitor://") ||
+            rawUrl.startsWith("content://") ||
+            rawUrl.startsWith("file://")
+        ) {
             return rawUrl;
         }
         const base = apiBaseUrl.current ? apiBaseUrl.current.origin : (typeof window !== "undefined" ? window.location.origin : "");

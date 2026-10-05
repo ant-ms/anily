@@ -9,6 +9,7 @@ import { getAvailableStreamServices } from "./getServices";
 import { resolvePlayStream } from "./getPlayStream";
 import { handleStreamDownload } from "./downloadStream";
 import { getEpisodeSkipTimes } from "./skipTimes";
+import { resolveEpisodeSubtitles } from "./getSubtitles";
 import { errorTracker } from "$src/errorTracker";
 
 const log = logger.child({ module: "apiStream" });
@@ -173,6 +174,51 @@ export const apiStreamSkipTimesGetRoute = app.get(
       return c.json(
         {
           error: "Failed to fetch skip times",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
+    }
+  },
+);
+
+// GET /api/stream/subtitles/:episodeId
+export const apiStreamSubtitlesGetRoute = app.get(
+  "/api/stream/subtitles/:episodeId",
+  episodeIdParamValidator,
+  zValidator(
+    "query",
+    z.object({
+      providerId: z.string().optional(),
+      identifier: z.string().optional(),
+      language: z.enum(["sub", "dub"]).default("sub"),
+      server: z.string().optional(),
+    }),
+  ),
+  async (c) => {
+    const { episodeId } = c.req.valid("param");
+    const { providerId, identifier, language, server } = c.req.valid("query");
+
+    try {
+      const origin = getPublicOrigin(c);
+      const result = await resolveEpisodeSubtitles(episodeId, {
+        providerId,
+        identifier,
+        language: language as StreamLanguage,
+        server,
+        origin,
+      });
+
+      if (result.notFound) {
+        return c.json({ error: "Episode not found" }, 404);
+      }
+
+      return c.json({ subtitles: result.subtitles ?? [] });
+    } catch (error) {
+      log.error({ error, episodeId }, "Failed to resolve subtitles");
+      return c.json(
+        {
+          error: "Failed to resolve subtitles",
           reason: error instanceof Error ? error.message : String(error),
         },
         500,

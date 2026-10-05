@@ -270,12 +270,13 @@ class VideoPlayerState {
     playlist: EpisodeData[],
     localUrl: string,
     skipTimes?: EpisodeSkipTimes,
+    subtitles?: SubtitleTrackInfo[],
   ) {
     await this.playOnlineEpisode(episode, animeName, animeId, playlist, {
       streamUrl: localUrl,
       container: "mp4",
       isLocal: true,
-      subtitles: [],
+      subtitles: subtitles ?? [],
       skipTimes,
     });
   }

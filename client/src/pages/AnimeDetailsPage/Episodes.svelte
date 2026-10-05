@@ -212,6 +212,7 @@
                     const res = await AnilyNative.getLocalEpisodePath({ filename });
                     if (res.exists && res.path) {
                         const localUrl = Capacitor.convertFileSrc(res.path);
+                        const offlineSubs = await downloadManager.getOfflineSubtitles(episode.id, episode.number);
                         await videoPlayerState.playOfflineEpisode(
                             episode,
                             animeName,
@@ -219,6 +220,7 @@
                             episodesState.episodes,
                             localUrl,
                             downloadManager.states[episode.id]?.skipTimes,
+                            offlineSubs,
                         );
                         return;
                     }
