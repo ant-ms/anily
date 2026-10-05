@@ -16,6 +16,7 @@ import "$src/routes/apiSyncJobs";
 import "$src/routes/apiStream";
 import "$src/routes/apiRate";
 import "$src/routes/apiPing";
+import "$src/routes/apiErrors";
 
 app.get("/info", (c) => {
   return c.json({

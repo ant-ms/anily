@@ -12,6 +12,7 @@ export const KNOWN_TABS: Record<string, Tab> = {
   completed: { id: "completed", name: "Completed" },
   settings: { id: "settings", name: "Settings" },
   logs: { id: "logs", name: "Import Logs" },
+  errors: { id: "errors", name: "Error Dashboard" },
   downloads: { id: "downloads", name: "Downloads" },
 };
 
@@ -19,7 +20,7 @@ export const KNOWN_TABS: Record<string, Tab> = {
  * Parses the current hash or path into a typed route state.
  * Supports:
  * - #/inbox, #/waiting, #/upcoming, #/completed
- * - #/settings, #/logs, #/downloads
+ * - #/settings, #/logs, #/errors, #/downloads
  * - #/anime/12345 or /anime/12345
  */
 export function parseCurrentRoute(): RouteState {

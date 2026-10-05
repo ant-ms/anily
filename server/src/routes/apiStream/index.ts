@@ -9,6 +9,7 @@ import { getAvailableStreamServices } from "./getServices";
 import { resolvePlayStream } from "./getPlayStream";
 import { handleStreamDownload } from "./downloadStream";
 import { getEpisodeSkipTimes } from "./skipTimes";
+import { errorTracker } from "$src/errorTracker";
 
 const log = logger.child({ module: "apiStream" });
 
@@ -126,6 +127,16 @@ export const apiStreamDownloadGetRoute = app.get(
       });
     } catch (error) {
       log.error({ error, episodeId }, "Failed to process download stream");
+      errorTracker.recordError({
+        category: "DOWNLOAD",
+        action: `Download Episode ${episodeId}`,
+        message: error instanceof Error ? error.message : "Failed to process download stream",
+        error,
+        statusCode: 500,
+        endpoint: c.req.url,
+        method: "GET",
+        params: { episodeId, providerId, identifier, language, server },
+      });
       return c.json(
         {
           error: "Failed to process download stream",

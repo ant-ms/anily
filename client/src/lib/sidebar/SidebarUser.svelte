@@ -2,6 +2,7 @@
     import Button from "../Button.svelte";
     import Avatar from "../Avatar.svelte";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
+    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
     import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
@@ -51,6 +52,17 @@
             selectTab({
                 id: "logs",
                 name: "System Jobs",
+            });
+        }}
+    />
+    <Button
+        Icon={WarningCircleIcon}
+        active={activeTab?.id === "errors"}
+        title="Error Dashboard"
+        onclick={() => {
+            selectTab({
+                id: "errors",
+                name: "Error Dashboard",
             });
         }}
     />

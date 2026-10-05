@@ -228,6 +228,27 @@ class DownloadManager {
     }
   }
 
+  private reportDownloadError(options: {
+    action: string;
+    message: string;
+    params?: Record<string, unknown>;
+  }) {
+    if (!apiBaseUrl.current) return;
+    try {
+      fetch(new URL("/api/errors/report", apiBaseUrl.current).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          category: "DOWNLOAD",
+          action: options.action,
+          message: options.message,
+          params: options.params,
+        }),
+      }).catch(() => {});
+    } catch {}
+  }
+
   public async startDownload(
     episodeId: number,
     episodeNumber: number,
@@ -269,7 +290,7 @@ class DownloadManager {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      snackbar.success("Download started in browser");
+      snackbar.success("Download started in browser (view Error Dashboard if it fails)");
       return;
     }
 
@@ -342,7 +363,12 @@ class DownloadManager {
         bytesDownloaded: 0,
       };
       this.persist();
-      snackbar.error("Failed to start download");
+      this.reportDownloadError({
+        action: `Start Download: ${animeName} - Ep ${episodeNumber}`,
+        message: err instanceof Error ? err.message : String(err),
+        params: { episodeId, episodeNumber, animeTitle: animeName, filename },
+      });
+      snackbar.error("Failed to start download (check Error Dashboard)");
     }
   }
 
@@ -572,11 +598,34 @@ class DownloadManager {
               snackbar.success(`Episode download completed!`);
             } else {
               state.status = "failed";
-              snackbar.error("Episode download failed: received 0 bytes");
+              this.reportDownloadError({
+                action: `Download Zero Bytes: ${state.animeTitle || "Episode"} - Ep ${state.episodeNumber}`,
+                message: "Download completed but received 0 bytes (upstream stream failed or returned error)",
+                params: {
+                  episodeId: state.episodeId,
+                  episodeNumber: state.episodeNumber,
+                  animeTitle: state.animeTitle,
+                  downloadId: state.downloadId,
+                  filename: state.filename,
+                },
+              });
+              snackbar.error("Episode download failed: received 0 bytes (check Error Dashboard)");
             }
           } else if (status.status === "FAILED") {
             state.status = "failed";
-            snackbar.error(String(status.reason || "Episode download failed"));
+            const failureReason = String(status.reason || "Episode download failed");
+            this.reportDownloadError({
+              action: `Download Failed: ${state.animeTitle || "Episode"} - Ep ${state.episodeNumber}`,
+              message: failureReason,
+              params: {
+                episodeId: state.episodeId,
+                episodeNumber: state.episodeNumber,
+                animeTitle: state.animeTitle,
+                downloadId: state.downloadId,
+                filename: state.filename,
+              },
+            });
+            snackbar.error(`${failureReason} (check Error Dashboard)`);
           } else if (status.status === "RUNNING" || status.status === "PENDING") {
             state.bytesDownloaded = status.bytesDownloaded;
             state.totalBytes = status.totalBytes;

@@ -1,6 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
-import { isAllowedOrigin, setupAuthHandlers } from "./auth";
+import {
+  isAllowedOrigin,
+  setupAuthHandlers,
+  DEFAULT_SESSION_EXPIRY_SECONDS,
+  appendMaxAgeToCookie,
+} from "./auth";
 
 describe("CORS configuration", () => {
   it("allows https://codeee-5173.ant.ms and variants with trailing slash", () => {
@@ -171,5 +176,41 @@ describe("CORS configuration", () => {
       delete process.env.OIDC_ISSUER;
       delete process.env.OIDC_CLIENT_ID;
     }
+  });
+
+  it("configures default session expiration to 1 week (604,800 seconds)", () => {
+    expect(DEFAULT_SESSION_EXPIRY_SECONDS).toBe(604800);
+    expect(Number(process.env.OIDC_AUTH_EXPIRES)).toBe(604800);
+  });
+
+  it("includes Max-Age on oidc-auth session cookie when refreshed/set on /api/*", async () => {
+    const testApp = new Hono();
+    setupAuthHandlers(testApp);
+    testApp.use("/api/*", async (c, next) => {
+      // Simulate refreshed session token set by OIDC handler
+      c.set("oidcAuthJwt" as any, "refreshed-session-jwt");
+      await next();
+    });
+    testApp.get("/api/test-session-cookie", (c) => c.json({ ok: true }));
+
+    const res = await testApp.request("/api/test-session-cookie");
+    expect(res.status).toBe(200);
+    const setCookieHeader = res.headers.get("set-cookie");
+    expect(setCookieHeader).toContain("oidc-auth=refreshed-session-jwt");
+    expect(setCookieHeader).toContain("Max-Age=604800");
+  });
+
+  it("appendMaxAgeToCookie appends Max-Age only when needed", () => {
+    const original = "oidc-auth=jwt-token; Path=/; HttpOnly; Secure";
+    const updated = appendMaxAgeToCookie(original, "oidc-auth", 604800);
+    expect(updated).toBe("oidc-auth=jwt-token; Path=/; HttpOnly; Secure; Max-Age=604800");
+
+    // Does not re-append if already present
+    const withMaxAge = "oidc-auth=jwt-token; Path=/; Max-Age=3600";
+    expect(appendMaxAgeToCookie(withMaxAge, "oidc-auth", 604800)).toBe(withMaxAge);
+
+    // Does not modify different cookies
+    const otherCookie = "other=value; Path=/";
+    expect(appendMaxAgeToCookie(otherCookie, "oidc-auth", 604800)).toBe(otherCookie);
   });
 });

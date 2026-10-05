@@ -10,6 +10,7 @@
     } from "../context.svelte";
     import SidebarCard from "./SidebarCard.svelte";
     import ListDashesIcon from "phosphor-svelte/lib/ListDashesIcon";
+    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
     import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
     import Badge from "../Badge.svelte";
     import MenuItem from "../MenuItem.svelte";
@@ -37,6 +38,7 @@
     let isAnimeListTab = $derived(
         activeTab?.id !== "settings" &&
         activeTab?.id !== "logs" &&
+        activeTab?.id !== "errors" &&
         activeTab?.id !== "downloads"
     );
 
@@ -46,6 +48,7 @@
         if (activeTab.id === "upcoming") return "Upcoming";
         if (activeTab.id === "completed") return "Completed";
         if (activeTab.id === "logs") return "Import Logs";
+        if (activeTab.id === "errors") return "Error Dashboard";
         if (activeTab.id === "settings") return "Settings";
         if (activeTab.id === "downloads") return "Downloads";
         return activeTab.name || activeTab.id;
@@ -59,13 +62,13 @@
                 visibleCardData = [];
                 animeCount = 0;
                 isRefreshing = false;
-                // If switching to a non-anime tab like settings, logs, or downloads, clear selected anime
-                if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads")) {
+                // If switching to a non-anime tab like settings, logs, errors, or downloads, clear selected anime
+                if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "errors" || tab.id === "downloads")) {
                     selectedAnimeAnilistId.set(undefined);
                 }
             }
 
-            if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "downloads")) {
+            if (typeof tab === "object" && tab && (tab.id === "settings" || tab.id === "logs" || tab.id === "errors" || tab.id === "downloads")) {
                 return;
             }
 
@@ -180,9 +183,18 @@
                 <div class="logs-sidebar-nav">
                     <MenuItem
                         Icon={ListDashesIcon}
-                        label="Import Logs"
+                        label="System Jobs"
                         active
-                        onclick={() => handleNavClick({ id: "logs", name: "Logs" })}
+                        onclick={() => handleNavClick({ id: "logs", name: "System Jobs" })}
+                    />
+                </div>
+            {:else if activeTab?.id === "errors"}
+                <div class="logs-sidebar-nav">
+                    <MenuItem
+                        Icon={WarningCircleIcon}
+                        label="Error Dashboard"
+                        active
+                        onclick={() => handleNavClick({ id: "errors", name: "Error Dashboard" })}
                     />
                 </div>
             {:else if activeTab?.id !== "settings"}

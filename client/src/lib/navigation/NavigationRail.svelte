@@ -4,6 +4,7 @@
     import { apiBaseUrl, selectedAnimeAnilistId, isGlobalSearchOpen } from "../context.svelte";
     import MagnifyingGlassIcon from "phosphor-svelte/lib/MagnifyingGlassIcon";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
+    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
     import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
@@ -27,7 +28,7 @@
 
     let isProfileMenuOpen = $state(false);
 
-    const isProfileTabActive = $derived(activeTab?.id === "logs" || activeTab?.id === "settings" || activeTab?.id === "downloads");
+    const isProfileTabActive = $derived(activeTab?.id === "logs" || activeTab?.id === "errors" || activeTab?.id === "settings" || activeTab?.id === "downloads");
 
     function isTabActive(tab: Tab): boolean {
         if (!activeTab) {
@@ -135,6 +136,14 @@
                             label="System Jobs"
                             active={activeTab?.id === "logs"}
                             onclick={() => handleTabClick({ id: "logs", name: "System Jobs" })}
+                            role="menuitem"
+                        />
+
+                        <MenuItem
+                            Icon={WarningCircleIcon}
+                            label="Error Dashboard"
+                            active={activeTab?.id === "errors"}
+                            onclick={() => handleTabClick({ id: "errors", name: "Error Dashboard" })}
                             role="menuitem"
                         />
 

@@ -15,6 +15,7 @@
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import LoginPage from "./pages/LoginPage.svelte";
     import LogsPage from "./pages/LogsPage.svelte";
+    import ErrorsPage from "./pages/ErrorsPage.svelte";
     import SettingsPage from "./pages/SettingsPage.svelte";
     import DownloadsPage from "./pages/DownloadsPage.svelte";
     import GlobalSearchModal from "./lib/search/GlobalSearchModal.svelte";
@@ -89,6 +90,7 @@
     let previousAnimeTab: Tab | undefined = $state(
         initialRoute.tab.id !== "settings" &&
             initialRoute.tab.id !== "logs" &&
+            initialRoute.tab.id !== "errors" &&
             initialRoute.tab.id !== "downloads"
             ? initialRoute.tab
             : { id: "inbox", name: "Inbox", default: true }
@@ -104,6 +106,7 @@
         if (selectedAnimeAnilistId.current !== undefined) return "Anime Details";
         if (activeTab?.id === "settings") return "Settings";
         if (activeTab?.id === "logs") return "Import Logs";
+        if (activeTab?.id === "errors") return "Error Dashboard";
         if (activeTab?.id === "downloads") return "Downloads";
         if (activeTab?.id === "waiting") return "Caught Up";
         if (activeTab?.id === "upcoming") return "Upcoming";
@@ -125,7 +128,7 @@
     });
 
     $effect(() => {
-        if (activeTab && activeTab.id !== "settings" && activeTab.id !== "logs" && activeTab.id !== "downloads") {
+        if (activeTab && activeTab.id !== "settings" && activeTab.id !== "logs" && activeTab.id !== "errors" && activeTab.id !== "downloads") {
             previousAnimeTab = activeTab;
         }
     });
@@ -169,6 +172,7 @@
         if (
             activeTab?.id === "settings" ||
             activeTab?.id === "logs" ||
+            activeTab?.id === "errors" ||
             activeTab?.id === "downloads"
         ) {
             activeTab = previousAnimeTab || {
@@ -360,9 +364,9 @@
         class:in-details={selectedAnimeAnilistId.current !== undefined}
     >
         <!-- Single Unified Mobile Top App Bar for Phones (<= 768px) -->
-        <header class="mobile-topbar" class:no-border={activeTab?.id === "logs"}>
+        <header class="mobile-topbar" class:no-border={activeTab?.id === "logs" || activeTab?.id === "errors"}>
             <div class="topbar-left">
-                {#if selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads"}
+                {#if selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "errors" || activeTab?.id === "downloads"}
                     <IconButton
                         Icon={CaretLeftIcon}
                         onclick={onBackClick}
@@ -372,7 +376,7 @@
 
                 <div class="topbar-title-wrapper">
                     <h1 class="topbar-title">{currentTitle}</h1>
-                    {#if selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads" && sidebarAnimeCount > 0}
+                    {#if selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "errors" && activeTab?.id !== "downloads" && sidebarAnimeCount > 0}
                         <Badge>{sidebarAnimeCount}</Badge>
                     {/if}
                 </div>
@@ -431,8 +435,8 @@
         <!-- Sidebar / List Pane -->
         <div
             class="sidebar-container"
-            class:mobile-hidden={selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads"}
-            class:desktop-collapsed={activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "downloads"}
+            class:mobile-hidden={selectedAnimeAnilistId.current !== undefined || activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "errors" || activeTab?.id === "downloads"}
+            class:desktop-collapsed={activeTab?.id === "settings" || activeTab?.id === "logs" || activeTab?.id === "errors" || activeTab?.id === "downloads"}
         >
             <Sidebar
                 bind:activeTab
@@ -444,7 +448,7 @@
         <!-- Detail / Main Content Area -->
         <div
             id="content"
-            class:mobile-hidden={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads"}
+            class:mobile-hidden={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "errors" && activeTab?.id !== "downloads"}
         >
             <!-- Tablet Topbar (769px - 1024px, shown only when an anime is selected) -->
             {#if selectedAnimeAnilistId.current !== undefined}
@@ -487,7 +491,7 @@
 
             <div
                 class="content-body"
-                class:content-empty={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "downloads"}
+                class:content-empty={selectedAnimeAnilistId.current === undefined && activeTab?.id !== "settings" && activeTab?.id !== "logs" && activeTab?.id !== "errors" && activeTab?.id !== "downloads"}
             >
                 {#if selectedAnimeAnilistId.current !== undefined}
                     <AnimeDetailsPage />
@@ -495,6 +499,8 @@
                     <SettingsPage />
                 {:else if activeTab?.id === "logs"}
                     <LogsPage />
+                {:else if activeTab?.id === "errors"}
+                    <ErrorsPage />
                 {:else if activeTab?.id === "downloads" && isNative}
                     <DownloadsPage />
                 {:else}

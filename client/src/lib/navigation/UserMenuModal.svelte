@@ -3,6 +3,7 @@
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import { apiBaseUrl, selectedAnimeAnilistId } from "../context.svelte";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
+    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
     import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
@@ -87,6 +88,14 @@
             hasIconPill
             active={activeTab?.id === "logs"}
             onclick={() => navigateTo({ id: "logs", name: "System Jobs" })}
+        />
+
+        <MenuItem
+            Icon={WarningCircleIcon}
+            label="Error Dashboard"
+            hasIconPill
+            active={activeTab?.id === "errors"}
+            onclick={() => navigateTo({ id: "errors", name: "Error Dashboard" })}
         />
 
         <MenuItem

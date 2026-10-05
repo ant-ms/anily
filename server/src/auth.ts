@@ -8,6 +8,12 @@ import {
 import { cors } from "hono/cors";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 
+export const DEFAULT_SESSION_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 1 week (604,800 seconds)
+
+// Default OIDC session expiration to 1 week if not explicitly set
+process.env.OIDC_AUTH_EXPIRES =
+  process.env.OIDC_AUTH_EXPIRES || `${DEFAULT_SESSION_EXPIRY_SECONDS}`;
+
 export const isAllowedOrigin = (origin: string): boolean => {
   if (!origin) return false;
   const normalized = origin.replace(/\/$/, "");
@@ -34,6 +40,20 @@ export const isAllowedOrigin = (origin: string): boolean => {
     return true;
   }
   return false;
+};
+
+export const appendMaxAgeToCookie = (
+  cookie: string,
+  cookieName: string,
+  maxAge: number
+): string => {
+  if (
+    cookie.startsWith(`${cookieName}=`) &&
+    !cookie.toLowerCase().includes("max-age")
+  ) {
+    return `${cookie}; Max-Age=${maxAge}`;
+  }
+  return cookie;
 };
 
 export const setupAuthHandlers = (app: Hono) => {
@@ -77,30 +97,47 @@ export const setupAuthHandlers = (app: Hono) => {
   });
   app.get("/callback", async (c) => {
     console.log("oidc callback");
-    return processOAuthCallback(c);
+    const res = await processOAuthCallback(c);
+    const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
+    const maxAge = Number(process.env.OIDC_AUTH_EXPIRES || DEFAULT_SESSION_EXPIRY_SECONDS);
+
+    // Ensure session cookie on the redirect response persists for 1 week
+    const cookies = res.headers.getSetCookie
+      ? res.headers.getSetCookie()
+      : [res.headers.get("set-cookie")].filter(Boolean) as string[];
+
+    if (cookies.length > 0) {
+      res.headers.delete("set-cookie");
+      for (const cookie of cookies) {
+        res.headers.append(
+          "set-cookie",
+          appendMaxAgeToCookie(cookie, cookieName, maxAge)
+        );
+      }
+    }
+    return res;
   });
   app.use("/api/*", async (c, next) => {
     if (c.req.path.startsWith("/api/stream/proxy")) {
       return next();
     }
-    if (!process.env.OIDC_ISSUER && !process.env.OIDC_CLIENT_ID) {
-      return next();
-    }
-    if (c.req.path === "/api/login") {
-      return oidcAuthMiddleware()(c, next);
-    }
+    if (process.env.OIDC_ISSUER || process.env.OIDC_CLIENT_ID) {
+      if (c.req.path === "/api/login") {
+        return oidcAuthMiddleware()(c, next);
+      }
 
-    try {
-      const auth = await getAuth(c);
-      if (!auth) {
+      try {
+        const auth = await getAuth(c);
+        if (!auth) {
+          const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
+          deleteCookie(c, cookieName, { path: "/" });
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+      } catch {
         const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
         deleteCookie(c, cookieName, { path: "/" });
         return c.json({ error: "Unauthorized" }, 401);
       }
-    } catch {
-      const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
-      deleteCookie(c, cookieName, { path: "/" });
-      return c.json({ error: "Unauthorized" }, 401);
     }
 
     await next();
@@ -109,10 +146,12 @@ export const setupAuthHandlers = (app: Hono) => {
     const session_jwt = c.get("oidcAuthJwt" as any);
     if (session_jwt !== undefined) {
       const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
+      const maxAge = Number(process.env.OIDC_AUTH_EXPIRES || DEFAULT_SESSION_EXPIRY_SECONDS);
       setCookie(c, cookieName, session_jwt, {
         path: "/",
         httpOnly: true,
         secure: true,
+        maxAge,
       });
     }
   });

@@ -31,6 +31,7 @@
     import MinusIcon from "phosphor-svelte/lib/MinusIcon";
     import CloudSlashIcon from "phosphor-svelte/lib/CloudSlashIcon";
     import LogIcon from "phosphor-svelte/lib/LogIcon";
+    import WarningCircleIcon from "phosphor-svelte/lib/WarningCircleIcon";
     import GearIcon from "phosphor-svelte/lib/GearIcon";
     import DownloadSimpleIcon from "phosphor-svelte/lib/DownloadSimpleIcon";
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
@@ -50,6 +51,7 @@
     const isInMediaDetails = $derived(selectedAnimeAnilistId.current !== undefined);
     const isProfileTabActive = $derived(
         activeTab?.id === "logs" ||
+        activeTab?.id === "errors" ||
         activeTab?.id === "settings" ||
         activeTab?.id === "downloads"
     );
@@ -270,6 +272,14 @@
                                             role="menuitem"
                                         />
 
+                                        <MenuItem
+                                            Icon={WarningCircleIcon}
+                                            label="Error Dashboard"
+                                            active={activeTab?.id === "errors"}
+                                            onclick={() => handleTabClick({ id: "errors", name: "Error Dashboard" })}
+                                            role="menuitem"
+                                        />
+
                                         <div class="popover-divider"></div>
 
                                         <MenuItem
@@ -373,6 +383,14 @@
                                         label="System Jobs"
                                         active={activeTab?.id === "logs"}
                                         onclick={() => handleTabClick({ id: "logs", name: "System Jobs" })}
+                                        role="menuitem"
+                                    />
+
+                                    <MenuItem
+                                        Icon={WarningCircleIcon}
+                                        label="Error Dashboard"
+                                        active={activeTab?.id === "errors"}
+                                        onclick={() => handleTabClick({ id: "errors", name: "Error Dashboard" })}
                                         role="menuitem"
                                     />
 

@@ -9,6 +9,7 @@ import {
   type SubtitleTrack,
 } from "@ant.ms/anily-providers";
 import { logger } from '$src/logger';
+import { errorTracker } from '$src/errorTracker';
 
 const log = logger.child({ module: "downloadStream" });
 
@@ -203,6 +204,15 @@ export async function handleStreamDownload(
   });
 
   if (!episode) {
+    errorTracker.recordError({
+      category: "DOWNLOAD",
+      action: `Download Episode ${episodeId}`,
+      message: `Episode #${episodeId} not found in database`,
+      statusCode: 404,
+      endpoint: c.req.url,
+      method: "GET",
+      params: { episodeId },
+    });
     return c.json({ error: "Episode not found" }, 404);
   }
 
@@ -211,10 +221,27 @@ export async function handleStreamDownload(
   const sanitizedTitle = rawTitle.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
   const filename = `${sanitizedTitle}_EP${episode.number}.mp4`;
 
+  const trace = errorTracker.startTrace(
+    "DOWNLOAD",
+    `Download ${rawTitle} - Episode ${episode.number}`,
+    {
+      episodeId,
+      episodeNumber: episode.number,
+      animeTitle: rawTitle,
+      anilistId: baseAnime.anilistId,
+      language,
+      providerId,
+      identifier,
+      server,
+      filename,
+    },
+  );
+
   let activeDownload: StartedFfmpeg | null = null;
   let lastError: Error | null = null;
 
   if (providerId && identifier) {
+    trace.step("Resolving stream from specified provider", { providerId, identifier, server, language });
     const streamSource = await registry.resolveStream(
       providerId,
       identifier,
@@ -224,14 +251,28 @@ export async function handleStreamDownload(
     );
 
     if (!streamSource || !streamSource.url) {
+      trace.fail(new Error("No stream available from selected provider"), {
+        statusCode: 404,
+        endpoint: c.req.url,
+        method: "GET",
+        message: `Provider ${providerId} returned no playable stream URL`,
+      });
       return c.json({ error: "No stream available from selected provider" }, 404);
     }
 
     try {
+      trace.step("Starting FFmpeg muxer for stream", {
+        container: streamSource.container,
+        hasSubtitles: Boolean(streamSource.subtitles?.length),
+      });
       activeDownload = await startFfmpegStream(streamSource, c.req.raw.signal);
+      trace.step("FFmpeg stream established successfully");
     } catch (err) {
       log.error({ error: err, episodeId, providerId }, "Failed to start ffmpeg for selected provider");
       lastError = err instanceof Error ? err : new Error(String(err));
+      trace.warn("FFmpeg failed to start for selected provider", {
+        error: lastError.message,
+      });
     }
   } else {
     const titles = [
@@ -240,8 +281,16 @@ export async function handleStreamDownload(
       baseAnime.titleNative,
     ].filter((t): t is string => Boolean(t));
 
+    trace.step("Searching provider availability for titles", { titles, episodeNumber: episode.number });
+
     const services = await registry.checkAvailability(titles, episode.number);
     if (services.length === 0) {
+      trace.fail(new Error("No streaming services available for this episode"), {
+        statusCode: 404,
+        endpoint: c.req.url,
+        method: "GET",
+        message: `No streaming services found matching titles: ${titles.join(", ")}`,
+      });
       return c.json({ error: "No streaming services available for this episode" }, 404);
     }
 
@@ -249,9 +298,20 @@ export async function handleStreamDownload(
     const candidates = langServices.length > 0 ? langServices : services;
     candidates.sort((a, b) => getServiceScore(b) - getServiceScore(a));
 
+    trace.step("Found candidates", {
+      totalFound: services.length,
+      candidatesInOrder: candidates.map((c) => ({
+        provider: c.providerName,
+        server: c.serverName,
+        language: c.language,
+        score: getServiceScore(c),
+      })),
+    });
+
     // Try candidates in order until ffmpeg starts successfully
     for (const candidate of candidates) {
       try {
+        trace.step(`Resolving candidate stream: ${candidate.providerName} (${candidate.serverName})`);
         const streamSource = await registry.resolveStream(
           candidate.providerId,
           candidate.identifier,
@@ -260,14 +320,21 @@ export async function handleStreamDownload(
           candidate.serverId,
         );
         if (!streamSource || !streamSource.url) {
+          trace.warn(`Candidate ${candidate.providerName} returned empty stream URL`);
           continue;
         }
+
+        trace.step(`Spawning FFmpeg for ${candidate.providerName} (${candidate.serverName})`, {
+          container: streamSource.container,
+          hasSubtitles: Boolean(streamSource.subtitles?.length),
+        });
 
         activeDownload = await startFfmpegStream(streamSource, c.req.raw.signal);
         log.info(
           { episodeId, provider: candidate.providerName, server: candidate.serverName },
           "Successfully started download stream with provider",
         );
+        trace.step(`Successfully started stream with ${candidate.providerName} (${candidate.serverName})`);
         break;
       } catch (err) {
         log.warn(
@@ -275,15 +342,25 @@ export async function handleStreamDownload(
           "Candidate stream failed to start ffmpeg muxer, trying next candidate...",
         );
         lastError = err instanceof Error ? err : new Error(String(err));
+        trace.warn(`Candidate ${candidate.providerName} failed to mux stream`, {
+          error: lastError.message,
+        });
       }
     }
   }
 
   if (!activeDownload) {
+    const errorMsg = lastError?.message || "No streams produced playable output";
+    trace.fail(lastError || new Error(errorMsg), {
+      statusCode: 502,
+      endpoint: c.req.url,
+      method: "GET",
+      message: `Failed to download stream: ${errorMsg}`,
+    });
     return c.json(
       {
         error: "Failed to download stream from available providers",
-        reason: lastError?.message || "No streams produced playable output",
+        reason: errorMsg,
       },
       502,
     );
