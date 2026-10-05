@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@ant.ms/anily-providers':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.1.0
+        version: 1.1.0
       '@ant.ms/thetvdb':
         specifier: ^1.0.0
         version: 1.0.0
@@ -87,8 +87,8 @@ importers:
 
 packages:
 
-  '@ant.ms/anily-providers@1.0.0':
-    resolution: {integrity: sha512-6LrQke+zfzj/r/Kocv1hdgjQrAsX53Ycm09ZeLQ6PcFJPYjglbeLRqVZzDvvVNdYcWoymhevceno4oqhVoV8kg==, tarball: https://registry.npmjs.org/@ant.ms/anily-providers/-/anily-providers-1.0.0.tgz}
+  '@ant.ms/anily-providers@1.1.0':
+    resolution: {integrity: sha512-LOG9MZLZ0F/aWvo9kCYk7NpCiex4exg92yD8ov/gJHEsqGrp4OH0kcbmpTUk6wK2lqyy42XURSpcASWAd9wvsA==, tarball: https://registry.npmjs.org/@ant.ms/anily-providers/-/anily-providers-1.1.0.tgz}
 
   '@ant.ms/thetvdb@1.0.0':
     resolution: {integrity: sha1-72+lOacJ1RxjFF4LJasXypRHe7s=, tarball: https://gitlab.com/api/v4/projects/85649350/packages/npm/@ant.ms/thetvdb/-/@ant.ms/thetvdb-1.0.0.tgz}
@@ -2976,7 +2976,7 @@ packages:
 
 snapshots:
 
-  '@ant.ms/anily-providers@1.0.0':
+  '@ant.ms/anily-providers@1.1.0':
     dependencies:
       cheerio: 1.2.0
       html-entities: 2.6.0
