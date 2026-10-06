@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { logger } from "$src/logger";
+import { getPublicOrigin } from "$src/routes/apiStream/helpers";
 import {
   generateStreamSignature,
   verifyStreamSignature,
@@ -32,6 +33,7 @@ export function makeProxiedUrl(
   referer: string,
   defaultExt = "ts",
   expires?: number,
+  origin = "",
 ): string {
   const absUrl = new URL(targetUri, baseUrl).toString();
   let filename = extractFilename(absUrl);
@@ -50,7 +52,8 @@ export function makeProxiedUrl(
   const exp = expires ?? Math.floor(Date.now() / 1000) + DEFAULT_STREAM_EXPIRY_SECONDS;
   const sig = generateStreamSignature(absUrl, exp);
   const refParam = referer ? `&ref=${encodeURIComponent(referer)}` : "";
-  return `/api/stream/proxy/${filename}?url=${encodeURIComponent(absUrl)}${refParam}&expires=${exp}&sig=${sig}`;
+  const prefix = origin ? origin.replace(/\/+$/, "") : "";
+  return `${prefix}/api/stream/proxy/${filename}?url=${encodeURIComponent(absUrl)}${refParam}&expires=${exp}&sig=${sig}`;
 }
 
 const vttDurationCache = new Map<string, number>();
@@ -99,6 +102,8 @@ export async function handleStreamProxy(c: Context) {
     });
   }
 
+  const origin = getPublicOrigin(c);
+
   const subVtt = c.req.query("sub_vtt");
   const referer = c.req.query("ref") || "";
   const expiresStr = c.req.query("expires");
@@ -113,7 +118,7 @@ export async function handleStreamProxy(c: Context) {
       return c.text("Forbidden destination address", 403);
     }
     const duration = await getVttDuration(subVtt, referer);
-    const vttProxiedUrl = `/api/stream/proxy/subtitle.vtt?url=${encodeURIComponent(subVtt)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}&expires=${expires}&sig=${sig}`;
+    const vttProxiedUrl = `${origin}/api/stream/proxy/subtitle.vtt?url=${encodeURIComponent(subVtt)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}&expires=${expires}&sig=${sig}`;
     const vttPlaylist = `#EXTM3U
 #EXT-X-TARGETDURATION:${Math.ceil(duration)}
 #EXT-X-VERSION:3
@@ -254,7 +259,7 @@ ${vttProxiedUrl}
         let subTagsInjected = false;
         const subTags = parsedSubs.map((s, idx) => {
           const subSig = generateStreamSignature(s.u, expires);
-          const subPlaylistUrl = `/api/stream/proxy/sub_${s.lang || idx}.m3u8?sub_vtt=${encodeURIComponent(s.u)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}&expires=${expires}&sig=${subSig}`;
+          const subPlaylistUrl = `${origin}/api/stream/proxy/sub_${s.lang || idx}.m3u8?sub_vtt=${encodeURIComponent(s.u)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}&expires=${expires}&sig=${subSig}`;
           const isDef = idx === defaultIndex ? "YES" : "NO";
           return `#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${(s.l || "Subtitles").replace(/"/g, "")}",DEFAULT=${isDef},AUTOSELECT=${isDef},FORCED=NO,LANGUAGE="${s.lang || "en"}",URI="${subPlaylistUrl}"`;
         });
@@ -263,7 +268,7 @@ ${vttProxiedUrl}
         // wrap it into a master playlist so players can bind the subtitle tracks.
         if (!isMasterPlaylist && parsedSubs.length > 0 && c.req.query("child") !== "true") {
           const childSig = generateStreamSignature(targetUrl, expires);
-          const childMediaUrl = `/api/stream/proxy/media.m3u8?url=${encodeURIComponent(targetUrl)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}&child=true&expires=${expires}&sig=${childSig}`;
+          const childMediaUrl = `${origin}/api/stream/proxy/media.m3u8?url=${encodeURIComponent(targetUrl)}${referer ? `&ref=${encodeURIComponent(referer)}` : ""}&child=true&expires=${expires}&sig=${childSig}`;
           const wrapped = [
             "#EXTM3U",
             "#EXT-X-VERSION:3",
@@ -319,7 +324,7 @@ ${vttProxiedUrl}
                     : trimmed.startsWith("#EXT-X-KEY")
                       ? "key"
                       : "mp4";
-                  return `URI="${makeProxiedUrl(tagUri, baseUrl, referer, defaultExt, expires)}"`;
+                  return `URI="${makeProxiedUrl(tagUri, baseUrl, referer, defaultExt, expires, origin)}"`;
                 });
               }
               return line;
@@ -327,7 +332,7 @@ ${vttProxiedUrl}
 
             // Non-comment lines are segment or variant playlist URIs
             const defaultExt = isMasterPlaylist ? "m3u8" : "ts";
-            return makeProxiedUrl(trimmed, baseUrl, referer, defaultExt, expires);
+            return makeProxiedUrl(trimmed, baseUrl, referer, defaultExt, expires, origin);
           })
           .filter((line): line is string => line !== null)
           .join("\n");

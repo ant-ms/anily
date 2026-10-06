@@ -278,7 +278,7 @@
         if (isHls && Hls.isSupported()) {
             const hls = new Hls({
                 enableWorker: true,
-                lowLatencyMode: true,
+                lowLatencyMode: false,
                 maxBufferLength: 30,
                 maxMaxBufferLength: 60,
                 renderTextTracksNatively: false,
