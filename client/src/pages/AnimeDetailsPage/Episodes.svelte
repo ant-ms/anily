@@ -411,10 +411,8 @@
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
-        overflow-y: auto;
         padding: 0.85rem 1.25rem;
-        flex: 1 1 0;
-        min-height: 0;
+        flex: 1 0 auto;
         width: 100%;
         box-sizing: border-box;
         container-type: inline-size;

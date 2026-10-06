@@ -18,6 +18,16 @@
 
     let animeDetails: AnimeDetailsData | undefined = $state();
     let updateSeed = $state(Math.random());
+    let leftEl: HTMLDivElement | undefined = $state();
+
+    watch(
+        () => selectedAnimeAnilistId.current,
+        () => {
+            if (leftEl) {
+                leftEl.scrollTop = 0;
+            }
+        },
+    );
 
     // Keep animeDetails in sync with selectedAnimeDetails if modified externally (e.g. bookmark toggle)
     $effect(() => {
@@ -89,9 +99,9 @@
     id="anime-details-page"
     class:seasons-open={isSeasonsSidebarOpen.current}
 >
-    <div class="left">
+    <div class="left" bind:this={leftEl}>
         {#if animeDetails}
-            <div transition:fade={{ duration: 200 }}>
+            <div class="hero-wrapper" transition:fade={{ duration: 200 }}>
                 <Hero {animeDetails} />
             </div>
         {:else}
@@ -128,7 +138,16 @@
             flex-direction: column;
             height: 100%;
             min-height: 0;
-            overflow: hidden;
+            min-width: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior-y: contain;
+            scrollbar-width: thin;
+            scrollbar-color: #3a3733 transparent;
+
+            .hero-wrapper {
+                flex-shrink: 0;
+            }
         }
 
         .right {
