@@ -34,6 +34,7 @@ public class AnilyNativePlugin extends Plugin {
 
         String subtitleUrl = call.getString("subtitleUrl");
         String subtitleTitle = call.getString("subtitleTitle", "English");
+        Boolean subtitlesEnable = call.getBoolean("subtitlesEnable", true);
 
         if (url == null && filename == null) {
             call.reject("Either url or filename must be provided");
@@ -72,7 +73,7 @@ public class AnilyNativePlugin extends Plugin {
                 intent.putExtra("subs", new android.os.Parcelable[] { subUri });
                 intent.putExtra("subs.name", new String[] { subtitleTitle });
                 intent.putExtra("subs.filename", new String[] { subtitleTitle });
-                intent.putExtra("subs.enable", new boolean[] { true });
+                intent.putExtra("subs.enable", new boolean[] { Boolean.TRUE.equals(subtitlesEnable) });
                 // MPV Android / Just Player
                 intent.putExtra("subtitles", subtitleUrl);
                 intent.putExtra("sub", subUri);

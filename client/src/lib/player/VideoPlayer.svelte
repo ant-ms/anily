@@ -809,6 +809,25 @@
                     videoPlayerState.skipCurrentSegment();
                 }
                 break;
+            case "c":
+            case "C": {
+                const subs = videoPlayerState.streamSource?.subtitles;
+                if (subs && subs.length > 0) {
+                    e.preventDefault();
+                    if (videoPlayerState.selectedSubtitleIndex >= 0) {
+                        setSubtitle(-1);
+                    } else {
+                        const defIdx = subs.findIndex((s) => s.default);
+                        const enIdx = subs.findIndex(
+                            (s) =>
+                                (s.language || "").toLowerCase().startsWith("en") ||
+                                (s.label || "").toLowerCase().includes("english"),
+                        );
+                        setSubtitle(defIdx >= 0 ? defIdx : enIdx >= 0 ? enIdx : 0);
+                    }
+                }
+                break;
+            }
             case "i":
             case "I":
                 e.preventDefault();

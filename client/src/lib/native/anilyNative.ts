@@ -8,6 +8,7 @@ export interface AnilyNativePlugin {
     filename?: string;
     subtitleUrl?: string;
     subtitleTitle?: string;
+    subtitlesEnable?: boolean;
   }): Promise<{ success: boolean }>;
 
   downloadEpisode(options: {

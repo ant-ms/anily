@@ -7,7 +7,7 @@ export { getQualityScore };
 
 export type MediaPlayer = 'builtin' | 'mpv' | 'iina' | 'vlc' | 'copy';
 
-export type StreamLanguagePreference = 'sub' | 'dub';
+export type StreamLanguagePreference = 'sub' | 'dub' | 'native';
 
 export interface SubtitleOption {
   url: string;
@@ -20,6 +20,7 @@ export const buildPlayerUrl = (
   mediaUrl: string,
   player: MediaPlayer,
   subtitleInput?: string | SubtitleOption[],
+  subVisibility: boolean = getStoredLanguagePreference() !== 'native',
 ): string => {
   let subUrls: string[] = [];
   if (Array.isArray(subtitleInput)) {
@@ -42,7 +43,8 @@ export const buildPlayerUrl = (
     case 'builtin':
       return mediaUrl;
     case 'iina': {
-      let url = `iina://open?url=${encodeURIComponent(mediaUrl)}&mpv_demuxer-lavf-o=strict=experimental&mpv_sub-visibility=yes&mpv_slang=en,eng,English`;
+      const subVis = subVisibility ? 'yes' : 'no';
+      let url = `iina://open?url=${encodeURIComponent(mediaUrl)}&mpv_demuxer-lavf-o=strict=experimental&mpv_sub-visibility=${subVis}&mpv_slang=en,eng,English`;
       if (subUrls.length > 0) {
         // mpv StringList treats colons as separators on Unix; colons inside URLs must be escaped as \:
         const escapedSubFiles = subUrls.map((u) => u.replace(/:/g, '\\:')).join(':');
@@ -59,8 +61,9 @@ export const buildPlayerUrl = (
     }
     case 'mpv': {
       const subArgs = subUrls.map((u) => `--sub-file="${u}"`).join(' ');
+      const subVisArg = subVisibility ? '--sub-visibility=yes' : '--sub-visibility=no';
       return subUrls.length > 0
-        ? `mpv "${mediaUrl}" ${subArgs} --demuxer-lavf-o=strict=experimental --sub-visibility=yes`
+        ? `mpv "${mediaUrl}" ${subArgs} --demuxer-lavf-o=strict=experimental ${subVisArg}`
         : `mpv "${mediaUrl}" --demuxer-lavf-o=strict=experimental`;
     }
     case 'copy':
@@ -77,7 +80,11 @@ export const setStoredPlayer = (player: MediaPlayer): void => {
 };
 
 export const getStoredLanguagePreference = (): StreamLanguagePreference => {
-  return (localStorage.getItem(STORAGE_KEYS.LANGUAGE_PREFERENCE) as StreamLanguagePreference) ?? 'sub';
+  const pref = localStorage.getItem(STORAGE_KEYS.LANGUAGE_PREFERENCE);
+  if (pref === 'sub' || pref === 'dub' || pref === 'native') {
+    return pref;
+  }
+  return 'sub';
 };
 
 export const setStoredLanguagePreference = (pref: StreamLanguagePreference): void => {
@@ -106,8 +113,9 @@ export const pickBestService = (
 ): AvailableService | null => {
   if (!services || services.length === 0) return null;
 
-  // Filter services that match the user's preferred language (sub or dub)
-  const matchingLanguage = services.filter((s) => s.language === preferredLang);
+  // Filter services that match the user's preferred language (sub, dub, or native -> sub)
+  const targetLanguage = preferredLang === 'native' ? 'sub' : preferredLang;
+  const matchingLanguage = services.filter((s) => s.language === targetLanguage);
   const candidates = matchingLanguage.length > 0 ? matchingLanguage : services;
 
   // Pick the highest quality service (prefer HD / 1080p / 720p)

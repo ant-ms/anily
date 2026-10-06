@@ -10,6 +10,10 @@ import {
 } from "../storageKeys";
 import type { EpisodeSkipTimes } from "../../types/SkipTimes";
 import type { SubtitleTrackInfo } from "../player/videoPlayer.svelte";
+import {
+  getStoredLanguagePreference,
+  type StreamLanguagePreference,
+} from "../../types/Media";
 
 export interface OfflineSubtitleTrack {
   label: string;
@@ -293,7 +297,7 @@ class DownloadManager {
     episodeId: number,
     episodeNumber: number,
     animeName: string,
-    lang: "sub" | "dub" = "sub",
+    lang: StreamLanguagePreference = "sub",
     anilistId?: number,
     service?: { providerId: string; identifier: string; serverId?: string },
     thumbnailUrl?: string,
@@ -303,9 +307,10 @@ class DownloadManager {
       return;
     }
 
+    const targetLang = lang === "native" ? "sub" : lang;
     const filename = this.getFilename(episodeId, episodeNumber);
     const downloadUrlObj = new URL(
-      `/api/stream/download/${episodeId}?language=${lang}`,
+      `/api/stream/download/${episodeId}?language=${targetLang}`,
       apiBaseUrl.current,
     );
 
@@ -367,7 +372,7 @@ class DownloadManager {
       // Pre-fetch and save subtitles for offline playback
       if (apiBaseUrl.current && isNative) {
         const subApiUrl = new URL(
-          `/api/stream/subtitles/${episodeId}?language=${lang}`,
+          `/api/stream/subtitles/${episodeId}?language=${targetLang}`,
           apiBaseUrl.current,
         );
         if (service?.providerId && service?.identifier) {
@@ -580,12 +585,14 @@ class DownloadManager {
         }
       } catch {}
 
+      const subEnabled = getStoredLanguagePreference() !== "native";
       await AnilyNative.openExternalPlayer({
         filename,
         isLocalFile: true,
         mimeType: "video/mp4",
         subtitleUrl: subUri,
         subtitleTitle: "English",
+        subtitlesEnable: subEnabled,
       });
     } catch (err) {
       console.error("Failed to launch offline player:", err);

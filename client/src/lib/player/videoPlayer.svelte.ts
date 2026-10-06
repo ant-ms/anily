@@ -244,8 +244,9 @@ class VideoPlayerState {
     this.isBuffering = true;
     this.mode = "expanded";
 
-    // Auto select default subtitle if available
-    if (streamData.subtitles && streamData.subtitles.length > 0) {
+    // Auto select default subtitle if available (unless preference is native, which loads subs without enabling by default)
+    const prefLang = getStoredLanguagePreference();
+    if (prefLang !== "native" && streamData.subtitles && streamData.subtitles.length > 0) {
       const defIdx = streamData.subtitles.findIndex((s) => s.default);
       if (defIdx >= 0) {
         this.selectedSubtitleIndex = defIdx;
@@ -511,7 +512,8 @@ class VideoPlayerState {
       if (services.length === 0) throw new Error("No streaming services found");
 
       const prefLang = getStoredLanguagePreference();
-      const best = services.find((s: any) => s.language === prefLang) || services[0];
+      const targetLang = prefLang === "native" ? "sub" : prefLang;
+      const best = services.find((s: any) => s.language === targetLang) || services[0];
       const params = new URLSearchParams({
         providerId: best.providerId,
         identifier: best.identifier,

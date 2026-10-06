@@ -52,6 +52,7 @@
     const languageOptions = [
         { value: "sub", label: "SUB (Subtitled)" },
         { value: "dub", label: "DUB (Dubbed)" },
+        { value: "native", label: "Native (Subtitles loaded, off by default)" },
     ];
 </script>
 
@@ -70,7 +71,7 @@
 
     <section>
         <h3>Preferred Audio / Subtitles</h3>
-        <p>Choose your preference for SUB or DUB when automatically selecting an episode stream.</p>
+        <p>Choose your preference for SUB, DUB, or Native (subtitles loaded, off by default) when automatically selecting an episode stream.</p>
         <Select
             bind:value={languagePreference}
             options={languageOptions}

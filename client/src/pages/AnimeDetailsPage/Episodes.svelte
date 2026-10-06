@@ -177,11 +177,13 @@
             }
 
             if (isNative) {
+                const subEnabled = getStoredLanguagePreference() !== 'native';
                 await AnilyNative.openExternalPlayer({
                     url: data.streamUrl,
                     mimeType: data.container === 'hls' ? 'application/x-mpegURL' : 'video/*',
                     subtitleUrl: bestSub?.url,
                     subtitleTitle: bestSub?.label ?? 'English',
+                    subtitlesEnable: subEnabled,
                 });
             } else {
                 const playerUrl = buildPlayerUrl(data.streamUrl, player, data.subtitles?.length ? data.subtitles : bestSub?.url);
@@ -242,9 +244,10 @@
             }
 
             const preferredLang = getStoredLanguagePreference();
+            const targetLang = preferredLang === 'native' ? 'sub' : preferredLang;
             const queue = [
-                ...sortServicesWithHdFirst(services.filter((s) => s.language === preferredLang)),
-                ...sortServicesWithHdFirst(services.filter((s) => s.language !== preferredLang)),
+                ...sortServicesWithHdFirst(services.filter((s) => s.language === targetLang)),
+                ...sortServicesWithHdFirst(services.filter((s) => s.language !== targetLang)),
             ];
 
             if (queue.length === 0) {
