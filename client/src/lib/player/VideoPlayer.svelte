@@ -237,17 +237,7 @@
     };
 
     const toggleFullscreen = async () => {
-        const target = containerEl || videoEl || videoPlayerState.getContainer() || videoPlayerState.getVideo();
-        if (!target) return;
-        try {
-            if (document.fullscreenElement) {
-                await document.exitFullscreen();
-            } else {
-                await target.requestFullscreen();
-            }
-        } catch (err) {
-            console.warn("Fullscreen toggle failed:", err);
-        }
+        await videoPlayerState.toggleFullscreen();
         restartControlsTimer();
     };
 
@@ -481,6 +471,9 @@
         const onPipChanged = (e: Event) => {
             const detail = (e as CustomEvent)?.detail;
             videoPlayerState.inNativePip = Boolean(detail?.inPip);
+            if (videoPlayerState.inNativePip) {
+                videoPlayerState.setFullscreen(false);
+            }
         };
         window.addEventListener("anily:pip-changed", onPipChanged);
 
@@ -501,6 +494,9 @@
         }
 
         return () => {
+            if (videoPlayerState.isFullscreen) {
+                videoPlayerState.setFullscreen(false);
+            }
             unbindMediaSession();
             window.removeEventListener("anily:pip-changed", onPipChanged);
             window.removeEventListener("resize", onWinResize);
@@ -819,7 +815,9 @@
                 videoPlayerState.minimize();
                 break;
             case "Escape":
-                if (!document.fullscreenElement) {
+                if (videoPlayerState.isFullscreen) {
+                    videoPlayerState.setFullscreen(false);
+                } else {
                     videoPlayerState.minimize();
                 }
                 break;
@@ -1320,10 +1318,10 @@
                             size="player"
                             variant="standard"
                             shape="circle"
-                            Icon={document.fullscreenElement ? ArrowsInIcon : ArrowsOutIcon}
+                            Icon={videoPlayerState.isFullscreen ? ArrowsInIcon : ArrowsOutIcon}
                             onclick={toggleFullscreen}
-                            title="Fullscreen (F)"
-                            ariaLabel="Fullscreen"
+                            title={videoPlayerState.isFullscreen ? "Exit Fullscreen (F)" : "Fullscreen (F)"}
+                            ariaLabel={videoPlayerState.isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
                         />
                     </div>
                 </div>

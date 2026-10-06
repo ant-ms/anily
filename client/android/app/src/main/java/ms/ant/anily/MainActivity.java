@@ -55,10 +55,21 @@ public class MainActivity extends BridgeActivity {
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, android.content.res.Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
         try {
+            if (isInPictureInPictureMode) {
+                AnilyNativePlugin.setSystemFullscreen(this, false);
+            }
             if (getBridge() != null && getBridge().getWebView() != null) {
                 String js = String.format("window.dispatchEvent(new CustomEvent('anily:pip-changed', { detail: { inPip: %b } }));", isInPictureInPictureMode);
                 getBridge().getWebView().evaluateJavascript(js, null);
             }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        try {
+            AnilyNativePlugin.setSystemFullscreen(this, false);
         } catch (Exception ignored) {}
     }
 

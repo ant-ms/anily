@@ -6,7 +6,12 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
+import android.view.View;
+import android.view.Window;
 import androidx.core.content.FileProvider;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -645,6 +650,62 @@ public class AnilyNativePlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("exists", file.exists() && file.length() > 0);
         ret.put("path", file.getAbsolutePath());
+        call.resolve(ret);
+    }
+
+    private static volatile boolean isNativeFullscreen = false;
+
+    public static void setSystemFullscreen(android.app.Activity activity, boolean fullscreen) {
+        if (activity == null) return;
+        activity.runOnUiThread(() -> {
+            try {
+                Window window = activity.getWindow();
+                if (window == null) return;
+                View decorView = window.getDecorView();
+                WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decorView);
+                if (controller != null) {
+                    if (fullscreen) {
+                        controller.hide(WindowInsetsCompat.Type.systemBars());
+                        controller.setSystemBarsBehavior(
+                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        );
+                    } else {
+                        controller.show(WindowInsetsCompat.Type.systemBars());
+                    }
+                }
+                isNativeFullscreen = fullscreen;
+            } catch (Exception ignored) {}
+        });
+    }
+
+    public static boolean isSystemFullscreen() {
+        return isNativeFullscreen;
+    }
+
+    @PluginMethod
+    public void setFullscreen(PluginCall call) {
+        Boolean fullscreen = call.getBoolean("fullscreen", true);
+        if (getActivity() == null) {
+            call.reject("Activity is null");
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            try {
+                setSystemFullscreen(getActivity(), Boolean.TRUE.equals(fullscreen));
+                JSObject ret = new JSObject();
+                ret.put("success", true);
+                ret.put("fullscreen", isNativeFullscreen);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("Failed to set fullscreen: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void isFullscreen(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("fullscreen", isNativeFullscreen);
         call.resolve(ret);
     }
 }

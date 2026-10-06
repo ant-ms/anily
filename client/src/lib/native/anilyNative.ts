@@ -57,6 +57,8 @@ export interface AnilyNativePlugin {
 
   setBrightness(options: { brightness: number }): Promise<{ success: boolean }>;
   getBrightness(): Promise<{ brightness: number }>;
+  setFullscreen(options: { fullscreen: boolean }): Promise<{ success: boolean; fullscreen?: boolean }>;
+  isFullscreen(): Promise<{ fullscreen: boolean }>;
   enterPip(): Promise<{ success: boolean }>;
   setAutoPip(options: { enabled: boolean }): Promise<{ success: boolean }>;
   getLocalEpisodePath(options: { filename: string }): Promise<{ path: string; exists: boolean }>;
@@ -90,6 +92,8 @@ export const AnilyNative = registerPlugin<AnilyNativePlugin>("AnilyNative", {
     }),
     setBrightness: async () => ({ success: true }),
     getBrightness: async () => ({ brightness: 1.0 }),
+    setFullscreen: async () => ({ success: true, fullscreen: false }),
+    isFullscreen: async () => ({ fullscreen: false }),
     enterPip: async () => ({ success: false }),
     setAutoPip: async () => ({ success: true }),
     getLocalEpisodePath: async () => ({ path: "", exists: false }),

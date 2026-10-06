@@ -51,6 +51,7 @@ class VideoPlayerState {
   subtitleSize = $state<SubtitleSize>("medium");
   brightness = $state<number>(1);
   inNativePip = $state<boolean>(false);
+  isFullscreen = $state<boolean>(false);
 
   // Auto-watch threshold flag
   private markedAsWatchedThisSession = false;
@@ -164,6 +165,14 @@ class VideoPlayerState {
           this.subtitleSize = savedSize;
         }
       } catch {}
+
+      if (typeof document !== "undefined") {
+        document.addEventListener("fullscreenchange", () => {
+          if (!isNative) {
+            this.isFullscreen = Boolean(document.fullscreenElement);
+          }
+        });
+      }
     }
   }
 
@@ -256,6 +265,7 @@ class VideoPlayerState {
       try {
         await AnilyNative.setAutoPip({ enabled: true });
       } catch {}
+      this.setFullscreen(true);
     }
 
     if (isAndroid) {
@@ -283,14 +293,23 @@ class VideoPlayerState {
 
   public expand() {
     this.mode = "expanded";
+    if (isNative) {
+      this.setFullscreen(true);
+    }
   }
 
   public minimize() {
     this.mode = "minimized";
+    if (isNative) {
+      this.setFullscreen(false);
+    }
   }
 
   public async close() {
     this.mode = "hidden";
+    if (isNative) {
+      this.setFullscreen(false);
+    }
     const v = this.getVideo();
     if (v) {
       v.pause();
@@ -405,6 +424,7 @@ class VideoPlayerState {
   public async enterPip() {
     if (isNative) {
       try {
+        this.setFullscreen(false);
         const res = await AnilyNative.enterPip();
         if (res.success) return;
       } catch {}
@@ -424,19 +444,34 @@ class VideoPlayerState {
     }
   }
 
-  public async toggleFullscreen() {
-    const target = this.getContainer() || this.getVideo();
-    if (!target) return;
-
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await target.requestFullscreen();
+  public async setFullscreen(enable: boolean) {
+    this.isFullscreen = enable;
+    if (isNative) {
+      try {
+        await AnilyNative.setFullscreen({ fullscreen: enable });
+      } catch (err) {
+        console.warn("Native fullscreen toggle failed:", err);
       }
-    } catch (err) {
-      console.warn("Fullscreen toggle failed:", err);
+    } else {
+      const target = this.getContainer() || this.getVideo();
+      try {
+        if (enable) {
+          if (target && !document.fullscreenElement) {
+            await target.requestFullscreen();
+          }
+        } else {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          }
+        }
+      } catch (err) {
+        console.warn("Web fullscreen toggle failed:", err);
+      }
     }
+  }
+
+  public async toggleFullscreen() {
+    await this.setFullscreen(!this.isFullscreen);
   }
 
   public get hasNextEpisode(): boolean {
