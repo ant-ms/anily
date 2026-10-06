@@ -1,6 +1,7 @@
 import { mount } from 'svelte';
 import './app.scss';
 import App from './App.svelte';
+import { Capacitor, CapacitorCookies } from '@capacitor/core';
 import { clearAuthSession } from './lib/auth';
 import { STORAGE_KEYS } from './lib/storageKeys';
 
@@ -43,19 +44,25 @@ window.fetch = async (input, init) => {
     if (err?.name === 'AbortError') {
       throw err;
     }
-    const urlStr = getUrlString(input);
-    const isApi = isCoreApiRequest(urlStr);
-    const hasAuthData = !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || !!localStorage.getItem(STORAGE_KEYS.PROFILE_DATA);
-    if (isApi && hasAuthData && typeof navigator !== 'undefined' && navigator.onLine) {
+    throw err;
+  }
+
+  const refreshedToken = res.headers?.get('x-session-token');
+  if (refreshedToken) {
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, refreshedToken);
+    if (Capacitor.isNativePlatform()) {
       try {
-        const infoUrl = new URL('/info', urlStr).toString();
-        const check = await originalFetch(infoUrl);
-        if (check.ok) {
-          clearAuthSession();
+        const savedBackend = localStorage.getItem(STORAGE_KEYS.BACKEND_URL);
+        if (savedBackend) {
+          const cleaned = JSON.parse(savedBackend).trim().replace(/\/+$/, "");
+          CapacitorCookies.setCookie({
+            url: cleaned,
+            key: "oidc-auth",
+            value: refreshedToken,
+          }).catch(() => {});
         }
       } catch {}
     }
-    throw err;
   }
 
   const urlStr = getUrlString(input);

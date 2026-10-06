@@ -14,6 +14,12 @@ export const DEFAULT_SESSION_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 1 week (604,8
 process.env.OIDC_AUTH_EXPIRES =
   process.env.OIDC_AUTH_EXPIRES || `${DEFAULT_SESSION_EXPIRY_SECONDS}`;
 
+// Default OIDC session refresh interval to match session expiration if not explicitly set
+process.env.OIDC_AUTH_REFRESH_INTERVAL =
+  process.env.OIDC_AUTH_REFRESH_INTERVAL ||
+  process.env.OIDC_AUTH_EXPIRES ||
+  `${DEFAULT_SESSION_EXPIRY_SECONDS}`;
+
 export const isAllowedOrigin = (origin: string): boolean => {
   if (!origin) return false;
   const normalized = origin.replace(/\/$/, "");
@@ -60,6 +66,7 @@ export const setupAuthHandlers = (app: Hono) => {
   const corsMiddleware = cors({
     origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined),
     credentials: true,
+    exposeHeaders: ["X-Session-Token"],
   });
 
   app.use("*", async (c, next) => {
@@ -75,11 +82,17 @@ export const setupAuthHandlers = (app: Hono) => {
     if (token) {
       const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
       const existingCookie = c.req.header("cookie");
-      const cookieVal = `${cookieName}=${token}`;
-      c.req.raw.headers.set(
-        "Cookie",
-        existingCookie ? `${existingCookie}; ${cookieVal}` : cookieVal
-      );
+      let cookieHeader = `${cookieName}=${token}`;
+      if (existingCookie) {
+        const otherCookies = existingCookie
+          .split(";")
+          .map((part) => part.trim())
+          .filter((part) => part && !part.startsWith(`${cookieName}=`));
+        if (otherCookies.length > 0) {
+          cookieHeader = `${cookieName}=${token}; ${otherCookies.join("; ")}`;
+        }
+      }
+      c.req.raw.headers.set("Cookie", cookieHeader);
     }
     await next();
   });
@@ -133,7 +146,21 @@ export const setupAuthHandlers = (app: Hono) => {
           deleteCookie(c, cookieName, { path: "/" });
           return c.json({ error: "Unauthorized" }, 401);
         }
-      } catch {
+      } catch (err: any) {
+        const isNetworkError =
+          err instanceof TypeError ||
+          err?.name === "FetchError" ||
+          err?.code === "ECONNREFUSED" ||
+          err?.code === "ENOTFOUND" ||
+          err?.code === "ETIMEDOUT";
+
+        if (isNetworkError) {
+          return c.json(
+            { error: "Authentication service temporarily unavailable", details: err?.message },
+            503,
+          );
+        }
+
         const cookieName = process.env.OIDC_COOKIE_NAME || "oidc-auth";
         deleteCookie(c, cookieName, { path: "/" });
         return c.json({ error: "Unauthorized" }, 401);
@@ -153,6 +180,7 @@ export const setupAuthHandlers = (app: Hono) => {
         secure: true,
         maxAge,
       });
+      c.res.headers.set("X-Session-Token", session_jwt);
     }
   });
   app.get("/api/login", (c) => {

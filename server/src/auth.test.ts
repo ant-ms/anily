@@ -213,4 +213,38 @@ describe("CORS configuration", () => {
     const otherCookie = "other=value; Path=/";
     expect(appendMaxAgeToCookie(otherCookie, "oidc-auth", 604800)).toBe(otherCookie);
   });
+
+  it("exposes X-Session-Token header on response when oidcAuthJwt is refreshed", async () => {
+    const testApp = new Hono();
+    setupAuthHandlers(testApp);
+    testApp.use("/api/*", async (c, next) => {
+      c.set("oidcAuthJwt" as any, "new-refreshed-jwt-token");
+      await next();
+    });
+    testApp.get("/api/test-token-header", (c) => c.json({ ok: true }));
+
+    const res = await testApp.request("/api/test-token-header");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-session-token")).toBe("new-refreshed-jwt-token");
+  });
+
+  it("replaces existing oidc-auth cookie when Authorization: Bearer is provided", async () => {
+    const testApp = new Hono();
+    setupAuthHandlers(testApp);
+    testApp.get("/api/test-bearer-override", (c) => {
+      return c.json({ cookie: c.req.header("cookie") });
+    });
+
+    const res = await testApp.request("/api/test-bearer-override", {
+      headers: {
+        Authorization: "Bearer brand-new-token",
+        Cookie: "oidc-auth=stale-old-cookie; other_cookie=xyz",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.cookie).toBe("oidc-auth=brand-new-token; other_cookie=xyz");
+    expect(data.cookie).not.toContain("stale-old-cookie");
+  });
 });
