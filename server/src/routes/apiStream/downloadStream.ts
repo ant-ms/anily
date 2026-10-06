@@ -16,9 +16,81 @@ const log = logger.child({ module: "downloadStream" });
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
+// In-memory cache of servers that recently hit HTTP 429 rate limits, with expiration timestamp
+const rateLimitedServers = new Map<string, number>();
+
+export function getRateLimitServerKey(candidate: { providerId: string; serverId?: string; serverName?: string }): string {
+  return `${candidate.providerId}:${candidate.serverId || candidate.serverName || "default"}`.toLowerCase();
+}
+
+export function markServerRateLimited(
+  providerId: string,
+  serverId?: string,
+  serverName?: string,
+  cooldownMs = 15 * 60 * 1000,
+): void {
+  const key = getRateLimitServerKey({ providerId, serverId, serverName });
+  rateLimitedServers.set(key, Date.now() + cooldownMs);
+  log.warn({ key, cooldownMs }, "Marked server as rate-limited for downloads");
+}
+
+export function isServerRateLimited(
+  providerId: string,
+  serverId?: string,
+  serverName?: string,
+): boolean {
+  const key = getRateLimitServerKey({ providerId, serverId, serverName });
+  const expires = rateLimitedServers.get(key);
+  if (!expires) return false;
+  if (Date.now() > expires) {
+    rateLimitedServers.delete(key);
+    return false;
+  }
+  return true;
+}
+
+export function clearRateLimitedServers(): void {
+  rateLimitedServers.clear();
+}
+
 interface StartedFfmpeg {
   process: ReturnType<typeof spawn>;
   webStream: ReadableStream<Uint8Array>;
+}
+
+interface StartFfmpegOptions {
+  signal?: AbortSignal;
+  trace?: ReturnType<typeof errorTracker.startTrace>;
+  providerName?: string;
+  serverName?: string;
+  onRateLimited?: () => void;
+}
+
+function checkStderrForFatalErrors(chunkStr: string): { isFatal: boolean; message: string; isRateLimit: boolean } {
+  if (
+    chunkStr.includes("429 Too Many Requests") ||
+    chunkStr.includes("HTTP error 429") ||
+    chunkStr.includes("Server returned 429")
+  ) {
+    return {
+      isFatal: true,
+      isRateLimit: true,
+      message: "Upstream CDN returned HTTP 429 Too Many Requests (rate limit reached)",
+    };
+  }
+
+  if (
+    /Segment \d+ of playlist \d+ failed too many times, skipping/i.test(chunkStr) ||
+    /failed too many times, skipping/i.test(chunkStr)
+  ) {
+    return {
+      isFatal: true,
+      isRateLimit: false,
+      message: "HLS segment skipped due to download failure; aborting to prevent truncated video",
+    };
+  }
+
+  return { isFatal: false, message: "", isRateLimit: false };
 }
 
 function startFfmpegStream(
@@ -28,19 +100,22 @@ function startFfmpegStream(
     headers?: Record<string, string>;
     subtitles?: SubtitleTrack[];
   },
-  signal?: AbortSignal,
+  options?: StartFfmpegOptions,
 ): Promise<StartedFfmpeg> {
   return new Promise((resolve, reject) => {
     const isHls = streamSource.container === "hls" || streamSource.url.includes(".m3u8");
 
     const args = [
       "-loglevel",
-      "error",
+      "warning",
       "-hide_banner",
     ];
 
     if (isHls) {
       args.push("-extension_picky", "0");
+      // Throttle HLS chunk requests to prevent triggering CDN burst rate limits (e.g. HTTP 429)
+      args.push("-readrate", "12");
+      args.push("-seg_max_retry", "5");
     }
 
     args.push(
@@ -48,6 +123,8 @@ function startFfmpegStream(
       "1",
       "-reconnect_streamed",
       "1",
+      "-reconnect_on_http_error",
+      "4xx,5xx",
       "-reconnect_delay_max",
       "5",
     );
@@ -94,6 +171,13 @@ function startFfmpegStream(
     const ffmpeg = spawn("ffmpeg", args);
     let stderr = "";
     let started = false;
+    let streamClosed = false;
+    let stdoutEnded = false;
+    let processClosed = false;
+    let exitCode: number | null = null;
+    let hasFatalError = false;
+    let fatalErrorMessage = "";
+    let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
 
     const killFfmpeg = () => {
       try {
@@ -101,12 +185,52 @@ function startFfmpegStream(
       } catch {}
     };
 
-    if (signal) {
-      signal.addEventListener("abort", killFfmpeg, { once: true });
+    if (options?.signal) {
+      options.signal.addEventListener("abort", killFfmpeg, { once: true });
     }
 
+    const finish = () => {
+      if (streamClosed) return;
+      streamClosed = true;
+      killFfmpeg();
+
+      if (hasFatalError || (exitCode !== null && exitCode !== 0)) {
+        const errorDetail = fatalErrorMessage || (stderr.trim() ? stderr.trim().slice(-300) : `ffmpeg exited with code ${exitCode}`);
+        const err = new Error(errorDetail);
+        log.error(
+          { error: err, exitCode, provider: options?.providerName, server: options?.serverName },
+          "Download stream terminated with error",
+        );
+        options?.trace?.fail(err, { message: errorDetail, statusCode: 502 });
+        if (streamController) {
+          try {
+            streamController.error(err);
+          } catch {}
+        }
+      } else {
+        options?.trace?.step("FFmpeg stream completed successfully");
+        if (streamController) {
+          try {
+            streamController.close();
+          } catch {}
+        }
+      }
+    };
+
     ffmpeg.stderr.on("data", (data) => {
-      stderr += data.toString();
+      const text = data.toString();
+      stderr += text;
+      const errorCheck = checkStderrForFatalErrors(text);
+      if (errorCheck.isFatal && !hasFatalError) {
+        hasFatalError = true;
+        fatalErrorMessage = errorCheck.message;
+        if (errorCheck.isRateLimit) {
+          options?.onRateLimited?.();
+        }
+        if (started && streamController && !streamClosed) {
+          finish();
+        }
+      }
     });
 
     const cleanup = () => {
@@ -129,6 +253,10 @@ function startFfmpegStream(
       if (!started) {
         cleanup();
         reject(err);
+      } else {
+        hasFatalError = true;
+        fatalErrorMessage = err.message;
+        finish();
       }
     };
 
@@ -139,6 +267,14 @@ function startFfmpegStream(
       }
     };
 
+    ffmpeg.on("close", (code) => {
+      processClosed = true;
+      exitCode = code;
+      if (started) {
+        finish();
+      }
+    });
+
     const onData = (firstChunk: Buffer) => {
       started = true;
       cleanup();
@@ -147,27 +283,34 @@ function startFfmpegStream(
 
       const webStream = new ReadableStream<Uint8Array>({
         start(controller) {
+          streamController = controller;
           controller.enqueue(new Uint8Array(firstChunk));
 
           ffmpeg.stdout.on("data", (chunk: Buffer) => {
-            controller.enqueue(new Uint8Array(chunk));
+            if (!streamClosed) {
+              try {
+                controller.enqueue(new Uint8Array(chunk));
+              } catch {}
+            }
           });
 
           ffmpeg.stdout.on("end", () => {
-            try {
-              controller.close();
-            } catch {}
+            stdoutEnded = true;
+            if (processClosed || hasFatalError) {
+              finish();
+            }
           });
 
           ffmpeg.stdout.on("error", (err) => {
-            try {
-              controller.error(err);
-            } catch {}
+            hasFatalError = true;
+            fatalErrorMessage = err.message;
+            finish();
           });
 
           ffmpeg.stdout.resume();
         },
         cancel() {
+          streamClosed = true;
           killFfmpeg();
         },
       });
@@ -264,7 +407,13 @@ export async function handleStreamDownload(
         container: streamSource.container,
         hasSubtitles: Boolean(streamSource.subtitles?.length),
       });
-      activeDownload = await startFfmpegStream(streamSource, c.req.raw.signal);
+      activeDownload = await startFfmpegStream(streamSource, {
+        signal: c.req.raw.signal,
+        trace,
+        providerName: providerId,
+        serverName: server,
+        onRateLimited: () => markServerRateLimited(providerId, server),
+      });
       trace.step("FFmpeg stream established successfully");
     } catch (err) {
       log.error({ error: err, episodeId, providerId }, "Failed to start ffmpeg for selected provider");
@@ -295,7 +444,24 @@ export async function handleStreamDownload(
 
     const langServices = services.filter((s) => s.language === language);
     const candidates = langServices.length > 0 ? langServices : services;
-    candidates.sort((a, b) => getServiceScore(b) - getServiceScore(a));
+
+    // Sort candidates for download:
+    // 1. Move recently rate-limited servers to the back.
+    // 2. Prefer providers that do not throttle/rate-limit downloads (e.g. ZokoAnime).
+    candidates.sort((a, b) => {
+      const aRateLimited = isServerRateLimited(a.providerId, a.serverId, a.serverName);
+      const bRateLimited = isServerRateLimited(b.providerId, b.serverId, b.serverName);
+      if (aRateLimited && !bRateLimited) return 1;
+      if (!aRateLimited && bRateLimited) return -1;
+
+      // Bonus for known high-throughput unthrottled servers for downloads
+      const aIsZoko = a.serverName?.toLowerCase().includes("zoko") || a.providerId === "zokoanime";
+      const bIsZoko = b.serverName?.toLowerCase().includes("zoko") || b.providerId === "zokoanime";
+      const aBonus = aIsZoko ? 6 : 0;
+      const bBonus = bIsZoko ? 6 : 0;
+
+      return (getServiceScore(b) + bBonus) - (getServiceScore(a) + aBonus);
+    });
 
     trace.step("Found candidates", {
       totalFound: services.length,
@@ -304,6 +470,7 @@ export async function handleStreamDownload(
         server: c.serverName,
         language: c.language,
         score: getServiceScore(c),
+        isRateLimited: isServerRateLimited(c.providerId, c.serverId, c.serverName),
       })),
     });
 
@@ -338,7 +505,13 @@ export async function handleStreamDownload(
           hasSubtitles: Boolean(streamSource.subtitles?.length),
         });
 
-        activeDownload = await startFfmpegStream(streamSource, c.req.raw.signal);
+        activeDownload = await startFfmpegStream(streamSource, {
+          signal: c.req.raw.signal,
+          trace,
+          providerName: candidate.providerName,
+          serverName: candidate.serverName,
+          onRateLimited: () => markServerRateLimited(candidate.providerId, candidate.serverId, candidate.serverName),
+        });
         log.info(
           { episodeId, provider: candidate.providerName, server: candidate.serverName },
           "Successfully started download stream with provider",

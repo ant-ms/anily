@@ -80,19 +80,32 @@ class DownloadManager {
       }
     } catch {}
 
-    try {
-      const rawIds = localStorage.getItem(STORAGE_KEYS.DOWNLOADED_ANIME_IDS);
-      if (rawIds) {
-        this.downloadedAnilistIds = JSON.parse(rawIds);
-      }
-    } catch {}
+    // Resync downloadedAnilistIds with actual completed downloads from state,
+    // immediately sanitizing any stale or corrupted entries from localStorage.
+    this.syncDownloadedAnilistIds();
+    this.persist();
 
     if (isNative) {
       this.checkAllActiveDownloads();
     }
   }
 
+  public syncDownloadedAnilistIds() {
+    const ids = new Set<number>();
+    for (const s of Object.values(this.states)) {
+      if (
+        s.status === "completed" &&
+        (s.bytesDownloaded > 0 || s.totalBytes > 0) &&
+        s.anilistId !== undefined
+      ) {
+        ids.add(Number(s.anilistId));
+      }
+    }
+    this.downloadedAnilistIds = Array.from(ids);
+  }
+
   private persist() {
+    this.syncDownloadedAnilistIds();
     try {
       localStorage.setItem(STORAGE_KEYS.ACTIVE_DOWNLOADS, JSON.stringify(this.states));
     } catch {}
@@ -107,13 +120,20 @@ class DownloadManager {
   public addDownloadedAnimeId(anilistId: number) {
     if (!this.downloadedAnilistIds.includes(anilistId)) {
       this.downloadedAnilistIds = [...this.downloadedAnilistIds, anilistId];
-      this.persist();
     }
+    this.persist();
   }
 
   public hasDownloads(allAnilistIds: number[]): boolean {
     if (!allAnilistIds || allAnilistIds.length === 0) return false;
-    return allAnilistIds.some((id) => this.downloadedAnilistIds.includes(id));
+    const anilistSet = new Set(allAnilistIds.map(Number));
+    return Object.values(this.states).some(
+      (s) =>
+        s.status === "completed" &&
+        (s.bytesDownloaded > 0 || s.totalBytes > 0) &&
+        s.anilistId !== undefined &&
+        anilistSet.has(Number(s.anilistId)),
+    );
   }
 
   public async checkEpisode(
@@ -211,7 +231,6 @@ class DownloadManager {
               JSON.stringify(groupData),
             );
           } catch {}
-          this.addDownloadedAnimeId(id);
 
           try {
             const dUrl = new URL(`/api/details/${id}`, apiBaseUrl.current);
@@ -625,20 +644,7 @@ class DownloadManager {
       }
     }
 
-    const currentAnilistId = anilistId ?? this.states[episodeId]?.anilistId;
     delete this.states[episodeId];
-
-    if (currentAnilistId) {
-      const hasOther = Object.values(this.states).some(
-        (s) => s.status === "completed" && s.anilistId === currentAnilistId,
-      );
-      if (!hasOther) {
-        this.downloadedAnilistIds = this.downloadedAnilistIds.filter(
-          (id) => id !== currentAnilistId,
-        );
-      }
-    }
-
     this.persist();
     snackbar.success("Deleted downloaded episode");
   }
@@ -661,11 +667,6 @@ class DownloadManager {
       delete this.states[item.episodeId];
     }
 
-    if (anilistId !== undefined) {
-      this.downloadedAnilistIds = this.downloadedAnilistIds.filter(
-        (id) => id !== anilistId,
-      );
-    }
     this.persist();
     snackbar.success("Deleted all downloads for this anime");
   }
