@@ -185,8 +185,8 @@ public class AnilyNativePlugin extends Plugin {
                         java.net.URL requestUrl = new java.net.URL(currentUrl);
                         conn = (java.net.HttpURLConnection) requestUrl.openConnection();
                         conn.setInstanceFollowRedirects(false);
-                        conn.setConnectTimeout(30000);
-                        conn.setReadTimeout(60000);
+                        conn.setConnectTimeout(60000);
+                        conn.setReadTimeout(180000);
                         conn.setRequestProperty("User-Agent", "Anily-Android/1.0");
 
                         if (headers != null) {

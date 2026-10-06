@@ -46,8 +46,6 @@ function startFfmpegStream(
     args.push(
       "-reconnect",
       "1",
-      "-reconnect_at_eof",
-      "1",
       "-reconnect_streamed",
       "1",
       "-reconnect_delay_max",
@@ -122,9 +120,10 @@ function startFfmpegStream(
       if (!started) {
         cleanup();
         killFfmpeg();
-        reject(new Error("ffmpeg startup timed out"));
+        const errDetail = stderr.trim() ? `: ${stderr.trim().slice(-300)}` : "";
+        reject(new Error(`ffmpeg startup timed out${errDetail}`));
       }
-    }, 15000);
+    }, 25000);
 
     const onError = (err: Error) => {
       if (!started) {
@@ -308,6 +307,8 @@ export async function handleStreamDownload(
       })),
     });
 
+    const triedUrls = new Set<string>();
+
     // Try candidates in order until ffmpeg starts successfully
     for (const candidate of candidates) {
       try {
@@ -323,6 +324,14 @@ export async function handleStreamDownload(
           trace.warn(`Candidate ${candidate.providerName} returned empty stream URL`);
           continue;
         }
+
+        if (triedUrls.has(streamSource.url)) {
+          trace.step(
+            `Skipping candidate ${candidate.providerName} (${candidate.serverName}): identical stream URL already attempted`,
+          );
+          continue;
+        }
+        triedUrls.add(streamSource.url);
 
         trace.step(`Spawning FFmpeg for ${candidate.providerName} (${candidate.serverName})`, {
           container: streamSource.container,
