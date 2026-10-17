@@ -123,6 +123,12 @@
                     color: #e8e4df;
                 }
 
+                &:focus-visible {
+                    outline: 2px solid #ffd52c;
+                    outline-offset: -2px;
+                    z-index: 1;
+                }
+
                 &:disabled {
                     opacity: 0.5;
                     cursor: not-allowed;
@@ -175,6 +181,7 @@
                 box-sizing: border-box;
                 border-radius: 8px;
                 cursor: pointer;
+                outline: none;
                 transition:
                     background 0.15s ease,
                     border-color 0.15s ease,
@@ -188,6 +195,11 @@
                 &:hover:not(:disabled) {
                     background: var(--m3-state-hover, rgba(231, 225, 222, 0.08));
                     color: var(--m3-on-surface, #e7e1de);
+                }
+
+                &:focus-visible {
+                    outline: 2px solid #ffd52c;
+                    outline-offset: -2px;
                 }
 
                 &:disabled {

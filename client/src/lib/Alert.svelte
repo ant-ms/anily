@@ -124,6 +124,12 @@
                 background: rgba(255, 255, 255, 0.04);
             }
 
+            &:focus-visible {
+                background: rgba(255, 255, 255, 0.06);
+                outline: 2px solid #ffd52c;
+                outline-offset: -2px;
+            }
+
             .header-content {
                 display: flex;
                 align-items: center;

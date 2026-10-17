@@ -29,13 +29,22 @@
 
 <!-- TODO: Stay highlighted -->
 
-<!-- svelte-ignore a11y_missing_attribute -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<a
-    onclick={() => {
+<button
+    type="button"
+    onclick={(e) => {
         if (isOfflineDisabled) return;
-        if (data.allAnilistIds.includes(selectedAnimeAnilistId.current ?? 0)) {
+        const isAlreadyActive = data.allAnilistIds.includes(
+            selectedAnimeAnilistId.current ?? 0,
+        );
+        if (isAlreadyActive) {
+            if (e.detail === 0) {
+                // Triggered via keyboard (Enter/Space) on an already-selected card: move focus into the main content area
+                const firstEpisodeOrControl = document.querySelector<HTMLElement>(
+                    '#content .episode-card:not(.is-future) .thumbnail-container[tabindex="0"], #content button:not([disabled]), #content [tabindex="0"]',
+                );
+                firstEpisodeOrControl?.focus();
+                return;
+            }
             selectedAnimeAnilistId.set(undefined);
         } else {
             selectedAnimeAnilistId.set(data.displayAnilistId, { clearHistory: true });
@@ -49,6 +58,7 @@
         selectedAnimeAnilistId.current ?? 0,
     )}
     class:offline-disabled={isOfflineDisabled}
+    disabled={isOfflineDisabled}
     aria-disabled={isOfflineDisabled}
 >
     <div class="thumb-container">
@@ -75,27 +85,40 @@
             </div>
         {/if}
     </div>
-</a>
+</button>
 
 <style lang="scss">
     .sidebar-card {
         display: flex;
+        align-items: center;
         gap: 0.5rem;
         padding: 8px;
         margin: 2px 12px;
+        width: calc(100% - 24px);
+        box-sizing: border-box;
+        background: transparent;
+        border: 2px solid transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
         border-radius: 12px;
         cursor: pointer;
+        outline: none;
         user-select: none;
         -webkit-user-select: none;
         -webkit-tap-highlight-color: transparent;
 
-        transition: background 0.2s cubic-bezier(0.2, 0, 0, 1);
+        transition:
+            background 0.2s cubic-bezier(0.2, 0, 0, 1),
+            border-color 0.15s ease,
+            box-shadow 0.15s ease;
 
         img {
             width: 65px;
             height: 90px;
             object-fit: cover;
             border-radius: 8px;
+            display: block;
         }
 
         .right {
@@ -104,6 +127,7 @@
             justify-content: center;
             gap: 2px;
             min-width: 0;
+            flex: 1;
 
             span {
                 font-size: 14px;
@@ -138,11 +162,22 @@
             background: hsl(36, 7%, 14%);
         }
 
+        &:focus-visible {
+            background: hsl(36, 7%, 16%);
+            border-color: #ffd52c;
+            box-shadow: 0 0 0 2px rgba(255, 213, 44, 0.22);
+        }
+
         &.active {
             background: rgba(255, 213, 44, 0.12);
 
             &:hover {
                 background: rgba(255, 213, 44, 0.18);
+            }
+
+            &:focus-visible {
+                background: rgba(255, 213, 44, 0.2);
+                border-color: #ffd52c;
             }
         }
 
@@ -181,6 +216,7 @@
             padding: 6px;
             gap: 0.4rem;
             margin: 2px 8px;
+            width: calc(100% - 16px);
 
             img {
                 width: 52px;

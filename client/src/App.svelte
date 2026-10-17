@@ -44,6 +44,10 @@
     import { App } from "@capacitor/app";
     import type { PluginListenerHandle } from "@capacitor/core";
     import { executeBackHandler } from "./lib/navigation/backHandler";
+    import {
+        handleSpatialNavigation,
+        focusDefaultElement,
+    } from "./lib/navigation/keyboardNav";
     import { serverPing } from "./lib/serverPing.svelte";
     import {
         parseCurrentRoute,
@@ -285,8 +289,21 @@
             }
 
             if (e.key === "Escape") {
-                handleBack();
+                const handled = handleBack();
+                if (handled) {
+                    requestAnimationFrame(() => {
+                        if (
+                            !document.activeElement ||
+                            document.activeElement === document.body
+                        ) {
+                            focusDefaultElement();
+                        }
+                    });
+                }
+                return;
             }
+
+            handleSpatialNavigation(e);
         };
         window.addEventListener("keydown", handleKeyDown);
 

@@ -61,12 +61,18 @@
         gap: 4px;
         padding: 6px;
         border-radius: 6px;
+        outline: none;
         user-select: none;
         -webkit-user-select: none;
         -webkit-tap-highlight-color: transparent;
         transition:
             background 0.2s,
             border 0.2s;
+
+        &:focus-visible {
+            outline: 2px solid #ffd52c;
+            outline-offset: 2px;
+        }
 
         &.style-normal {
             background: hsl(20, 17.6%, 8.5%);

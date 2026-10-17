@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { tick } from "svelte";
     import type { Snippet } from "svelte";
 
     import { registerBackHandler } from "./navigation/backHandler";
@@ -17,30 +18,40 @@
         children?: Snippet;
     } = $props();
 
+    let sheetRef: HTMLElement | undefined = $state();
+
     $effect(() => {
         if (isOpen) {
-            return registerBackHandler(() => {
+            const previousFocus = document.activeElement as HTMLElement | null;
+            tick().then(() => {
+                const target =
+                    sheetRef?.querySelector<HTMLElement>(
+                        '.selected:not([disabled]), [aria-checked="true"]:not([disabled]), [aria-selected="true"]:not([disabled]), button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                    ) ?? sheetRef;
+                target?.focus({ preventScroll: true });
+            });
+
+            const unregister = registerBackHandler(() => {
                 if (isOpen) {
                     isOpen = false;
                     return true;
                 }
                 return false;
             });
+
+            return () => {
+                unregister();
+                if (previousFocus && previousFocus.isConnected) {
+                    tick().then(() => previousFocus.focus({ preventScroll: true }));
+                }
+            };
         }
     });
 
     function handleBackdropClick() {
         isOpen = false;
     }
-
-    function handleKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape" && isOpen) {
-            isOpen = false;
-        }
-    }
 </script>
-
-<svelte:window onkeydown={handleKeydown} />
 
 {#if isOpen}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -48,6 +59,7 @@
     <div class="bottom-sheet-backdrop" onclick={handleBackdropClick}>
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <div
+            bind:this={sheetRef}
             class="bottom-sheet-content"
             role="dialog"
             aria-modal="true"

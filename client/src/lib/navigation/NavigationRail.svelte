@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { tick } from "svelte";
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import type ProfileData from "../../types/ProfileData";
     import { apiBaseUrl, selectedAnimeAnilistId, isGlobalSearchOpen } from "../context.svelte";
@@ -10,6 +11,7 @@
     import SignOutIcon from "phosphor-svelte/lib/SignOutIcon";
     import NavDestination from "./NavDestination.svelte";
     import { defaultDestinations } from "./destinations";
+    import { registerBackHandler } from "./backHandler";
     import Avatar from "../Avatar.svelte";
     import MenuItem from "../MenuItem.svelte";
     import CloudSlashIcon from "phosphor-svelte/lib/CloudSlashIcon";
@@ -27,6 +29,31 @@
     } = $props();
 
     let isProfileMenuOpen = $state(false);
+
+    $effect(() => {
+        if (isProfileMenuOpen) {
+            const previousFocus = document.activeElement as HTMLElement | null;
+            tick().then(() => {
+                const firstItem = document.querySelector<HTMLElement>(
+                    ".m3-navigation-rail .profile-popover button:not([disabled])",
+                );
+                firstItem?.focus({ preventScroll: true });
+            });
+            const unregister = registerBackHandler(() => {
+                if (isProfileMenuOpen) {
+                    isProfileMenuOpen = false;
+                    return true;
+                }
+                return false;
+            });
+            return () => {
+                unregister();
+                if (previousFocus && previousFocus.isConnected) {
+                    tick().then(() => previousFocus.focus({ preventScroll: true }));
+                }
+            };
+        }
+    });
 
     const isProfileTabActive = $derived(activeTab?.id === "logs" || activeTab?.id === "errors" || activeTab?.id === "settings" || activeTab?.id === "downloads");
 

@@ -879,6 +879,12 @@
                         border: none;
                         padding: 0;
                         cursor: pointer;
+                        outline: none;
+
+                        &:focus-visible {
+                            outline: 2px solid #ffd52c;
+                            outline-offset: 2px;
+                        }
 
                         .anime-thumbnail {
                             width: 100%;
@@ -915,21 +921,30 @@
                             .anime-title-btn {
                                 background: none;
                                 border: none;
-                                padding: 0;
+                                padding: 2px 4px;
+                                margin: -2px -4px;
+                                border-radius: 4px;
                                 font-size: 0.95rem;
                                 font-weight: 600;
                                 color: #fff;
                                 text-align: left;
                                 cursor: pointer;
+                                outline: none;
                                 white-space: nowrap;
                                 overflow: hidden;
                                 text-overflow: ellipsis;
                                 display: block;
                                 max-width: 100%;
 
-                                &:hover {
+                                &:hover,
+                                &:focus-visible {
                                     color: #ffd52c;
                                     text-decoration: underline;
+                                }
+
+                                &:focus-visible {
+                                    outline: 2px solid #ffd52c;
+                                    outline-offset: 2px;
                                 }
                             }
                         }

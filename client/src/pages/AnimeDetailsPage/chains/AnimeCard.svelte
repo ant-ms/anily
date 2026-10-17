@@ -91,6 +91,20 @@
             border-color: #5a554c;
         }
 
+        &:focus-visible {
+            outline: none;
+
+            img,
+            .placeholder {
+                border-color: #ffd52c;
+                box-shadow: 0 0 0 2px rgba(255, 213, 44, 0.35);
+            }
+
+            .caption {
+                color: #ffd52c;
+            }
+        }
+
         &.selected img,
         &.selected .placeholder {
             border-color: #ffd52c;

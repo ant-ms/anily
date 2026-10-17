@@ -301,14 +301,14 @@ class VideoPlayerState {
 
   public minimize() {
     this.mode = "minimized";
-    if (isNative) {
+    if (isNative || this.isFullscreen) {
       this.setFullscreen(false);
     }
   }
 
   public async close() {
     this.mode = "hidden";
-    if (isNative) {
+    if (isNative || this.isFullscreen) {
       this.setFullscreen(false);
     }
     const v = this.getVideo();

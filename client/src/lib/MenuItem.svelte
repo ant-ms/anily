@@ -52,6 +52,7 @@
         border-radius: 8px;
         background: transparent;
         border: none;
+        outline: none;
         color: #d0c8c0;
         cursor: pointer;
         font-size: 14px;
@@ -60,6 +61,13 @@
         transition:
             background 0.15s ease,
             color 0.15s ease;
+
+        &:focus-visible {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            outline: 2px solid #ffd52c;
+            outline-offset: -2px;
+        }
 
         &.has-icon-pill {
             padding: 10px 12px;

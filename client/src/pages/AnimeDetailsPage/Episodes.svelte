@@ -90,6 +90,7 @@
     };
 
     import { ratingManager } from '../../lib/rating.svelte';
+    import { registerBackHandler } from '../../lib/navigation/backHandler';
 
     // ── Rating ───────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,18 @@
     let dropdownOpenEpisodeId: number | null = $state(null);
     let servicesCache: Record<number, AvailableService[]> = $state({});
     let selectedServices: Record<number, AvailableService> = $state({});
+
+    $effect(() => {
+        if (dropdownOpenEpisodeId !== null) {
+            return registerBackHandler(() => {
+                if (dropdownOpenEpisodeId !== null) {
+                    dropdownOpenEpisodeId = null;
+                    return true;
+                }
+                return false;
+            });
+        }
+    });
 
     const fetchServices = async (episode: EpisodeData): Promise<AvailableService[]> => {
         if (servicesCache[episode.id]) return servicesCache[episode.id];

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { tick } from "svelte";
     import { fade } from "svelte/transition";
     import type { Snippet } from "svelte";
 
@@ -20,19 +21,35 @@
         children?: Snippet;
     } = $props();
 
+    let popoverRef: HTMLElement | undefined = $state();
+
     $effect(() => {
         if (isOpen) {
-            return registerBackHandler(() => {
+            const previousFocus = document.activeElement as HTMLElement | null;
+            tick().then(() => {
+                const target =
+                    popoverRef?.querySelector<HTMLElement>(
+                        '.selected:not([disabled]), [aria-checked="true"]:not([disabled]), [aria-selected="true"]:not([disabled]), button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                    ) ?? popoverRef;
+                target?.focus({ preventScroll: true });
+            });
+
+            const unregister = registerBackHandler(() => {
                 if (isOpen) {
                     isOpen = false;
                     return true;
                 }
                 return false;
             });
+
+            return () => {
+                unregister();
+                if (previousFocus && previousFocus.isConnected) {
+                    tick().then(() => previousFocus.focus({ preventScroll: true }));
+                }
+            };
         }
     });
-
-    let popoverRef: HTMLElement | undefined = $state();
 
     function handleWindowClick(e: MouseEvent) {
         if (!isOpen) return;
@@ -41,15 +58,9 @@
             isOpen = false;
         }
     }
-
-    function handleKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape" && isOpen) {
-            isOpen = false;
-        }
-    }
 </script>
 
-<svelte:window onclick={handleWindowClick} onkeydown={handleKeydown} />
+<svelte:window onclick={handleWindowClick} />
 
 {#if isOpen}
     <div

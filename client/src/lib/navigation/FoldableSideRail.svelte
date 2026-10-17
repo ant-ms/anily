@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { tick } from "svelte";
     import type { Tab } from "$lib/tab-switcher/tab-switcher-types";
     import type ProfileData from "../../types/ProfileData";
     import {
@@ -9,6 +10,7 @@
         isAnimeDescriptionOpen,
     } from "../context.svelte";
     import { defaultDestinations } from "./destinations";
+    import { registerBackHandler } from "./backHandler";
     import NavDestination from "./NavDestination.svelte";
     import IconButton from "../IconButton.svelte";
     import Avatar from "../Avatar.svelte";
@@ -47,6 +49,31 @@
     } = $props();
 
     let isProfileMenuOpen = $state(false);
+
+    $effect(() => {
+        if (isProfileMenuOpen) {
+            const previousFocus = document.activeElement as HTMLElement | null;
+            tick().then(() => {
+                const firstItem = document.querySelector<HTMLElement>(
+                    ".foldable-side-rail .profile-popover button:not([disabled])",
+                );
+                firstItem?.focus({ preventScroll: true });
+            });
+            const unregister = registerBackHandler(() => {
+                if (isProfileMenuOpen) {
+                    isProfileMenuOpen = false;
+                    return true;
+                }
+                return false;
+            });
+            return () => {
+                unregister();
+                if (previousFocus && previousFocus.isConnected) {
+                    tick().then(() => previousFocus.focus({ preventScroll: true }));
+                }
+            };
+        }
+    });
 
     const isInMediaDetails = $derived(selectedAnimeAnilistId.current !== undefined);
     const isProfileTabActive = $derived(

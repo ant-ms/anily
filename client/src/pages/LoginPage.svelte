@@ -195,12 +195,12 @@
             onclick={handleLogin}>Login</Button
         >
     </div>
-    <div class="checkbox-list">
-        <input type="checkbox" readonly checked={entedUrlValid} />
+    <div class="checkbox-list" aria-live="polite">
+        <input type="checkbox" tabindex="-1" disabled checked={entedUrlValid} />
         <span>Valid URL</span>
-        <input type="checkbox" readonly checked={enteredUrlReachable} />
+        <input type="checkbox" tabindex="-1" disabled checked={enteredUrlReachable} />
         <span>Reachable</span>
-        <input type="checkbox" readonly checked={enteredUrlAuthenticated} />
+        <input type="checkbox" tabindex="-1" disabled checked={enteredUrlAuthenticated} />
         <span>Authenticated</span>
     </div>
 </div>

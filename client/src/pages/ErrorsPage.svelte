@@ -1,8 +1,10 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import Button from "$lib/Button.svelte";
     import IconButton from "$lib/IconButton.svelte";
     import SegmentedControl from "$lib/SegmentedControl.svelte";
     import EmptyState from "$lib/EmptyState.svelte";
+    import BottomSheet from "$lib/BottomSheet.svelte";
     import { apiBaseUrl } from "$lib/context.svelte";
     import { snackbar } from "$lib/snackbar.svelte";
     import ArrowsClockwiseIcon from "phosphor-svelte/lib/ArrowsClockwiseIcon";
@@ -33,6 +35,7 @@
     let searchQuery = $state("");
     let expandedErrors: Record<string, boolean> = $state({});
     let isClearing = $state(false);
+    let isConfirmClearOpen = $state(false);
 
     const fetchErrors = async () => {
         try {
@@ -59,8 +62,12 @@
         }
     };
 
-    const clearErrors = async () => {
-        if (!confirm("Are you sure you want to clear all error records?")) return;
+    const promptClearErrors = () => {
+        isConfirmClearOpen = true;
+    };
+
+    const confirmClearErrors = async () => {
+        isConfirmClearOpen = false;
         try {
             isClearing = true;
             if (!apiBaseUrl.current) return;
@@ -172,7 +179,7 @@
             {#if errors.length > 0}
                 <IconButton
                     Icon={TrashIcon}
-                    onclick={clearErrors}
+                    onclick={promptClearErrors}
                     variant="tonal"
                     shape="circle"
                     size="standard"
@@ -231,7 +238,19 @@
                 {@const isExpanded = !!expandedErrors[errorItem.id]}
                 {@const CategoryIcon = getCategoryIcon(errorItem.category)}
                 <div class="error-card" class:expanded={isExpanded} class:download-error={errorItem.category === "DOWNLOAD"}>
-                    <div class="card-summary" role="button" tabindex="0" onclick={() => toggleExpand(errorItem.id)} onkeydown={(e) => e.key === 'Enter' && toggleExpand(errorItem.id)}>
+                    <div
+                        class="card-summary"
+                        role="button"
+                        tabindex="0"
+                        aria-expanded={isExpanded}
+                        onclick={() => toggleExpand(errorItem.id)}
+                        onkeydown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                toggleExpand(errorItem.id);
+                            }
+                        }}
+                    >
                         <div class="card-header-row">
                             <div class="badge-group">
                                 <span class="category-badge category-{errorItem.category.toLowerCase()}">
@@ -254,17 +273,13 @@
                                 <h2 class="error-action">{errorItem.action}</h2>
                                 <p class="error-message">{errorItem.message}</p>
                             </div>
-                            <button
-                                type="button"
-                                class="expand-btn"
-                                aria-label={isExpanded ? "Collapse trace" : "Expand trace"}
-                            >
+                            <span class="expand-btn" aria-hidden="true">
                                 {#if isExpanded}
                                     <CaretUpIcon size="1.25rem" />
                                 {:else}
                                     <CaretDownIcon size="1.25rem" />
                                 {/if}
-                            </button>
+                            </span>
                         </div>
 
                         <!-- Parameter Pills -->
@@ -352,6 +367,32 @@
         </div>
     {/if}
 </div>
+
+<BottomSheet bind:isOpen={isConfirmClearOpen} ariaLabel="Confirm Clear Error History">
+    <div class="confirm-sheet-content">
+        <h3 class="sheet-title">Clear all error records?</h3>
+        <p class="sheet-desc">
+            This will permanently remove all diagnostic error traces from the server history.
+        </p>
+        <div class="sheet-actions">
+            <Button
+                style="ghost"
+                onclick={() => {
+                    isConfirmClearOpen = false;
+                }}
+            >
+                Cancel
+            </Button>
+            <Button
+                class="btn-danger"
+                Icon={TrashIcon}
+                onclick={confirmClearErrors}
+            >
+                Clear All
+            </Button>
+        </div>
+    </div>
+</BottomSheet>
 
 <style lang="scss">
     #errors-page {
@@ -671,6 +712,12 @@
                 &:hover {
                     background: var(--m3-surface-container-highest);
                 }
+
+                &:focus-visible {
+                    background: var(--m3-surface-container-highest);
+                    outline: 2px solid #ffd52c;
+                    outline-offset: 2px;
+                }
             }
         }
 
@@ -772,6 +819,33 @@
             overflow-x: auto;
             white-space: pre;
             line-height: 1.4;
+        }
+    }
+
+    .confirm-sheet-content {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 4px 0 12px 0;
+
+        .sheet-title {
+            margin: 0;
+            font-size: 1.15rem;
+            color: #fff;
+        }
+
+        .sheet-desc {
+            margin: 0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #c4bfb9;
+        }
+
+        .sheet-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 8px;
         }
     }
 

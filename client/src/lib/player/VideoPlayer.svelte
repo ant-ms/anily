@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
+    import { onMount, onDestroy, tick } from "svelte";
     import { fade, scale } from "svelte/transition";
     import Hls from "hls.js";
     import { parseResponse, renderVTTCueString, type VTTCue } from "media-captions";
@@ -12,6 +12,7 @@
     } from "./mediaSession";
     import { AnilyNative, isNative, isAndroid } from "../native/anilyNative";
     import { apiBaseUrl } from "../context.svelte";
+    import { registerBackHandler } from "../navigation/backHandler";
     import IconButton from "../IconButton.svelte";
     import SegmentedControl from "../SegmentedControl.svelte";
 
@@ -142,6 +143,40 @@
     // Active menus
     let isSubtitleMenuOpen = $state(false);
 
+    $effect(() => {
+        if (isSubtitleMenuOpen) {
+            const unregister = registerBackHandler(() => {
+                isSubtitleMenuOpen = false;
+                tick().then(() => {
+                    containerEl?.querySelector<HTMLElement>(".menu-relative > button")?.focus();
+                });
+                return true;
+            });
+            tick().then(() => {
+                const selectedEl = containerEl?.querySelector<HTMLElement>(
+                    ".m3-popup-menu .menu-option.selected, .m3-popup-menu .menu-option",
+                );
+                selectedEl?.focus();
+            });
+            return unregister;
+        }
+    });
+
+    // Auto-focus Skip Intro/Outro button when it appears on TV if user isn't actively in another player menu/control
+    $effect(() => {
+        const seg = videoPlayerState.activeSkipSegment;
+        if (seg && videoPlayerState.mode === "expanded" && !isSubtitleMenuOpen) {
+            tick().then(() => {
+                const active = document.activeElement as HTMLElement | null;
+                const inControls = active?.closest(".player-bottombar, .player-topbar, .m3-popup-menu");
+                if (!inControls || !areControlsVisible) {
+                    const skipBtn = containerEl?.querySelector<HTMLElement>(".skip-segment-btn");
+                    skipBtn?.focus({ preventScroll: true });
+                }
+            });
+        }
+    });
+
     // Gestures HUD
     type GestureType = "seek" | "volume" | "brightness" | null;
     let activeGesture = $state<GestureType>(null);
@@ -182,6 +217,15 @@
         controlsTimer = setTimeout(() => {
             if (videoPlayerState.isPlaying && !isScrubbing && !isSubtitleMenuOpen) {
                 areControlsVisible = false;
+                const active = document.activeElement as HTMLElement | null;
+                if (active && active.closest(".player-topbar, .player-bottombar")) {
+                    const skipBtn = containerEl?.querySelector<HTMLElement>(".skip-segment-btn, .next-prompt-btn");
+                    if (skipBtn) {
+                        skipBtn.focus({ preventScroll: true });
+                    } else {
+                        active.blur();
+                    }
+                }
             }
         }, 3500);
     };
@@ -215,6 +259,26 @@
         seek(v.currentTime + offset);
     };
 
+    const seekRelativeWithHud = (offset: number) => {
+        const v = videoEl || videoPlayerState.getVideo();
+        if (!v) return;
+        const dur = v.duration || videoPlayerState.duration || Infinity;
+        const nextTarget = Math.max(0, Math.min(dur, v.currentTime + offset));
+        if (activeGesture === "seek") {
+            gestureSeekDelta += offset;
+        } else {
+            gestureSeekDelta = offset;
+        }
+        gestureSeekTarget = nextTarget;
+        activeGesture = "seek";
+        seek(nextTarget);
+        if (gestureHudTimer) clearTimeout(gestureHudTimer);
+        gestureHudTimer = setTimeout(() => {
+            activeGesture = null;
+            gestureSeekDelta = 0;
+        }, 850);
+    };
+
     const toggleMute = () => {
         const v = videoEl || videoPlayerState.getVideo();
         const next = !videoPlayerState.muted;
@@ -234,6 +298,9 @@
         videoPlayerState.setSubtitle(index);
         isSubtitleMenuOpen = false;
         restartControlsTimer();
+        tick().then(() => {
+            containerEl?.querySelector<HTMLElement>(".menu-relative > button")?.focus();
+        });
     };
 
     const toggleFullscreen = async () => {
@@ -744,41 +811,220 @@
         window.addEventListener("touchend", onScrubEnd);
     };
 
-    // Keyboard Shortcuts
+    const getVisibleElements = (selector: string): HTMLElement[] => {
+        if (!containerEl) return [];
+        return Array.from(containerEl.querySelectorAll<HTMLElement>(selector)).filter(
+            (el) => el.offsetParent !== null && !el.hasAttribute("disabled"),
+        );
+    };
+
+    // Keyboard & TV Remote Shortcuts
     const onKeyDown = (e: KeyboardEvent) => {
         if (videoPlayerState.mode !== "expanded") return;
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+        if (e.target instanceof HTMLTextAreaElement) return;
+        if (e.target instanceof HTMLInputElement && !e.target.classList.contains("volume-slider")) return;
 
+        // 1. Subtitle menu navigation when open
+        if (isSubtitleMenuOpen) {
+            const options = getVisibleElements(".m3-popup-menu .menu-option");
+            const segments = getVisibleElements(".m3-popup-menu .segment-item");
+            const active = document.activeElement as HTMLElement | null;
+            const optIdx = active ? options.indexOf(active) : -1;
+            const segIdx = active ? segments.indexOf(active) : -1;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                e.stopPropagation();
+                if (optIdx >= 0 && optIdx < options.length - 1) {
+                    options[optIdx + 1].focus();
+                } else if (optIdx === options.length - 1 && segments.length > 0) {
+                    const activeSeg = segments.find((s) => s.classList.contains("active-accent")) || segments[0];
+                    activeSeg.focus();
+                } else if (options.length > 0) {
+                    options[0].focus();
+                }
+                return;
+            }
+            if (e.key === "ArrowUp") {
+                e.preventDefault();
+                e.stopPropagation();
+                if (segIdx >= 0 && options.length > 0) {
+                    options[options.length - 1].focus();
+                } else if (optIdx > 0) {
+                    options[optIdx - 1].focus();
+                }
+                return;
+            }
+            if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                if (segIdx >= 0 && segments.length > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const nextIdx =
+                        e.key === "ArrowRight"
+                            ? (segIdx + 1) % segments.length
+                            : (segIdx - 1 + segments.length) % segments.length;
+                    segments[nextIdx].focus();
+                    segments[nextIdx].click();
+                }
+                return;
+            }
+            return;
+        }
+
+        const active = document.activeElement as HTMLElement | null;
+        const isControlsShown = areControlsVisible || !videoPlayerState.isPlaying;
+        const inTopBar = Boolean(active?.closest(".player-topbar")) && isControlsShown;
+        const inControlsRow = Boolean(active?.closest(".controls-row")) && isControlsShown;
+        const inScrubber = Boolean(active?.classList.contains("scrubber-wrapper")) && isControlsShown;
+        const inPrompt = Boolean(active?.closest(".skip-segment-container, .next-prompt-container"));
+
+        // 2. Directional navigation across OSD tiers
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+            const dir = e.key === "ArrowRight" ? 1 : -1;
+            if (inControlsRow && !(active instanceof HTMLInputElement)) {
+                const rowBtns = getVisibleElements(".controls-row button");
+                const idx = active ? rowBtns.indexOf(active) : -1;
+                if (idx >= 0) {
+                    e.preventDefault();
+                    restartControlsTimer();
+                    const nextIdx = Math.max(0, Math.min(rowBtns.length - 1, idx + dir));
+                    rowBtns[nextIdx]?.focus();
+                    return;
+                }
+            }
+            if (inTopBar) {
+                const topBtns = getVisibleElements(".player-topbar button");
+                const idx = active ? topBtns.indexOf(active) : -1;
+                if (idx >= 0) {
+                    e.preventDefault();
+                    restartControlsTimer();
+                    const nextIdx = Math.max(0, Math.min(topBtns.length - 1, idx + dir));
+                    topBtns[nextIdx]?.focus();
+                    return;
+                }
+            }
+            if (inPrompt) {
+                const prompts = getVisibleElements(".skip-segment-btn, .next-prompt-btn");
+                const idx = active ? prompts.indexOf(active) : -1;
+                if (prompts.length > 1 && idx >= 0) {
+                    e.preventDefault();
+                    const nextIdx = Math.max(0, Math.min(prompts.length - 1, idx + dir));
+                    prompts[nextIdx]?.focus();
+                    return;
+                }
+            }
+            if (!(active instanceof HTMLInputElement)) {
+                e.preventDefault();
+                seekRelativeWithHud(dir * 5);
+                return;
+            }
+        }
+
+        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            const isUp = e.key === "ArrowUp";
+            const wasControlsShown = isControlsShown;
+            restartControlsTimer();
+
+            const scrubber = containerEl?.querySelector<HTMLElement>(".scrubber-wrapper");
+            const rowBtns = getVisibleElements(".controls-row button");
+            const topBtns = getVisibleElements(".player-topbar button");
+            const prompts = getVisibleElements(".skip-segment-btn, .next-prompt-btn");
+
+            if (!wasControlsShown && !inPrompt) {
+                if (isUp) {
+                    scrubber?.focus();
+                } else {
+                    rowBtns[0]?.focus();
+                }
+                return;
+            }
+
+            if (isUp) {
+                if (inControlsRow) {
+                    scrubber?.focus();
+                } else if (inScrubber) {
+                    if (prompts.length > 0) {
+                        prompts[0].focus();
+                    } else {
+                        topBtns[0]?.focus();
+                    }
+                } else if (inPrompt) {
+                    topBtns[0]?.focus();
+                } else if (!inTopBar) {
+                    scrubber?.focus();
+                }
+            } else {
+                if (inTopBar) {
+                    if (prompts.length > 0) {
+                        prompts[0].focus();
+                    } else {
+                        scrubber?.focus();
+                    }
+                } else if (inPrompt) {
+                    scrubber?.focus();
+                } else if (inScrubber) {
+                    rowBtns[0]?.focus();
+                } else if (!inControlsRow) {
+                    rowBtns[0]?.focus();
+                }
+            }
+            return;
+        }
+
+        // 3. Enter / Space / Hardware Media Keys & Hotkeys
         switch (e.key) {
-            case " ":
-            case "k":
-            case "K":
+            case "Enter": {
+                if ((inControlsRow || inTopBar || inPrompt) && active instanceof HTMLButtonElement) {
+                    restartControlsTimer();
+                    return; // Let native button click fire
+                }
                 e.preventDefault();
                 togglePlay();
                 break;
-            case "ArrowLeft":
+            }
+            case " ": {
+                if ((inControlsRow || inTopBar || inPrompt) && active instanceof HTMLButtonElement) {
+                    restartControlsTimer();
+                    return; // Let native button click fire
+                }
                 e.preventDefault();
-                seekRelative(-5);
+                togglePlay();
                 break;
-            case "ArrowRight":
+            }
+            case "k":
+            case "K":
+            case "MediaPlayPause":
                 e.preventDefault();
-                seekRelative(5);
+                togglePlay();
+                break;
+            case "MediaPlay":
+                e.preventDefault();
+                if (!videoPlayerState.isPlaying) togglePlay();
+                break;
+            case "MediaPause":
+                e.preventDefault();
+                if (videoPlayerState.isPlaying) togglePlay();
                 break;
             case "j":
             case "J":
+            case "MediaRewind":
                 e.preventDefault();
-                seekRelative(-10);
+                seekRelativeWithHud(-10);
                 break;
             case "l":
             case "L":
+            case "MediaFastForward":
                 e.preventDefault();
-                seekRelative(10);
+                seekRelativeWithHud(10);
                 break;
-            case "ArrowUp":
+            case "+":
+            case "=":
                 e.preventDefault();
                 setVolume(videoPlayerState.volume + 0.05);
                 break;
-            case "ArrowDown":
+            case "-":
+            case "_":
                 e.preventDefault();
                 setVolume(videoPlayerState.volume - 0.05);
                 break;
@@ -794,11 +1040,13 @@
                 break;
             case "n":
             case "N":
+            case "MediaTrackNext":
                 e.preventDefault();
                 videoPlayerState.playNextEpisode();
                 break;
             case "p":
             case "P":
+            case "MediaTrackPrevious":
                 e.preventDefault();
                 videoPlayerState.playPreviousEpisode();
                 break;
@@ -832,13 +1080,6 @@
             case "I":
                 e.preventDefault();
                 videoPlayerState.minimize();
-                break;
-            case "Escape":
-                if (videoPlayerState.isFullscreen) {
-                    videoPlayerState.setFullscreen(false);
-                } else {
-                    videoPlayerState.minimize();
-                }
                 break;
         }
     };
@@ -1123,15 +1364,6 @@
                     aria-valuetext="{formatTime(videoPlayerState.currentTime)} of {formatTime(videoPlayerState.duration)}"
                     onmousedown={onScrubStart}
                     ontouchstart={onScrubStart}
-                    onkeydown={(e) => {
-                        if (e.key === "ArrowLeft") {
-                            e.preventDefault();
-                            seekRelative(-5);
-                        } else if (e.key === "ArrowRight") {
-                            e.preventDefault();
-                            seekRelative(5);
-                        }
-                    }}
                 >
                     <div class="scrub-track-bg"></div>
                     {#if videoPlayerState.duration > 0}
@@ -1274,7 +1506,6 @@
                                         class="m3-popup-menu"
                                         transition:fade={{ duration: 120 }}
                                         onclick={(e) => e.stopPropagation()}
-                                        onkeydown={(e) => e.stopPropagation()}
                                         role="dialog"
                                         tabindex="-1"
                                         aria-label="Subtitle settings"
@@ -1820,6 +2051,7 @@
             }
 
             &:hover,
+            &:focus-visible,
             &.is-scrubbing {
                 .scrub-track-bg,
                 .scrub-track-buffer,
@@ -2094,10 +2326,14 @@
             font-weight: 700;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
             cursor: pointer;
-            transition: transform 0.15s ease;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
 
-            &:hover {
+            &:hover,
+            &:focus-visible {
                 transform: scale(1.04);
+                outline: 2px solid #ffffff;
+                outline-offset: 2px;
+                box-shadow: 0 8px 28px rgba(0, 0, 0, 0.8), 0 0 16px rgba(255, 213, 44, 0.5);
             }
         }
     }
@@ -2168,11 +2404,14 @@
                 margin-left: 2px;
             }
 
-            &:hover {
+            &:hover,
+            &:focus-visible {
                 transform: scale(1.04);
                 background: rgba(45, 38, 28, 0.95);
                 border-color: #ffd52c;
-                box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75), 0 0 12px rgba(255, 213, 44, 0.25);
+                outline: 2px solid #ffd52c;
+                outline-offset: 2px;
+                box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75), 0 0 16px rgba(255, 213, 44, 0.35);
             }
 
             &:active {
@@ -2194,7 +2433,8 @@
         opacity: 0;
         transition: opacity 0.2s ease;
 
-        &:hover {
+        &:hover,
+        &:focus-within {
             opacity: 1;
         }
 

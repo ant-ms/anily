@@ -119,9 +119,16 @@
             if (!episodeFuture) onPlay(episode);
         }}
         onkeydown={(e) => {
-            if (!episodeFuture && (e.key === 'Enter' || e.key === ' ')) {
+            if (episodeFuture) return;
+            if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 onPlay(episode);
+            } else if (e.key === 'w' || e.key === 'W') {
+                e.preventDefault();
+                onToggleWatch(episode);
+            } else if (e.key === 'o' || e.key === 'O' || e.key === 'm' || e.key === 'M') {
+                e.preventDefault();
+                onToggleDropdown(episode);
             }
         }}
     >
@@ -188,7 +195,7 @@
                 shape="circle"
                 size="standard"
                 onclick={() => onToggleWatch(episode)}
-                title={episode.watched ? 'Mark as unplayed' : 'Mark as played'}
+                title={episode.watched ? 'Mark as unplayed (W)' : 'Mark as played (W)'}
                 ariaLabel={episode.watched ? 'Mark as unplayed' : 'Mark as played'}
             />
 
@@ -257,7 +264,7 @@
                         e.stopPropagation();
                         onToggleDropdown(episode);
                     }}
-                    title="Streaming options"
+                    title="Streaming options (O)"
                     ariaLabel="Streaming options"
                 />
 
@@ -306,6 +313,17 @@
             border-color: rgba(255, 213, 44, 0.4);
         }
 
+        &:focus-within {
+            background: #24201d;
+            border-color: #ffd52c;
+            box-shadow: 0 0 0 2px rgba(255, 213, 44, 0.28), 0 8px 24px rgba(0, 0, 0, 0.5);
+            z-index: 3;
+
+            &.dropdown-open {
+                z-index: 50;
+            }
+        }
+
         &:active {
             background: #24201d;
         }
@@ -316,6 +334,11 @@
                 border-color: #4e4842;
                 box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
                 z-index: 2;
+
+                &:focus-within {
+                    border-color: #ffd52c;
+                    z-index: 3;
+                }
 
                 .thumbnail-container.clickable .episode-thumbnail {
                     transform: scale(1.03);
@@ -338,6 +361,7 @@
             border-bottom-right-radius: 0;
             overflow: hidden;
             flex-shrink: 0;
+            outline: none;
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
@@ -346,6 +370,19 @@
                 cursor: pointer;
 
                 &:active .thumb-play-overlay:not(.is-loading) {
+                    opacity: 1;
+                }
+            }
+
+            &:focus-visible {
+                outline: 2px solid #ffd52c;
+                outline-offset: -2px;
+
+                .episode-thumbnail {
+                    transform: scale(1.03);
+                }
+
+                .thumb-play-overlay {
                     opacity: 1;
                 }
             }

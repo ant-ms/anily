@@ -83,25 +83,37 @@
         isGlobalSearchOpen.set(false);
     }
 
+    let didSelectAnime = false;
+
     $effect(() => {
         if (isGlobalSearchOpen.current) {
+            didSelectAnime = false;
+            const previousFocus = document.activeElement as HTMLElement | null;
             selectedIndex = 0;
             tick().then(() => {
                 inputElement?.focus();
                 inputElement?.select();
             });
 
-            return registerBackHandler(() => {
+            const unregister = registerBackHandler(() => {
                 if (isGlobalSearchOpen.current) {
                     closeModal();
                     return true;
                 }
                 return false;
             });
+
+            return () => {
+                unregister();
+                if (!didSelectAnime && previousFocus && previousFocus.isConnected) {
+                    tick().then(() => previousFocus.focus({ preventScroll: true }));
+                }
+            };
         }
     });
 
     function selectAnime(item: SearchResult) {
+        didSelectAnime = true;
         selectedAnimeAnilistId.set(item.anilistId, { clearHistory: true });
         if (typeof window !== "undefined" && window.innerWidth <= 768) {
             isMobileNavOpen.set(false);
@@ -111,12 +123,6 @@
 
     function handleKeyDown(e: KeyboardEvent) {
         if (!isGlobalSearchOpen.current) return;
-
-        if (e.key === "Escape") {
-            e.preventDefault();
-            closeModal();
-            return;
-        }
 
         if (e.key === "ArrowDown") {
             e.preventDefault();

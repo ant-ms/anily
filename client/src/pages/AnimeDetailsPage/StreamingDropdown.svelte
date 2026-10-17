@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { tick } from 'svelte';
     import Tag from '../../lib/Tag.svelte';
     import { isHdService, type AvailableService } from '../../types/Media';
     import type EpisodeData from '../../types/Episode';
@@ -32,6 +33,26 @@
             dropdownEl.style.right = 'auto';
         }
     });
+
+    $effect(() => {
+        const previousFocus = document.activeElement as HTMLElement | null;
+        return () => {
+            if (previousFocus && previousFocus.isConnected) {
+                tick().then(() => previousFocus.focus({ preventScroll: true }));
+            }
+        };
+    });
+
+    $effect(() => {
+        if (!isChecking && services.length > 0 && dropdownEl) {
+            tick().then(() => {
+                const target = dropdownEl?.querySelector<HTMLElement>(
+                    '.service-item.selected, .service-item',
+                );
+                target?.focus({ preventScroll: true });
+            });
+        }
+    });
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -39,6 +60,9 @@
 <div
     bind:this={dropdownEl}
     class="services-dropdown"
+    role="menu"
+    tabindex="-1"
+    aria-label="Stream providers"
     onclick={(e) => e.stopPropagation()}
 >
     <div class="dropdown-header">
@@ -56,6 +80,8 @@
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <button
                     type="button"
+                    role="menuitemradio"
+                    aria-checked={isSelected(service)}
                     class="service-item"
                     class:selected={isSelected(service)}
                     onclick={() => onSelect(service)}
@@ -144,6 +170,12 @@
             &:hover {
                 background: hsl(20, 17.6%, 17%);
                 border-color: hsl(36, 5.7%, 26%);
+            }
+
+            &:focus-visible {
+                background: hsl(20, 17.6%, 19%);
+                outline: 2px solid #ffd52c;
+                outline-offset: -2px;
             }
 
             &.selected {
