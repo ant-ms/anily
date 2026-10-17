@@ -8,6 +8,13 @@ import {
   type StreamLanguage,
   type SubtitleTrack,
 } from "@ant.ms/anily-providers";
+import {
+  getRateLimitServerKey,
+  markServerRateLimited as coreMarkServerRateLimited,
+  isServerRateLimited,
+  clearRateLimitedServers,
+  checkStderrForFatalErrors,
+} from "@ant.ms/stream-core";
 import { logger } from '$src/logger';
 import { errorTracker } from '$src/errorTracker';
 
@@ -16,12 +23,7 @@ const log = logger.child({ module: "downloadStream" });
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
-// In-memory cache of servers that recently hit HTTP 429 rate limits, with expiration timestamp
-const rateLimitedServers = new Map<string, number>();
-
-export function getRateLimitServerKey(candidate: { providerId: string; serverId?: string; serverName?: string }): string {
-  return `${candidate.providerId}:${candidate.serverId || candidate.serverName || "default"}`.toLowerCase();
-}
+export { getRateLimitServerKey, isServerRateLimited, clearRateLimitedServers };
 
 export function markServerRateLimited(
   providerId: string,
@@ -30,27 +32,8 @@ export function markServerRateLimited(
   cooldownMs = 15 * 60 * 1000,
 ): void {
   const key = getRateLimitServerKey({ providerId, serverId, serverName });
-  rateLimitedServers.set(key, Date.now() + cooldownMs);
+  coreMarkServerRateLimited(providerId, serverId, serverName, cooldownMs);
   log.warn({ key, cooldownMs }, "Marked server as rate-limited for downloads");
-}
-
-export function isServerRateLimited(
-  providerId: string,
-  serverId?: string,
-  serverName?: string,
-): boolean {
-  const key = getRateLimitServerKey({ providerId, serverId, serverName });
-  const expires = rateLimitedServers.get(key);
-  if (!expires) return false;
-  if (Date.now() > expires) {
-    rateLimitedServers.delete(key);
-    return false;
-  }
-  return true;
-}
-
-export function clearRateLimitedServers(): void {
-  rateLimitedServers.clear();
 }
 
 interface StartedFfmpeg {
@@ -64,33 +47,6 @@ interface StartFfmpegOptions {
   providerName?: string;
   serverName?: string;
   onRateLimited?: () => void;
-}
-
-function checkStderrForFatalErrors(chunkStr: string): { isFatal: boolean; message: string; isRateLimit: boolean } {
-  if (
-    chunkStr.includes("429 Too Many Requests") ||
-    chunkStr.includes("HTTP error 429") ||
-    chunkStr.includes("Server returned 429")
-  ) {
-    return {
-      isFatal: true,
-      isRateLimit: true,
-      message: "Upstream CDN returned HTTP 429 Too Many Requests (rate limit reached)",
-    };
-  }
-
-  if (
-    /Segment \d+ of playlist \d+ failed too many times, skipping/i.test(chunkStr) ||
-    /failed too many times, skipping/i.test(chunkStr)
-  ) {
-    return {
-      isFatal: true,
-      isRateLimit: false,
-      message: "HLS segment skipped due to download failure; aborting to prevent truncated video",
-    };
-  }
-
-  return { isFatal: false, message: "", isRateLimit: false };
 }
 
 function startFfmpegStream(

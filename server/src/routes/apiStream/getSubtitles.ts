@@ -3,7 +3,7 @@ import { registry, getServiceScore, type StreamLanguage } from "@ant.ms/anily-pr
 import {
   generateStreamSignature,
   DEFAULT_STREAM_EXPIRY_SECONDS,
-} from "$lib/streaming/hmac";
+} from "@ant.ms/stream-core";
 
 export interface SubtitleTrackDto {
   label: string;

@@ -1,0 +1,5 @@
+minimumReleaseAgeExclude:
+  - '@ant.ms/stream-core@1.0.0'
+  - '@ant.ms/stream-core@1.0.1'
+  - '@ant.ms/anily-providers@1.1.0'
+  - '@ant.ms/thetvdb@1.0.0'

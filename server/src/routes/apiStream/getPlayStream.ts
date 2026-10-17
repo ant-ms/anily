@@ -1,10 +1,10 @@
 import { prisma } from "$src/prisma";
 import { registry, type StreamLanguage } from "@ant.ms/anily-providers";
-import { extractFilename } from "$lib/streaming/proxy";
 import {
+  extractFilename,
   generateStreamSignature,
   DEFAULT_STREAM_EXPIRY_SECONDS,
-} from "$lib/streaming/hmac";
+} from "@ant.ms/stream-core";
 
 export interface PlayStreamResult {
   streamUrl?: string;

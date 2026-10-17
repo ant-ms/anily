@@ -1,32 +1,16 @@
 import { prisma } from "$src/prisma";
 import { logger } from "$src/logger";
+import {
+  SkipTimesCache,
+  type SkipType,
+  type SkipInterval,
+  type SkipTimeEntry,
+  type EpisodeSkipTimesResult,
+} from "@ant.ms/stream-core";
 
 const log = logger.child({ module: "apiStream:skipTimes" });
 
-export type SkipType = "op" | "ed" | "recap" | "mixed-op" | "mixed-ed";
-
-export interface SkipInterval {
-  startTime: number;
-  endTime: number;
-}
-
-export interface SkipTimeEntry {
-  type: SkipType;
-  interval: SkipInterval;
-  skipId?: string;
-  episodeLength?: number;
-}
-
-export interface EpisodeSkipTimesResult {
-  found: boolean;
-  notFound?: boolean;
-  results: SkipTimeEntry[];
-  op?: SkipInterval;
-  ed?: SkipInterval;
-  recap?: SkipInterval;
-  mixedOp?: SkipInterval;
-  mixedEd?: SkipInterval;
-}
+export type { SkipType, SkipInterval, SkipTimeEntry, EpisodeSkipTimesResult };
 
 interface AniSkipRawResponse {
   found: boolean;
@@ -41,54 +25,6 @@ interface AniSkipRawResponse {
   }>;
   message?: string;
   statusCode?: number;
-}
-
-interface CacheEntry {
-  result: EpisodeSkipTimesResult;
-  expiresAt: number;
-}
-
-// Bounded in-memory LRU cache to prevent redundant AniSkip requests
-class SkipTimesCache {
-  private cache = new Map<string, CacheEntry>();
-  private readonly maxSize: number;
-
-  constructor(maxSize = 2000) {
-    this.maxSize = maxSize;
-  }
-
-  get(key: string): EpisodeSkipTimesResult | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-
-    if (Date.now() > entry.expiresAt) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    // Refresh LRU position
-    this.cache.delete(key);
-    this.cache.set(key, entry);
-    return entry.result;
-  }
-
-  set(key: string, result: EpisodeSkipTimesResult, ttlMs: number): void {
-    if (this.cache.size >= this.maxSize) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey !== undefined) {
-        this.cache.delete(oldestKey);
-      }
-    }
-
-    this.cache.set(key, {
-      result,
-      expiresAt: Date.now() + ttlMs,
-    });
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
 }
 
 export const skipTimesCache = new SkipTimesCache(2000);
