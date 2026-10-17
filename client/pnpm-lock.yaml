@@ -11,6 +11,9 @@ importers:
       '@ant.ms/anily-providers':
         specifier: ^1.0.0
         version: 1.0.0
+      '@ant.ms/anily-ui':
+        specifier: ^1.0.0
+        version: 1.0.0(svelte@5.56.3)(vite@8.0.16(@types/node@25.9.3)(sass-embedded@1.100.0)(sass@1.100.0))
       '@capacitor/android':
         specifier: ^8.5.2
         version: 8.5.2(@capacitor/core@8.5.2)
@@ -83,6 +86,11 @@ packages:
 
   '@ant.ms/anily-providers@1.0.0':
     resolution: {integrity: sha512-6LrQke+zfzj/r/Kocv1hdgjQrAsX53Ycm09ZeLQ6PcFJPYjglbeLRqVZzDvvVNdYcWoymhevceno4oqhVoV8kg==}
+
+  '@ant.ms/anily-ui@1.0.0':
+    resolution: {integrity: sha1-q2H+HKdZg2RIeZWG+68ATiRiBsM=, tarball: https://gitlab.com/api/v4/projects/87760024/packages/npm/@ant.ms/anily-ui/-/@ant.ms/anily-ui-1.0.0.tgz}
+    peerDependencies:
+      svelte: ^5.0.0
 
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
@@ -1336,6 +1344,27 @@ snapshots:
       html-entities: 2.6.0
       lru-cache: 11.5.3
       m3u8-parser: 7.2.0
+
+  '@ant.ms/anily-ui@1.0.0(svelte@5.56.3)(vite@8.0.16(@types/node@25.9.3)(sass-embedded@1.100.0)(sass@1.100.0))':
+    dependencies:
+      '@ant.ms/anily-providers': 1.0.0
+      '@capacitor/android': 8.5.2(@capacitor/core@8.5.2)
+      '@capacitor/app': 8.1.1(@capacitor/core@8.5.2)
+      '@capacitor/app-launcher': 8.0.1(@capacitor/core@8.5.2)
+      '@capacitor/browser': 8.0.4(@capacitor/core@8.5.2)
+      '@capacitor/core': 8.5.2
+      '@capacitor/filesystem': 8.1.3(@capacitor/core@8.5.2)
+      '@capacitor/network': 8.0.1(@capacitor/core@8.5.2)
+      '@capacitor/preferences': 8.0.1(@capacitor/core@8.5.2)
+      hls.js: 1.7.3
+      media-captions: 0.0.18
+      phosphor-svelte: 3.1.0(svelte@5.56.3)(vite@8.0.16(@types/node@25.9.3)(sass-embedded@1.100.0)(sass@1.100.0))
+      runed: 0.37.1(svelte@5.56.3)
+      svelte: 5.56.3
+    transitivePeerDependencies:
+      - '@sveltejs/kit'
+      - vite
+      - zod
 
   '@babel/runtime@7.29.7': {}
 
