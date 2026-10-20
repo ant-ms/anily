@@ -3,6 +3,7 @@ import { logger } from "$src/logger";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { handleStreamProxy } from "$lib/streaming/proxy";
+import { verifyStreamSignature, isSafeStreamUrl } from "@ant.ms/stream-core";
 import type { StreamLanguage } from "@ant.ms/anily-providers";
 import { getPublicOrigin } from "./helpers";
 import { getAvailableStreamServices } from "./getServices";
@@ -11,6 +12,14 @@ import { handleStreamDownload } from "./downloadStream";
 import { getEpisodeSkipTimes } from "./skipTimes";
 import { resolveEpisodeSubtitles } from "./getSubtitles";
 import { errorTracker } from "$src/errorTracker";
+import { downloadJimakuSubtitleText } from "$src/services/jimaku";
+import {
+  convertAssToVtt,
+  convertSrtToVtt,
+  addFuriganaToVtt,
+  getCachedSubtitle,
+  setCachedSubtitle,
+} from "$src/services/furigana";
 
 const log = logger.child({ module: "apiStream" });
 
@@ -56,7 +65,7 @@ export const apiStreamPlayGetRoute = app.get(
     z.object({
       providerId: z.string(),
       identifier: z.string(),
-      language: z.enum(["sub", "dub"]),
+      language: z.enum(["sub", "dub", "native"]).default("sub"),
       server: z.string().optional(),
     }),
   ),
@@ -69,7 +78,7 @@ export const apiStreamPlayGetRoute = app.get(
       const result = await resolvePlayStream(episodeId, {
         providerId,
         identifier,
-        language: language as StreamLanguage,
+        language,
         server,
         origin,
       });
@@ -182,6 +191,74 @@ export const apiStreamSkipTimesGetRoute = app.get(
   },
 );
 
+// GET /api/stream/subtitles/track
+export const apiStreamSubtitleTrackRoute = app.get(
+  "/api/stream/subtitles/track",
+  zValidator(
+    "query",
+    z.object({
+      url: z.string(),
+      furigana: z.string().optional(),
+      ep: z.coerce.number().optional(),
+      expires: z.coerce.number().optional(),
+      sig: z.string().optional(),
+    }),
+  ),
+  async (c) => {
+    const { url: targetUrl, furigana, ep, expires, sig } = c.req.valid("query");
+
+    if (sig && expires) {
+      const isValid = verifyStreamSignature(targetUrl, expires, sig);
+      if (!isValid) {
+        return c.text("Invalid or expired stream signature", 403);
+      }
+    }
+
+    if (!isSafeStreamUrl(targetUrl)) {
+      return c.text("Forbidden destination address", 403);
+    }
+
+    const wantFurigana = furigana === "1" || furigana === "true";
+    const cacheKey = `${targetUrl}:${ep ?? 0}:${wantFurigana ? 1 : 0}`;
+    const cached = getCachedSubtitle(cacheKey);
+    if (cached) {
+      return c.text(cached, 200, {
+        "Content-Type": "text/vtt; charset=utf-8",
+        "Cache-Control": "public, max-age=86400",
+        "Access-Control-Allow-Origin": "*",
+      });
+    }
+
+    const downloaded = await downloadJimakuSubtitleText(targetUrl, ep);
+    if (!downloaded) {
+      return c.text("Failed to retrieve subtitle track", 502);
+    }
+
+    let vtt: string;
+    if (downloaded.format === "ass") {
+      vtt = convertAssToVtt(downloaded.text);
+    } else if (downloaded.format === "srt") {
+      vtt = convertSrtToVtt(downloaded.text);
+    } else {
+      vtt = downloaded.text.trimStart().startsWith("WEBVTT")
+        ? downloaded.text
+        : `WEBVTT\n\n${downloaded.text}`;
+    }
+
+    if (wantFurigana) {
+      vtt = await addFuriganaToVtt(vtt);
+    }
+
+    setCachedSubtitle(cacheKey, vtt);
+
+    return c.text(vtt, 200, {
+      "Content-Type": "text/vtt; charset=utf-8",
+      "Cache-Control": "public, max-age=86400",
+      "Access-Control-Allow-Origin": "*",
+    });
+  },
+);
+
 // GET /api/stream/subtitles/:episodeId
 export const apiStreamSubtitlesGetRoute = app.get(
   "/api/stream/subtitles/:episodeId",
@@ -191,7 +268,7 @@ export const apiStreamSubtitlesGetRoute = app.get(
     z.object({
       providerId: z.string().optional(),
       identifier: z.string().optional(),
-      language: z.enum(["sub", "dub"]).default("sub"),
+      language: z.enum(["sub", "dub", "native"]).default("sub"),
       server: z.string().optional(),
     }),
   ),
@@ -204,7 +281,7 @@ export const apiStreamSubtitlesGetRoute = app.get(
       const result = await resolveEpisodeSubtitles(episodeId, {
         providerId,
         identifier,
-        language: language as StreamLanguage,
+        language,
         server,
         origin,
       });

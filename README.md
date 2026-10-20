@@ -10,3 +10,4 @@ Compared to most other options available, it however has these benefits:
 - Material Design compliant-ish UI, which works well on pc, phone, and foldable.
 - Android application allowing offline functionality through on-device downloads.
 - Selfhostable with OIDC-Authentication.
+- Japanese subtitle integration via Jimaku.cc with dynamic Furigana generation (<ruby> tags), automatically enabled in Native preset.

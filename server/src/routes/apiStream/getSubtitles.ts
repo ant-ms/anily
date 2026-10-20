@@ -4,6 +4,7 @@ import {
   generateStreamSignature,
   DEFAULT_STREAM_EXPIRY_SECONDS,
 } from "@ant.ms/stream-core";
+import { getJimakuSubtitlesForEpisode } from "$src/services/jimaku";
 
 export interface SubtitleTrackDto {
   label: string;
@@ -22,12 +23,14 @@ export async function resolveEpisodeSubtitles(
   options: {
     providerId?: string;
     identifier?: string;
-    language?: StreamLanguage;
+    language?: "sub" | "dub" | "native";
     server?: string;
     origin: string;
   },
 ): Promise<SubtitlesResult> {
   const { providerId, identifier, language = "sub", server, origin } = options;
+  const isNative = language === "native";
+  const providerLang: StreamLanguage = isNative ? "sub" : language;
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
@@ -49,7 +52,7 @@ export async function resolveEpisodeSubtitles(
       providerId,
       identifier,
       episode.number,
-      language,
+      providerLang,
       server,
     );
   } else {
@@ -62,7 +65,7 @@ export async function resolveEpisodeSubtitles(
 
     const services = await registry.checkAvailability(titles, episode.number);
     if (services.length > 0) {
-      const langServices = services.filter((s) => s.language === language);
+      const langServices = services.filter((s) => s.language === providerLang);
       const candidates = langServices.length > 0 ? langServices : services;
       candidates.sort((a, b) => getServiceScore(b) - getServiceScore(a));
 
@@ -72,7 +75,7 @@ export async function resolveEpisodeSubtitles(
             candidate.providerId,
             candidate.identifier,
             episode.number,
-            language,
+            providerLang,
             candidate.serverId,
           );
           if (resolved?.subtitles && resolved.subtitles.length > 0) {
@@ -87,17 +90,13 @@ export async function resolveEpisodeSubtitles(
     }
   }
 
-  if (!streamSource || !streamSource.subtitles || streamSource.subtitles.length === 0) {
-    return { subtitles: [] };
-  }
-
   const nowUnix = Math.floor(Date.now() / 1000);
   const streamExpires = nowUnix + DEFAULT_STREAM_EXPIRY_SECONDS;
-  const refParam = streamSource.headers?.Referer
+  const refParam = streamSource?.headers?.Referer
     ? `&ref=${encodeURIComponent(streamSource.headers.Referer)}`
     : "";
 
-  const subtitles: SubtitleTrackDto[] = streamSource.subtitles.map((sub) => {
+  const providerSubtitles: SubtitleTrackDto[] = (streamSource?.subtitles || []).map((sub) => {
     const subFilename = `sub_${sub.language || "en"}.vtt`;
     const subSig = generateStreamSignature(sub.url, streamExpires);
     const subUrl = `${origin}/api/stream/proxy/${subFilename}?url=${encodeURIComponent(
@@ -107,9 +106,34 @@ export async function resolveEpisodeSubtitles(
       label: sub.label,
       language: sub.language || "en",
       url: subUrl,
-      default: sub.default,
+      // If native preset is active, disable default on provider (e.g. English) subs
+      default: isNative ? false : sub.default,
     };
   });
+
+  // Query Jimaku for Japanese subtitles
+  const baseAnime = episode.animeDetails.baseAnime;
+  const titles = [
+    baseAnime.titleEnglish,
+    baseAnime.titleRomanji,
+    baseAnime.titleNative,
+  ].filter((t): t is string => Boolean(t));
+
+  let jimakuSubtitles: SubtitleTrackDto[] = [];
+  try {
+    jimakuSubtitles = await getJimakuSubtitlesForEpisode(
+      baseAnime.anilistId,
+      episode.number,
+      titles,
+      {
+        origin,
+        expires: streamExpires,
+        isNativeDefault: isNative,
+      },
+    );
+  } catch {}
+
+  const subtitles = [...providerSubtitles, ...jimakuSubtitles];
 
   return { subtitles };
 }

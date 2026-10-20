@@ -5,6 +5,7 @@ import {
   generateStreamSignature,
   DEFAULT_STREAM_EXPIRY_SECONDS,
 } from "@ant.ms/stream-core";
+import { getJimakuSubtitlesForEpisode } from "$src/services/jimaku";
 
 export interface PlayStreamResult {
   streamUrl?: string;
@@ -25,15 +26,22 @@ export async function resolvePlayStream(
   options: {
     providerId: string;
     identifier: string;
-    language: StreamLanguage;
+    language: "sub" | "dub" | "native";
     server?: string;
     origin: string;
   },
 ): Promise<PlayStreamResult> {
   const { providerId, identifier, language, server, origin } = options;
+  const isNative = language === "native";
+  const providerLang: StreamLanguage = isNative ? "sub" : language;
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
+    include: {
+      animeDetails: {
+        include: { baseAnime: true },
+      },
+    },
   });
 
   if (!episode) {
@@ -44,7 +52,7 @@ export async function resolvePlayStream(
     providerId,
     identifier,
     episode.number,
-    language,
+    providerLang,
     server,
   );
 
@@ -62,9 +70,55 @@ export async function resolvePlayStream(
   const streamExpires = nowUnix + DEFAULT_STREAM_EXPIRY_SECONDS;
   const streamSig = generateStreamSignature(streamSource.url, streamExpires);
 
+  const providerSubtitles = (streamSource.subtitles || []).map((sub) => {
+    const subFilename = `sub_${sub.language || "en"}.vtt`;
+    const subSig = generateStreamSignature(sub.url, streamExpires);
+    const subUrl = `${origin}/api/stream/proxy/${subFilename}?url=${encodeURIComponent(
+      sub.url,
+    )}${refParam}&expires=${streamExpires}&sig=${subSig}`;
+    return {
+      label: sub.label,
+      language: sub.language,
+      url: subUrl,
+      default: isNative ? false : sub.default,
+    };
+  });
+
+  // Query Jimaku for Japanese subtitles
+  let jimakuSubtitles: Array<{
+    label: string;
+    language: string;
+    url: string;
+    default?: boolean;
+  }> = [];
+
+  if (episode.animeDetails?.baseAnime) {
+    const baseAnime = episode.animeDetails.baseAnime;
+    const titles = [
+      baseAnime.titleEnglish,
+      baseAnime.titleRomanji,
+      baseAnime.titleNative,
+    ].filter((t): t is string => Boolean(t));
+
+    try {
+      jimakuSubtitles = await getJimakuSubtitlesForEpisode(
+        baseAnime.anilistId,
+        episode.number,
+        titles,
+        {
+          origin,
+          expires: streamExpires,
+          isNativeDefault: isNative,
+        },
+      );
+    } catch {}
+  }
+
+  const allSubtitles = [...providerSubtitles, ...jimakuSubtitles];
+
   let subsParam = "";
-  if (streamSource.subtitles && streamSource.subtitles.length > 0) {
-    const subsPayload = streamSource.subtitles.map((s) => ({
+  if (allSubtitles.length > 0) {
+    const subsPayload = allSubtitles.map((s) => ({
       l: s.label,
       lang: s.language,
       u: s.url,
@@ -77,24 +131,10 @@ export async function resolvePlayStream(
     streamSource.url,
   )}${refParam}${subsParam}&expires=${streamExpires}&sig=${streamSig}`;
 
-  const subtitles = (streamSource.subtitles || []).map((sub) => {
-    const subFilename = `sub_${sub.language || "en"}.vtt`;
-    const subSig = generateStreamSignature(sub.url, streamExpires);
-    const subUrl = `${origin}/api/stream/proxy/${subFilename}?url=${encodeURIComponent(
-      sub.url,
-    )}${refParam}&expires=${streamExpires}&sig=${subSig}`;
-    return {
-      label: sub.label,
-      language: sub.language,
-      url: subUrl,
-      default: sub.default,
-    };
-  });
-
   return {
     streamUrl,
     container: streamSource.container,
     serverName: streamSource.serverName,
-    subtitles,
+    subtitles: allSubtitles,
   };
 }
