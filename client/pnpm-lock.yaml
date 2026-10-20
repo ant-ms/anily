@@ -12,8 +12,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       '@ant.ms/anily-ui':
-        specifier: ^1.0.1
-        version: 1.0.1(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(sass-embedded@1.105.2)(sass@1.105.2))
+        specifier: ^1.0.2
+        version: 1.0.2(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(sass-embedded@1.105.2)(sass@1.105.2))
       '@capacitor/android':
         specifier: ^8.5.3
         version: 8.5.3(@capacitor/core@8.5.3)
@@ -87,8 +87,8 @@ packages:
   '@ant.ms/anily-providers@1.1.0':
     resolution: {integrity: sha512-LOG9MZLZ0F/aWvo9kCYk7NpCiex4exg92yD8ov/gJHEsqGrp4OH0kcbmpTUk6wK2lqyy42XURSpcASWAd9wvsA==}
 
-  '@ant.ms/anily-ui@1.0.1':
-    resolution: {integrity: sha1-RdMx4N94nc2mqNjTMh5Vq1aUeAc=, tarball: https://gitlab.com/api/v4/projects/87760024/packages/npm/@ant.ms/anily-ui/-/@ant.ms/anily-ui-1.0.1.tgz}
+  '@ant.ms/anily-ui@1.0.2':
+    resolution: {integrity: sha1-UJRngGAt0gFsijvPPz1pyYq+Pxs=, tarball: https://gitlab.com/api/v4/projects/87760024/packages/npm/@ant.ms/anily-ui/-/@ant.ms/anily-ui-1.0.2.tgz}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -1318,7 +1318,7 @@ snapshots:
       lru-cache: 11.5.3
       m3u8-parser: 7.2.0
 
-  '@ant.ms/anily-ui@1.0.1(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(sass-embedded@1.105.2)(sass@1.105.2))':
+  '@ant.ms/anily-ui@1.0.2(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(sass-embedded@1.105.2)(sass@1.105.2))':
     dependencies:
       '@ant.ms/anily-providers': 1.1.0
       '@capacitor/android': 8.5.3(@capacitor/core@8.5.3)
