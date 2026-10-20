@@ -70,7 +70,10 @@ export const setupAuthHandlers = (app: Hono) => {
   });
 
   app.use("*", async (c, next) => {
-    if (c.req.path.startsWith("/api/stream/proxy")) {
+    if (
+      c.req.path.startsWith("/api/stream/proxy") ||
+      c.req.path.startsWith("/api/stream/subtitles/track")
+    ) {
       return next();
     }
     return corsMiddleware(c, next);
@@ -131,7 +134,10 @@ export const setupAuthHandlers = (app: Hono) => {
     return res;
   });
   app.use("/api/*", async (c, next) => {
-    if (c.req.path.startsWith("/api/stream/proxy")) {
+    if (
+      c.req.path.startsWith("/api/stream/proxy") ||
+      c.req.path.startsWith("/api/stream/subtitles/track")
+    ) {
       return next();
     }
     if (process.env.OIDC_ISSUER || process.env.OIDC_CLIENT_ID) {
