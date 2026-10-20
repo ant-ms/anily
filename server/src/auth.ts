@@ -235,9 +235,9 @@ export const getAuthenticatedUser = async (c: any): Promise<AuthUser> => {
 
   try {
     const auth = await getAuth(c);
-    if (auth?.email) email = auth.email;
-    if (auth?.name) name = auth.name;
-    if (auth?.sub) sub = auth.sub;
+    if (auth?.email) email = String(auth.email);
+    if (auth?.name) name = String(auth.name);
+    if (auth?.sub) sub = String(auth.sub);
   } catch {}
 
   let user: AuthUser | null = null;

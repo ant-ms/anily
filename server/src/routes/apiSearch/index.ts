@@ -1,12 +1,27 @@
 import { searchForAnime } from "./searchForAnime";
 import { app } from "$src/app";
+import { getAuthenticatedUser } from "$src/auth";
+import { prisma } from "$src/prisma";
 
 export const apiSearchGetRoute = app.get("/api/search", async (c) => {
   const query = c.req.query("q");
-  if (!query) return c.json({ error: "No query provided" });
+  if (!query) return c.json({ error: "No query provided" }, 400);
 
   try {
-    const results = await searchForAnime(query);
+    const [user, results] = await Promise.all([
+      getAuthenticatedUser(c),
+      searchForAnime(query),
+    ]);
+
+    const userBookmarks = await prisma.userBookmark.findMany({
+      where: {
+        userId: user.id,
+        anilistId: { in: results.map((r) => r.anilistId) },
+      },
+      select: { anilistId: true },
+    });
+    const bookmarkedSet = new Set(userBookmarks.map((b) => b.anilistId));
+
     const filteredResults = results.map((result) => {
       let thumbnailUrl = result.animeDetails?.thumbnailUrl ?? null;
 
@@ -43,10 +58,7 @@ export const apiSearchGetRoute = app.get("/api/search", async (c) => {
         }
       }
 
-      const isBookmarked =
-        result.animeDetails?.groupingId != null ||
-        result.groupings.length > 0 ||
-        result.displayForGroupings.length > 0;
+      const isBookmarked = bookmarkedSet.has(result.anilistId);
 
       return {
         anilistId: result.anilistId,
@@ -71,9 +83,12 @@ export const apiSearchGetRoute = app.get("/api/search", async (c) => {
 
     return c.json(filteredResults.slice(0, 20));
   } catch (error) {
-    return c.json({
-      error: "Failed to search",
-      reason: error instanceof Error ? error.message : String(error),
-    });
+    return c.json(
+      {
+        error: "Failed to search",
+        reason: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
   }
 });

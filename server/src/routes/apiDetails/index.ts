@@ -56,10 +56,13 @@ export const apiDetailsAnilistIdGetRoute = app.get(
       };
       return c.json(filteredDetails);
     } catch (error) {
-      return c.json({
-        error: "Failed to get details",
-        reason: error instanceof Error ? error.message : String(error),
-      });
+      return c.json(
+        {
+          error: "Failed to get details",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
     }
   },
 );

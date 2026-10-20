@@ -110,6 +110,7 @@ export const buildAnimeGroupingDetails = async (rootAnilistId: number) => {
         include: {
           episodes: {
             select: {
+              id: true,
               watched: true,
               airingAt: true
             }

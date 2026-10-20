@@ -5,6 +5,6 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 export default defineConfig({
   plugins: [svelte()],
   server: {
-    allowedHosts: ["codeee-5173.ant.ms"],
+    allowedHosts: process.env.VITE_ALLOWED_HOSTS ? process.env.VITE_ALLOWED_HOSTS.split(",") : true,
   },
 });

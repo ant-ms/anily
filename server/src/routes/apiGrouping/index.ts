@@ -2,6 +2,8 @@ import { buildAnimeGroupingDetails } from "./buildAnimeGroupings";
 import { app } from "$src/app";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { getAuthenticatedUser } from "$src/auth";
+import { prisma } from "$src/prisma";
 
 // TODO: This grouping should actually be stored in the database
 
@@ -27,7 +29,11 @@ type FilteredChainNode = {
   children: FilteredChainNode[];
 };
 
-const filterAnimeDetails = (a: NonChainEntry | ChainEntry["anime"]) => {
+const filterAnimeDetails = (
+  a: NonChainEntry | ChainEntry["anime"],
+  progressMap?: Map<number, boolean>,
+) => {
+  const episodes = a.animeDetails?.episodes ?? [];
   return {
     anilistId: a.anilistId,
     titleEnglish: a.titleEnglish,
@@ -36,16 +42,25 @@ const filterAnimeDetails = (a: NonChainEntry | ChainEntry["anime"]) => {
     thumbnailUrl: a.animeDetails?.thumbnailUrl || null,
     progress: {
       anilistId: a.anilistId,
-      watched: a.animeDetails?.episodes.filter((e) => e.watched).length || 0,
-      total: a.animeDetails?.episodes.length || 0,
-      released: a.animeDetails?.episodes.filter((e: any) => e.airingAt && e.airingAt <= new Date()).length || 0,
-    }
+      watched: episodes.filter((e: any) =>
+        progressMap && progressMap.has(e.id) ? progressMap.get(e.id)! : e.watched,
+      ).length,
+      total: episodes.length,
+      released: episodes.filter(
+        (e: any) => e.airingAt && e.airingAt <= new Date(),
+      ).length,
+    },
   };
 };
 
-const recursivelyFilterChainEntry = (node: ChainEntry): FilteredChainNode => ({
-  ...filterAnimeDetails(node.anime),
-  children: node.children.map(recursivelyFilterChainEntry),
+const recursivelyFilterChainEntry = (
+  node: ChainEntry,
+  progressMap?: Map<number, boolean>,
+): FilteredChainNode => ({
+  ...filterAnimeDetails(node.anime, progressMap),
+  children: node.children.map((child) =>
+    recursivelyFilterChainEntry(child, progressMap),
+  ),
 });
 
 export const apiGroupingGetRoute = app.get(
@@ -60,19 +75,61 @@ export const apiGroupingGetRoute = app.get(
     const query = c.req.valid("query");
 
     try {
-      const chains = await buildAnimeGroupingDetails(query.baseAnilistId);
+      const [user, chains] = await Promise.all([
+        getAuthenticatedUser(c),
+        buildAnimeGroupingDetails(query.baseAnilistId),
+      ]);
+
+      // Collect all episode IDs across chains and notInChain
+      const allEpisodeIds: number[] = [];
+      const collectEpisodeIds = (node: ChainEntry) => {
+        for (const ep of node.anime.animeDetails?.episodes ?? []) {
+          allEpisodeIds.push((ep as any).id);
+        }
+        for (const child of node.children) {
+          collectEpisodeIds(child);
+        }
+      };
+      for (const chain of chains.chains) {
+        collectEpisodeIds(chain);
+      }
+      for (const entry of chains.notInChain) {
+        for (const ep of entry.animeDetails?.episodes ?? []) {
+          allEpisodeIds.push((ep as any).id);
+        }
+      }
+
+      const userProgress = allEpisodeIds.length > 0
+        ? await prisma.userEpisodeProgress.findMany({
+            where: {
+              userId: user.id,
+              episodeId: { in: allEpisodeIds },
+            },
+            select: { episodeId: true, watched: true },
+          })
+        : [];
+      const progressMap = new Map(
+        userProgress.map((p) => [p.episodeId, p.watched]),
+      );
 
       const output = {
-        chains: chains.chains.map(recursivelyFilterChainEntry),
-        notInChain: chains.notInChain.map(filterAnimeDetails),
+        chains: chains.chains.map((chain) =>
+          recursivelyFilterChainEntry(chain, progressMap),
+        ),
+        notInChain: chains.notInChain.map((entry) =>
+          filterAnimeDetails(entry, progressMap),
+        ),
       };
 
       return c.json(output);
     } catch (error) {
-      return c.json({
-        error: "Failed to get build grouping",
-        reason: error instanceof Error ? error.message : String(error),
-      });
+      return c.json(
+        {
+          error: "Failed to get build grouping",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
     }
   },
 );

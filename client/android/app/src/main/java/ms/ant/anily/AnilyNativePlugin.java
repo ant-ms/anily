@@ -100,12 +100,27 @@ public class AnilyNativePlugin extends Plugin {
         volatile long bytesDownloaded = 0;
         volatile long totalBytes = 0;
         volatile String errorMessage = null;
+        volatile long completedAt = 0;
         java.util.concurrent.Future<?> future;
         java.net.HttpURLConnection connection;
     }
 
     private final java.util.Map<String, DownloadTask> activeDownloads = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ExecutorService downloadExecutor = java.util.concurrent.Executors.newFixedThreadPool(2);
+
+    private void cleanupOldTasks() {
+        long now = System.currentTimeMillis();
+        long maxRetentionMs = 10 * 60 * 1000; // 10 minutes retention for completed/failed tasks
+        Iterator<java.util.Map.Entry<String, DownloadTask>> it = activeDownloads.entrySet().iterator();
+        while (it.hasNext()) {
+            java.util.Map.Entry<String, DownloadTask> entry = it.next();
+            DownloadTask task = entry.getValue();
+            if (("SUCCESSFUL".equals(task.status) || "FAILED".equals(task.status)) &&
+                task.completedAt > 0 && (now - task.completedAt > maxRetentionMs)) {
+                it.remove();
+            }
+        }
+    }
 
     private void startDownloadService(String title, String text) {
         try {
@@ -168,6 +183,7 @@ public class AnilyNativePlugin extends Plugin {
         }
 
         try {
+            cleanupOldTasks();
             Context context = getContext();
             String downloadId = java.util.UUID.randomUUID().toString();
             DownloadTask task = new DownloadTask();
@@ -310,10 +326,12 @@ public class AnilyNativePlugin extends Plugin {
                     task.errorMessage = e.getMessage();
                     if (tmpFile.exists()) tmpFile.delete();
                 } finally {
+                    task.completedAt = System.currentTimeMillis();
                     if (conn != null) {
                         try { conn.disconnect(); } catch (Exception ignored) {}
                     }
                     checkStopDownloadService();
+                    cleanupOldTasks();
                 }
             });
 

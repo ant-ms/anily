@@ -150,7 +150,7 @@ const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<Side
     };
 
     const progressChains = groupingChains.chains.map(tree => extractProgress(tree));
-    const notInChainProgressFlat = groupingChains.notInChain.map(anime => {
+    const notInChainProgressFlat = groupingChains.notInChain.map((anime: any) => {
       const episodes = anime.animeDetails?.episodes ?? [];
       return {
         anilistId: anime.anilistId,

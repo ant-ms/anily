@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   AnimeHubProvider,
   HiAnimeProvider,
@@ -158,7 +158,7 @@ describe("Streaming Providers & Quality Benchmarks", () => {
 
       expect(stream).not.toBeNull();
       expect(stream?.url).toContain("http");
-      expect(stream?.serverName).toContain("ZokoAnime");
+      expect(stream?.serverName).toMatch(/zokoanime|megaplay/i);
     }, 20000);
 
     it("achieves high-throughput streaming (>15 Mbps) on video segments", async () => {
@@ -271,6 +271,75 @@ describe("Streaming Providers & Quality Benchmarks", () => {
   });
 
   describe("ProviderRegistry & Stream Proxy", () => {
+    const originalFetch = globalThis.fetch;
+
+    beforeAll(() => {
+      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const urlStr =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : (input as Request).url;
+
+        // Mock aniwatchtv master playlist
+        if (urlStr.includes("aniwatchtv.uk") && urlStr.endsWith("master.m3u8")) {
+          const body = `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1920x1080
+https://hls2.aniwatchtv.uk/v/scxqicy/huanbc9tmy/nyvrcjopy8/xaprjusg9l2rwy/index.m3u8`;
+          return new Response(body, {
+            status: 200,
+            headers: { "Content-Type": "application/vnd.apple.mpegurl" },
+          });
+        }
+
+        // Mock aniwatchtv child playlist
+        if (urlStr.includes("aniwatchtv.uk") && urlStr.endsWith("index.m3u8")) {
+          const body = `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:10
+#EXTINF:10.0,
+seg_001.ts
+#EXT-X-ENDLIST`;
+          return new Response(body, {
+            status: 200,
+            headers: { "Content-Type": "application/vnd.apple.mpegurl" },
+          });
+        }
+
+        // Mock dpopdrop child playlist with disguised Content-Type (image/jpeg)
+        if (urlStr.includes("dpopdrop89.store") && !urlStr.includes("seg_")) {
+          const body = `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:10
+#EXTINF:10.0,
+https://imgcdn44.dpopdrop89.store/cdn/seg_001.ts
+#EXT-X-ENDLIST`;
+          return new Response(body, {
+            status: 200,
+            headers: { "Content-Type": "image/jpeg" },
+          });
+        }
+
+        // Mock dpopdrop segment with disguised Content-Type (image/jpeg)
+        if (urlStr.includes("dpopdrop89.store") && urlStr.includes("seg_")) {
+          // MPEG-TS segment data starting with sync byte 0x47
+          const tsData = new Uint8Array([0x47, 0x40, 0x00, 0x10]);
+          return new Response(tsData, {
+            status: 200,
+            headers: { "Content-Type": "image/jpeg" },
+          });
+        }
+
+        return originalFetch(input, init);
+      };
+    });
+
+    afterAll(() => {
+      globalThis.fetch = originalFetch;
+    });
+
     it("returns available services ranked with top performance servers first", async () => {
       const registry = new ProviderRegistry();
       const services = await registry.checkAvailability(

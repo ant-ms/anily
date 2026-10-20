@@ -23,7 +23,7 @@ export const apiPingRoute = app.get("/api/ping", async (c) => {
         type: true,
         status: true,
         startedAt: true,
-        finishedAt: true,
+        completedAt: true,
       },
     });
   } catch {}
@@ -49,7 +49,8 @@ export const apiPingRoute = app.get("/api/ping", async (c) => {
       ? {
           ...latestSyncJob,
           startedAt: latestSyncJob.startedAt.toISOString(),
-          finishedAt: latestSyncJob.finishedAt?.toISOString() ?? null,
+          completedAt: latestSyncJob.completedAt?.toISOString() ?? null,
+          finishedAt: latestSyncJob.completedAt?.toISOString() ?? null,
         }
       : null,
     lastUpdated,
