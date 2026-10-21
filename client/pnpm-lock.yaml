@@ -39,8 +39,8 @@ importers:
         specifier: ^1.0.0
         version: 1.0.0(@capacitor/core@8.5.3)
       '@medialy/ui':
-        specifier: ^1.0.2
-        version: 1.0.2(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(sass-embedded@1.105.2)(sass@1.105.2))
+        specifier: ^1.1.0
+        version: 1.1.0(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(sass-embedded@1.105.2)(sass@1.105.2))
       hls.js:
         specifier: ^1.7.3
         version: 1.7.3
@@ -200,8 +200,8 @@ packages:
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
 
-  '@medialy/ui@1.0.2':
-    resolution: {integrity: sha1-SW7q8L0acBv5CbLCRktYjvH8K90=, tarball: https://gitlab.com/api/v4/projects/87760024/packages/npm/@medialy/ui/-/@medialy/ui-1.0.2.tgz}
+  '@medialy/ui@1.1.0':
+    resolution: {integrity: sha1-b/+iWgWtfgDMGgixY/DgwwG6Tug=, tarball: https://gitlab.com/api/v4/projects/87760024/packages/npm/@medialy/ui/-/@medialy/ui-1.1.0.tgz}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -1491,7 +1491,7 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.5.3
 
-  '@medialy/ui@1.0.2(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(sass-embedded@1.105.2)(sass@1.105.2))':
+  '@medialy/ui@1.1.0(svelte@5.57.2)(vite@8.3.4(@types/node@26.6.5)(sass-embedded@1.105.2)(sass@1.105.2))':
     dependencies:
       '@ant.ms/anily-providers': 1.1.0
       '@capacitor/android': 8.5.3(@capacitor/core@8.5.3)

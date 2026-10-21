@@ -7,6 +7,7 @@ const app = mountAnilyApp(document.getElementById("app")!, {
   mediaLabelSingular: "anime",
   mediaLabelPlural: "anime",
   detailsTitle: "Anime Details",
+  accentColor: "#ffd52c",
   features: {
     audioLanguageToggle: true,
     romanjiTitles: true,
