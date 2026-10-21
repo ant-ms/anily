@@ -10,7 +10,7 @@ docker-build:
   script:
     - /kaniko/executor
       --context "$CI_PROJECT_DIR"
-      --dockerfile "$CI_PROJECT_DIR/anily/Dockerfile"
+      --dockerfile "$CI_PROJECT_DIR/server/Dockerfile"
       --destination "$CI_REGISTRY_IMAGE/anily:$CI_COMMIT_SHORT_SHA"
       --destination "$CI_REGISTRY_IMAGE/anily:latest"
   before_script:
