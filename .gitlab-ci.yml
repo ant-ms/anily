@@ -11,11 +11,11 @@ docker-build:
     - /kaniko/executor
       --context "$CI_PROJECT_DIR"
       --dockerfile "$CI_PROJECT_DIR/server/Dockerfile"
-      --destination "$CI_REGISTRY_IMAGE/anily:$CI_COMMIT_SHORT_SHA"
-      --destination "$CI_REGISTRY_IMAGE/anily:latest"
+      --destination "$CI_REGISTRY_IMAGE/app:$CI_COMMIT_SHORT_SHA"
+      --destination "$CI_REGISTRY_IMAGE/app:latest"
   before_script:
     - mkdir -p /kaniko/.docker
-    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" | base64)\"}}}" > /kaniko/.docker/config.json
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\r\n')\"}}}" > /kaniko/.docker/config.json
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
