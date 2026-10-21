@@ -45,7 +45,7 @@
         </provider>
 
         <service
-            android:name="ms.ant.anily.DownloadService"
+            android:name="ms.ant.anily.android.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
     </application>

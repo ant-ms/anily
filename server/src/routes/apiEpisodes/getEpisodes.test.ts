@@ -6,9 +6,12 @@ import { upsertEpisodesForAnime } from "$lib/thetvdb/upsertEpisodesForAnime";
 import { prisma } from "$src/prisma";
 
 let originalKey: string | undefined;
+let originalOrKey: string | undefined;
 beforeAll(async () => {
   originalKey = process.env.OPENROUTER_API_KEY;
+  originalOrKey = process.env.OPENROUTER_KEY;
   delete process.env.OPENROUTER_API_KEY;
+  delete process.env.OPENROUTER_KEY;
 
   // Clear Frieren ONA episodes to prevent test state pollution from previous runs
   const frierenOnaDetails = await prisma.animeDetails.findUnique({
@@ -22,6 +25,9 @@ beforeAll(async () => {
 afterAll(() => {
   if (originalKey) {
     process.env.OPENROUTER_API_KEY = originalKey;
+  }
+  if (originalOrKey) {
+    process.env.OPENROUTER_KEY = originalOrKey;
   }
 });
 

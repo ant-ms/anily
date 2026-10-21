@@ -14,7 +14,7 @@ import {
   isServerRateLimited,
   clearRateLimitedServers,
   checkStderrForFatalErrors,
-} from "@ant.ms/stream-core";
+} from "@medialy/stream-core";
 import { logger } from '$src/logger';
 import { errorTracker } from '$src/errorTracker';
 

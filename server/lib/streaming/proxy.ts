@@ -3,7 +3,7 @@ import {
   makeProxiedUrl,
   getVttDuration,
   createStreamProxyHandler,
-} from "@ant.ms/stream-core";
+} from "@medialy/stream-core";
 import { logger } from "$src/logger";
 import { getPublicOrigin } from "$src/routes/apiStream/helpers";
 

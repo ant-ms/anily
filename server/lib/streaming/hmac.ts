@@ -4,4 +4,4 @@ export {
   generateStreamSignature,
   verifyStreamSignature,
   isSafeStreamUrl,
-} from "@ant.ms/stream-core";
+} from "@medialy/stream-core";

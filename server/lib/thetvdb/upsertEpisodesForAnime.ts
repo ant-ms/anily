@@ -1,5 +1,5 @@
 import { prisma } from "$src/prisma";
-import { resolveTvdbMapping, getSeriesEpisodes } from "@ant.ms/thetvdb";
+import { resolveTvdbMapping, getSeriesEpisodes } from "@medialy/thetvdb";
 import { getAnimeScheduleDates } from "../animeschedule/getAnimeScheduleDates";
 
 const LANGUAGE_ENGLISH = "eng";
@@ -113,7 +113,7 @@ export const upsertEpisodesForAnime = async (
       if (apiDetails) {
         effectiveEpisodeCount = apiDetails.episodes;
         if (!fallbackStartDate && apiDetails.startDate?.year && apiDetails.startDate?.month && apiDetails.startDate?.day) {
-          fallbackStartDate = new Date(apiDetails.startDate.year, apiDetails.startDate.month - 1, apiDetails.startDate.day);
+          fallbackStartDate = new Date(Date.UTC(apiDetails.startDate.year, apiDetails.startDate.month - 1, apiDetails.startDate.day));
         }
       }
     } catch {
@@ -126,7 +126,14 @@ export const upsertEpisodesForAnime = async (
   }
 
   const mapping = await resolveTvdbMapping(anilistId, async () => {
-    return details.baseAnime.titleEnglish || details.baseAnime.titleRomanji || null;
+    return {
+      titleEnglish: details.baseAnime.titleEnglish,
+      titleRomanji: details.baseAnime.titleRomanji,
+      titleNative: details.baseAnime.titleNative,
+      format: details.baseAnime.format,
+      startDate: fallbackStartDate,
+      episodeCount: effectiveEpisodeCount,
+    };
   });
 
   if (!mapping) {

@@ -3,7 +3,7 @@ import { resolveEpisodeSubtitles } from "./getSubtitles";
 import { app } from "$src/app";
 import { registry } from "@ant.ms/anily-providers";
 import * as jimakuModule from "$src/services/jimaku";
-import { generateStreamSignature } from "@ant.ms/stream-core";
+import { generateStreamSignature } from "@medialy/stream-core";
 import "./index";
 
 describe("Subtitles Service & Route", () => {

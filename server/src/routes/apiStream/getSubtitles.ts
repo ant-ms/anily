@@ -3,7 +3,7 @@ import { registry, getServiceScore, type StreamLanguage } from "@ant.ms/anily-pr
 import {
   generateStreamSignature,
   DEFAULT_STREAM_EXPIRY_SECONDS,
-} from "@ant.ms/stream-core";
+} from "@medialy/stream-core";
 import { getJimakuSubtitlesForEpisode } from "$src/services/jimaku";
 
 export interface SubtitleTrackDto {

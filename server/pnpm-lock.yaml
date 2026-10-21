@@ -11,12 +11,6 @@ importers:
       '@ant.ms/anily-providers':
         specifier: ^1.1.0
         version: 1.1.0
-      '@ant.ms/stream-core':
-        specifier: ^1.0.0
-        version: 1.0.0
-      '@ant.ms/thetvdb':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@hono/node-server':
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.13)
@@ -26,6 +20,12 @@ importers:
       '@hono/zod-validator':
         specifier: ^0.9.1
         version: 0.9.1(hono@4.13.13)(zod@4.6.7)
+      '@medialy/stream-core':
+        specifier: ^1.0.1
+        version: 1.0.1
+      '@medialy/thetvdb':
+        specifier: ^1.0.1
+        version: 1.0.1
       '@prisma/adapter-pg':
         specifier: ^7.10.1
         version: 7.10.1
@@ -110,12 +110,6 @@ packages:
 
   '@ant.ms/anily-providers@1.1.0':
     resolution: {integrity: sha512-LOG9MZLZ0F/aWvo9kCYk7NpCiex4exg92yD8ov/gJHEsqGrp4OH0kcbmpTUk6wK2lqyy42XURSpcASWAd9wvsA==, tarball: https://registry.npmjs.org/@ant.ms/anily-providers/-/anily-providers-1.1.0.tgz}
-
-  '@ant.ms/stream-core@1.0.0':
-    resolution: {integrity: sha1-j82w1cie9uu/BoUowK1YP8Zyxl8=, tarball: https://gitlab.com/api/v4/projects/87761146/packages/npm/@ant.ms/stream-core/-/@ant.ms/stream-core-1.0.0.tgz}
-
-  '@ant.ms/thetvdb@1.0.0':
-    resolution: {integrity: sha1-72+lOacJ1RxjFF4LJasXypRHe7s=, tarball: https://gitlab.com/api/v4/projects/85649350/packages/npm/@ant.ms/thetvdb/-/@ant.ms/thetvdb-1.0.0.tgz}
 
   '@ardatan/relay-compiler@13.0.2':
     resolution: {integrity: sha512-VFpv9UP820SiwDUPYtq7PmD3jifzZlevkQ26bhbSzFeruSTys0eHzQCZyKg+IhgmZzwPI9AFjPe26ABNjGeIKg==}
@@ -793,6 +787,12 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@medialy/stream-core@1.0.1':
+    resolution: {integrity: sha1-xN9Q8xLhv3cQaaIS4ZwoHWlp5Mo=, tarball: https://gitlab.com/api/v4/projects/87761146/packages/npm/@medialy/stream-core/-/@medialy/stream-core-1.0.1.tgz}
+
+  '@medialy/thetvdb@1.0.1':
+    resolution: {integrity: sha1-+DSv4sQrqX6afJkbsLJOTnHljXk=, tarball: https://gitlab.com/api/v4/projects/85649350/packages/npm/@medialy/thetvdb/-/@medialy/thetvdb-1.0.1.tgz}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -3007,14 +3007,6 @@ snapshots:
       lru-cache: 11.5.3
       m3u8-parser: 7.2.0
 
-  '@ant.ms/stream-core@1.0.0':
-    dependencies:
-      hono: 4.13.13
-
-  '@ant.ms/thetvdb@1.0.0':
-    dependencies:
-      dotenv: 16.6.1
-
   '@ardatan/relay-compiler@13.0.2(graphql@17.0.2)':
     dependencies:
       '@babel/runtime': 8.0.7
@@ -3791,6 +3783,14 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  '@medialy/stream-core@1.0.1':
+    dependencies:
+      hono: 4.13.13
+
+  '@medialy/thetvdb@1.0.1':
+    dependencies:
+      dotenv: 16.6.1
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true

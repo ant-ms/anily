@@ -6,7 +6,7 @@ import {
   type SkipInterval,
   type SkipTimeEntry,
   type EpisodeSkipTimesResult,
-} from "@ant.ms/stream-core";
+} from "@medialy/stream-core";
 
 const log = logger.child({ module: "apiStream:skipTimes" });
 

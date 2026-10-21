@@ -1,6 +1,6 @@
 import AdmZip from "adm-zip";
 import { logger } from "$src/logger";
-import { generateStreamSignature } from "@ant.ms/stream-core";
+import { generateStreamSignature } from "@medialy/stream-core";
 
 const log = logger.child({ module: "jimaku" });
 

@@ -1,4 +1,4 @@
-import { mountAnilyApp } from "@ant.ms/anily-ui";
+import { mountAnilyApp } from "@medialy/ui";
 
 const app = mountAnilyApp(document.getElementById("app")!, {
   appId: "anily",

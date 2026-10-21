@@ -4,7 +4,7 @@ import {
   extractFilename,
   generateStreamSignature,
   DEFAULT_STREAM_EXPIRY_SECONDS,
-} from "@ant.ms/stream-core";
+} from "@medialy/stream-core";
 import { getJimakuSubtitlesForEpisode } from "$src/services/jimaku";
 
 export interface PlayStreamResult {

@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@ant.ms/anily-providers": "^1.1.0",
-    "@ant.ms/anily-ui": "^1.0.2",
     "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.2",
     "@capacitor/app-launcher": "^8.0.1",
@@ -31,6 +30,8 @@
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/network": "^8.0.1",
     "@capacitor/preferences": "^8.0.1",
+    "@medialy/android": "^1.0.0",
+    "@medialy/ui": "^1.0.2",
     "hls.js": "^1.7.3",
     "hono": "^4.13.13",
     "media-captions": "^0.0.18",
