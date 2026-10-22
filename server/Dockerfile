@@ -1,5 +1,7 @@
 FROM node:22-alpine AS client-builder
 
+ENV npm_config_store_dir=/cache/pnpm-store
+
 RUN corepack enable && corepack prepare pnpm@10.29.2 --activate
 
 WORKDIR /app/client
@@ -11,6 +13,8 @@ COPY client/ ./
 RUN pnpm build
 
 FROM node:22-alpine AS builder
+
+ENV npm_config_store_dir=/cache/pnpm-store
 
 RUN corepack enable && corepack prepare pnpm@10.29.2 --activate
 
@@ -27,6 +31,7 @@ RUN pnpm build
 FROM node:22-alpine AS runtime
 
 ENV NODE_ENV=production
+ENV npm_config_store_dir=/cache/pnpm-store
 
 RUN corepack enable && corepack prepare pnpm@10.29.2 --activate
 

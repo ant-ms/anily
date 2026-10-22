@@ -7,6 +7,8 @@ docker-build:
   image:
     name: gcr.io/kaniko-project/executor:v1.23.0-debug
     entrypoint: [""]
+  variables:
+    npm_config_store_dir: /cache/pnpm-store
   script:
     - /kaniko/executor
       --context "$CI_PROJECT_DIR"
