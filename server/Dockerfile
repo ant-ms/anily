@@ -40,8 +40,9 @@ RUN pnpm prisma generate
 RUN pnpm codegen
 RUN pnpm build
 
-FROM node:22-alpine AS prod-deps
+FROM node:22-alpine AS runtime
 
+ENV NODE_ENV=production
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 ENV CI=true
 ENV npm_config_store_dir=/cache/pnpm-store
@@ -50,23 +51,15 @@ ENV npm_config_fetch_timeout=60000
 
 RUN corepack enable && corepack prepare pnpm@10.29.2 --activate
 
+RUN apk add --no-cache ffmpeg
+
 WORKDIR /app
 
 COPY .npmrc /.npmrc
 COPY .npmrc ./
 COPY server/package.json server/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod && \
-    find node_modules -name ".pnpm-store" -type d -prune -exec rm -rf {} +
+RUN pnpm install --frozen-lockfile --prod
 
-FROM node:22-alpine AS runtime
-
-ENV NODE_ENV=production
-
-RUN apk add --no-cache ffmpeg
-
-WORKDIR /app
-
-COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=client-builder /app/client/dist ./public
 
