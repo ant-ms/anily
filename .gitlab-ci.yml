@@ -15,6 +15,9 @@ docker-build:
       --dockerfile "$CI_PROJECT_DIR/server/Dockerfile"
       --destination "$CI_REGISTRY_IMAGE/app:$CI_COMMIT_SHORT_SHA"
       --destination "$CI_REGISTRY_IMAGE/app:latest"
+      --cache=true
+      --cache-dir="/cache/kaniko"
+      --cache-repo="$CI_REGISTRY_IMAGE/cache"
   before_script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\r\n')\"}}}" > /kaniko/.docker/config.json
