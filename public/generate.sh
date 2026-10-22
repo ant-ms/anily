@@ -8,6 +8,8 @@ if [ -n "${1:-}" ]; then
   APK_SRC="$1"
 elif [ -f "$ROOT_DIR/client/android/app/build/outputs/apk/release/app-release.apk" ]; then
   APK_SRC="$ROOT_DIR/client/android/app/build/outputs/apk/release/app-release.apk"
+elif [ -f "$ROOT_DIR/client/android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
+  APK_SRC="$ROOT_DIR/client/android/app/build/outputs/apk/release/app-release-unsigned.apk"
 else
   APK_SRC="$ROOT_DIR/client/android/app/build/outputs/apk/debug/app-debug.apk"
 fi
@@ -36,6 +38,7 @@ case "$PAGES_URL" in
 esac
 APP_ID="ms.ant.anily"
 APP_NAME="Anily"
+APP_NAME_LOWER="anily"
 APP_VERSION="$(grep 'versionName' "$ROOT_DIR/client/android/app/build.gradle" 2>/dev/null | sed 's/.*versionName "\([^"]*\)".*/\1/' || echo "1.0")"
 
 html_escape() {
@@ -63,6 +66,8 @@ urlencode() {
 }
 
 ESC_APP_NAME="$(html_escape "$APP_NAME")"
+ESC_APP_NAME_LOWER="$(html_escape "$APP_NAME_LOWER")"
+ESC_APP_ID="$(html_escape "$APP_ID")"
 ESC_APP_VERSION="$(html_escape "$APP_VERSION")"
 ESC_COMMIT_SHA="$(html_escape "$COMMIT_SHA")"
 ESC_COMMIT_REF="$(html_escape "$COMMIT_REF")"
@@ -71,20 +76,20 @@ ESC_COMMIT_DATE="$(html_escape "$COMMIT_DATE")"
 ESC_PROJECT_URL="$(html_escape "$PROJECT_URL")"
 ESC_PAGES_URL="$(html_escape "$PAGES_URL")"
 
-APK_FILENAME="anily-${APP_VERSION}-${COMMIT_SHA}.apk"
+APK_FILENAME="${APP_NAME_LOWER}-${APP_VERSION}-${COMMIT_SHA}.apk"
 
 mkdir -p "$OUTPUT_DIR"
 
 echo "Copying APKs to $OUTPUT_DIR..."
 cp "$APK_SRC" "$OUTPUT_DIR/$APK_FILENAME"
-cp "$APK_SRC" "$OUTPUT_DIR/anily-${COMMIT_SHA}.apk"
-cp "$APK_SRC" "$OUTPUT_DIR/anily.apk"
+cp "$APK_SRC" "$OUTPUT_DIR/${APP_NAME_LOWER}-${COMMIT_SHA}.apk"
+cp "$APK_SRC" "$OUTPUT_DIR/${APP_NAME_LOWER}.apk"
 cp "$APK_SRC" "$OUTPUT_DIR/app-release.apk"
 cp "$APK_SRC" "$OUTPUT_DIR/app-debug.apk"
 
 APK_SHA256="$(sha256sum "$APK_SRC" | awk '{print $1}')"
 echo "$APK_SHA256  $APK_FILENAME" > "$OUTPUT_DIR/$APK_FILENAME.sha256"
-echo "$APK_SHA256  anily.apk" > "$OUTPUT_DIR/anily.apk.sha256"
+echo "$APK_SHA256  ${APP_NAME_LOWER}.apk" > "$OUTPUT_DIR/${APP_NAME_LOWER}.apk.sha256"
 APK_SIZE="$(ls -lh "$APK_SRC" | awk '{print $5}')"
 
 if [ -f "$ROOT_DIR/client/public/icon-192.png" ]; then
@@ -95,7 +100,7 @@ if [ -f "$ROOT_DIR/client/public/favicon.ico" ]; then
 fi
 
 # Obtainium configuration and deep link
-STATIC_CONFIG="{\"id\":\"$APP_ID\",\"url\":\"$PAGES_URL\",\"author\":\"ant.ms\",\"name\":\"$APP_NAME\",\"additionalSettings\":\"{\\\"versionExtractionRegEx\\\":\\\"anily-([^/]+)\\\\\\\\.apk\\\",\\\"matchGroupToUse\\\":\\\"1\\\"}\"}"
+STATIC_CONFIG="{\"id\":\"$APP_ID\",\"url\":\"$PAGES_URL\",\"author\":\"ant.ms\",\"name\":\"$APP_NAME\",\"additionalSettings\":\"{\\\"versionExtractionRegEx\\\":\\\"${APP_NAME_LOWER}-([^/]+)\\\\\\\\.apk\\\",\\\"matchGroupToUse\\\":\\\"1\\\",\\\"apkFilterRegEx\\\":\\\"${APP_NAME_LOWER}-.+\\\\\\\\.apk\\\"}\"}"
 printf '%s\n' "$STATIC_CONFIG" > "$OUTPUT_DIR/obtainium.json"
 STATIC_CONFIG_ENCODED="$(urlencode "$STATIC_CONFIG")"
 STATIC_OBTAINIUM_DIRECT="obtainium://app/$STATIC_CONFIG_ENCODED"
@@ -104,6 +109,8 @@ STATIC_OBTAINIUM_REDIRECT="https://apps.obtainium.imranr.dev/redirect?r=$STATIC_
 # Substitute placeholders from template into index.html
 sed \
   -e "s|{{APP_NAME}}|$ESC_APP_NAME|g" \
+  -e "s|{{APP_NAME_LOWER}}|$ESC_APP_NAME_LOWER|g" \
+  -e "s|{{APP_ID}}|$ESC_APP_ID|g" \
   -e "s|{{APP_VERSION}}|$ESC_APP_VERSION|g" \
   -e "s|{{COMMIT_SHA}}|$ESC_COMMIT_SHA|g" \
   -e "s|{{COMMIT_REF}}|$ESC_COMMIT_REF|g" \
