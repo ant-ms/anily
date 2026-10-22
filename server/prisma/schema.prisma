@@ -170,7 +170,6 @@ model Episode {
 
   thumbnailUrl String?
 
-  watched Boolean @default(false)
   userProgress UserEpisodeProgress[]
 
   mediaStatus          MediaStatus @default(NONE)

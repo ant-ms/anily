@@ -60,7 +60,6 @@ const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<Side
                 episodes: {
                   select: {
                     id: true,
-                    watched: true,
                     airingAt: true,
                   },
                 },

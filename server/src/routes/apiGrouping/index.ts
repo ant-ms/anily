@@ -43,7 +43,7 @@ const filterAnimeDetails = (
     progress: {
       anilistId: a.anilistId,
       watched: episodes.filter((e: any) =>
-        progressMap && progressMap.has(e.id) ? progressMap.get(e.id)! : e.watched,
+        progressMap?.get(e.id) ?? false,
       ).length,
       total: episodes.length,
       released: episodes.filter(

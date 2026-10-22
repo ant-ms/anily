@@ -31,7 +31,7 @@ export const apiEpisodesAnilistIdGetRoute = app.get(
         id: episode.id,
         number: episode.number,
         airingAt: episode.airingAt,
-        watched: progressMap.has(episode.id) ? progressMap.get(episode.id)! : episode.watched,
+        watched: progressMap.get(episode.id) ?? false,
         titleEnglish: episode.titleEnglish,
         titleNative: episode.titleNative,
         titleRomanji: episode.titleRomanji,
