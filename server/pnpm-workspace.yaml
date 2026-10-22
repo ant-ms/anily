@@ -1,5 +1,9 @@
 minimumReleaseAgeExclude:
   - '@medialy/stream-core@1.0.0'
   - '@medialy/stream-core@1.0.1'
+  - '@medialy/stream-core@1.0.2'
   - '@medialy/thetvdb@1.0.0'
+  - '@medialy/thetvdb@1.0.1'
+  - '@medialy/thetvdb@1.0.2'
   - '@ant.ms/anily-providers@1.1.0'
+  - '@ant.ms/anily-providers@1.2.0'

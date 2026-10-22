@@ -14,14 +14,14 @@
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^26.6.5",
-    "sass-embedded": "^1.105.2",
+    "sass-embedded": "^1.106.0",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.7",
     "typescript": "~6.0.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.5"
   },
   "dependencies": {
-    "@ant.ms/anily-providers": "^1.1.0",
+    "@ant.ms/anily-providers": "^1.2.0",
     "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.2",
     "@capacitor/app-launcher": "^8.0.1",
@@ -31,7 +31,7 @@
     "@capacitor/network": "^8.0.1",
     "@capacitor/preferences": "^8.0.1",
     "@medialy/android": "^1.0.0",
-    "@medialy/ui": "^1.1.0",
+    "@medialy/ui": "^1.2.1",
     "hls.js": "^1.7.3",
     "hono": "^4.13.13",
     "media-captions": "^0.0.18",

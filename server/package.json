@@ -30,12 +30,12 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "@ant.ms/anily-providers": "^1.1.0",
+    "@ant.ms/anily-providers": "^1.2.0",
     "@hono/node-server": "^2.1.5",
     "@hono/oidc-auth": "^1.10.0",
     "@hono/zod-validator": "^0.9.1",
-    "@medialy/stream-core": "^1.0.1",
-    "@medialy/thetvdb": "^1.0.1",
+    "@medialy/stream-core": "^1.0.2",
+    "@medialy/thetvdb": "^1.0.2",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@trpc/server": "^11.19.0",
