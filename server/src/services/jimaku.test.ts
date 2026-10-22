@@ -53,7 +53,7 @@ describe("Jimaku Service", () => {
     const zipBuffer = zip.toBuffer();
 
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(zipBuffer, {
+      new Response(new Uint8Array(zipBuffer), {
         status: 200,
         headers: { "Content-Type": "application/zip" },
       }),

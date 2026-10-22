@@ -175,15 +175,11 @@ model Episode {
 
   mediaStatus          MediaStatus @default(NONE)
   mediaPath            String?     // relative path within media volume, e.g. "21234/ep01/[SubsPlease] Show - 01.mkv"
-  mediaTorrentHash     String?     // qBittorrent torrent hash
   mediaSize            BigInt?     // file size in bytes once available
-  mediaSelectedTorrent Json?       // stored torrent selection info (title, seeders, etc.)
   mediaLastSearchAt    DateTime?   // last time search was performed
-  mediaFailedTorrents  String[]    @default([]) // blacklisted torrent links/titles that stalled or failed
 
   @@unique([animeDetailsId, number])
   @@index([animeDetailsId])
-  @@index([mediaTorrentHash])
 }
 
 model User {
