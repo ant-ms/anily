@@ -97,19 +97,16 @@ export const apiDetailsAnilistIdGroupingPostRoute = app.post(
 
     try {
       const user = await getAuthenticatedUser(c);
-      await prisma.userBookmark.upsert({
-        where: {
-          userId_anilistId: {
-            userId: user.id,
-            anilistId: params.anilistId,
+      // Only bookmark once the grouping exists, otherwise a failed grouping
+      // leaves an orphan bookmark that never shows up in the sidebar.
+      const bookmark = () =>
+        prisma.userBookmark.upsert({
+          where: {
+            userId_anilistId: { userId: user.id, anilistId: params.anilistId },
           },
-        },
-        create: {
-          userId: user.id,
-          anilistId: params.anilistId,
-        },
-        update: {},
-      });
+          create: { userId: user.id, anilistId: params.anilistId },
+          update: {},
+        });
 
       const numberOfAnimeGroupings = await getNumberOfAnimeGroupings(
         params.anilistId,
@@ -121,6 +118,7 @@ export const apiDetailsAnilistIdGroupingPostRoute = app.post(
           where: { items: { some: { anilistId: params.anilistId } } },
           data: { displayAnimeId: params.anilistId },
         });
+        await bookmark();
         return c.body(null, 204);
       }
 
@@ -141,6 +139,7 @@ export const apiDetailsAnilistIdGroupingPostRoute = app.post(
         },
       });
 
+      await bookmark();
       return c.body(null, 204);
     } catch (error) {
       log.error({ anilistId: params.anilistId, error }, "Failed to bookmark anime");

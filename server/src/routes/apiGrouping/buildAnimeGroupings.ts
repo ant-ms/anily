@@ -87,8 +87,16 @@ export const fillAnimeGroupingDetails = async (memberIds: number[]) => {
   for (const detail of existingDetails) {
     memberIdsWithoutFetchedDetails.delete(detail.baseAnimeAnilistId);
   }
-  for (const anilistId of memberIdsWithoutFetchedDetails) {
-    await getAnimeDetailsFromApiAndUpsert(anilistId);
+  // Fetch in small parallel batches; large franchises (e.g. Pokémon, 100+
+  // entries) take minutes when fetched sequentially.
+  const missing = [...memberIdsWithoutFetchedDetails];
+  const CONCURRENCY = 5;
+  for (let i = 0; i < missing.length; i += CONCURRENCY) {
+    await Promise.all(
+      missing
+        .slice(i, i + CONCURRENCY)
+        .map((id) => getAnimeDetailsFromApiAndUpsert(id)),
+    );
   }
 
   return [
