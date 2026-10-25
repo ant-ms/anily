@@ -31,7 +31,7 @@
     "@capacitor/network": "^8.0.1",
     "@capacitor/preferences": "^8.0.1",
     "@medialy/android": "^1.0.0",
-    "@medialy/ui": "^1.3.2",
+    "@medialy/ui": "^1.4.0",
     "hls.js": "^1.7.3",
     "hono": "^4.13.13",
     "media-captions": "^0.0.18",

@@ -150,4 +150,114 @@ describe("apiDetails bookmark and grouping endpoints", () => {
       expect(result).toEqual({ success: true });
     });
   });
+
+  describe("grouping deduplication and concurrency", () => {
+    const BLEACH_ID = 269;
+
+    const cleanupBleach = async () => {
+      const user = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
+      if (user) {
+        await prisma.userBookmark.deleteMany({
+          where: { userId: user.id, anilistId: BLEACH_ID },
+        });
+      }
+      await prisma.animeGrouping.deleteMany({
+        where: {
+          OR: [
+            { displayAnimeId: BLEACH_ID },
+            { items: { some: { anilistId: BLEACH_ID } } },
+          ],
+        },
+      });
+    };
+
+    beforeEach(async () => {
+      await cleanupBleach();
+    });
+
+    afterAll(async () => {
+      await cleanupBleach();
+    });
+
+    it("concurrent bookmark requests do not create duplicate AnimeGrouping rows", async () => {
+      // Send multiple concurrent requests to bookmark the same anime
+      const requests = [
+        app.request(`/api/details/${BLEACH_ID}/grouping`, { method: "POST" }),
+        app.request(`/api/details/${BLEACH_ID}/grouping`, { method: "POST" }),
+        app.request(`/api/details/${BLEACH_ID}/grouping`, { method: "POST" }),
+      ];
+
+      const responses = await Promise.all(requests);
+      for (const res of responses) {
+        expect(res.status).toBe(204);
+      }
+
+      // Check DB: exactly one AnimeGrouping should exist for BLEACH_ID
+      const groupings = await prisma.animeGrouping.findMany({
+        where: {
+          OR: [
+            { displayAnimeId: BLEACH_ID },
+            { items: { some: { anilistId: BLEACH_ID } } },
+          ],
+        },
+      });
+      expect(groupings.length).toBe(1);
+      expect(groupings[0].displayAnimeId).toBe(BLEACH_ID);
+    });
+
+    it("duplicate sequential bookmark requests do not create duplicate AnimeGrouping rows", async () => {
+      const res1 = await app.request(`/api/details/${BLEACH_ID}/grouping`, {
+        method: "POST",
+      });
+      expect(res1.status).toBe(204);
+
+      const res2 = await app.request(`/api/details/${BLEACH_ID}/grouping`, {
+        method: "POST",
+      });
+      expect(res2.status).toBe(204);
+
+      const groupings = await prisma.animeGrouping.findMany({
+        where: {
+          OR: [
+            { displayAnimeId: BLEACH_ID },
+            { items: { some: { anilistId: BLEACH_ID } } },
+          ],
+        },
+      });
+      expect(groupings.length).toBe(1);
+    });
+
+    it("consolidates pre-existing duplicate AnimeGroupings when bookmarking", async () => {
+      // Manually create two duplicate groupings in DB
+      const g1 = await prisma.animeGrouping.create({
+        data: {
+          displayAnimeId: BLEACH_ID,
+          items: { connect: [{ anilistId: BLEACH_ID }] },
+        },
+      });
+      const g2 = await prisma.animeGrouping.create({
+        data: {
+          displayAnimeId: BLEACH_ID,
+          items: { connect: [{ anilistId: BLEACH_ID }] },
+        },
+      });
+
+      const beforeGroupings = await prisma.animeGrouping.findMany({
+        where: { displayAnimeId: BLEACH_ID },
+      });
+      expect(beforeGroupings.length).toBe(2);
+
+      // Bookmark request should consolidate them into one
+      const res = await app.request(`/api/details/${BLEACH_ID}/grouping`, {
+        method: "POST",
+      });
+      expect(res.status).toBe(204);
+
+      const afterGroupings = await prisma.animeGrouping.findMany({
+        where: { displayAnimeId: BLEACH_ID },
+      });
+      expect(afterGroupings.length).toBe(1);
+      expect(afterGroupings[0].id).toBe(g1.id);
+    });
+  });
 });

@@ -42,7 +42,7 @@ function getEpisodeStats(items: GroupingItem[], now: Date) {
 
 import { getAuthenticatedUser } from "$src/auth";
 
-const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<SidebarCardData[]> => {
+export const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<SidebarCardData[]> => {
   const [animeGroupings, userProgress, userBookmarks] = await Promise.all([
     prisma.animeGrouping.findMany({
       include: {
@@ -131,7 +131,16 @@ const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<Side
     }
   });
 
-  return filteredGroupings.map((grouping) => {
+  const cards: SidebarCardData[] = [];
+  const seenDisplayAnimeIds = new Set<number>();
+
+  for (const grouping of filteredGroupings) {
+    const displayId = grouping.displayAnime.anilistId;
+    if (seenDisplayAnimeIds.has(displayId)) {
+      continue;
+    }
+    seenDisplayAnimeIds.add(displayId);
+
     const groupingChains = buildChains(grouping.items as any);
     
     // We flatten trees into simple arrays of AnimeProgress for the pill UI.
@@ -164,7 +173,7 @@ const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<Side
       allProgressChains.push(notInChainProgressFlat);
     }
 
-    return {
+    cards.push({
       displayAnilistId: grouping.displayAnime.anilistId,
       allAnilistIds: grouping.items.map((item) => item.anilistId),
       progress: allProgressChains,
@@ -173,8 +182,20 @@ const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<Side
       titleNative: grouping.displayAnime.titleNative,
       thumbnailUrl: grouping.displayAnime.animeDetails?.thumbnailUrl ?? null,
       nextEpisodeDate: new Date(),
-    };
-  });
+    });
+  }
+
+  // Deduplicate returned list by displayAnilistId as defense-in-depth
+  const finalCards: SidebarCardData[] = [];
+  const finalSeenIds = new Set<number>();
+  for (const card of cards) {
+    if (!finalSeenIds.has(card.displayAnilistId)) {
+      finalSeenIds.add(card.displayAnilistId);
+      finalCards.push(card);
+    }
+  }
+
+  return finalCards;
 };
 
 export const apiSidebarGetRoute = app.get(

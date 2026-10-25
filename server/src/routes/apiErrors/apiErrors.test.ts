@@ -146,4 +146,26 @@ describe("apiErrors routes & errorTracker", () => {
     expect(detail.message).toBe("Received 0 bytes");
     expect(detail.params.animeTitle).toBe("Delicious in Dungeon");
   });
+
+  it("logs 404s on /api/* routes to errorTracker", async () => {
+    const res = await app.request("/api/unknown-endpoint");
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toEqual({ error: "Not Found" });
+
+    const errors = errorTracker.getErrors({ category: "HTTP" });
+    expect(errors.total).toBe(1);
+    expect(errors.errors[0].category).toBe("HTTP");
+    expect(errors.errors[0].statusCode).toBe(404);
+    expect(errors.errors[0].action).toBe("GET /api/unknown-endpoint");
+    expect(errors.errors[0].message).toBe("Route not found: GET /api/unknown-endpoint");
+  });
+
+  it("does not log 404s on non-api routes to errorTracker", async () => {
+    const res = await app.request("/favicon.ico");
+    expect(res.status).toBe(404);
+
+    const errors = errorTracker.getErrors({ category: "HTTP" });
+    expect(errors.total).toBe(0);
+  });
 });

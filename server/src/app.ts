@@ -32,3 +32,18 @@ app.onError((err, c) => {
   );
 });
 
+app.notFound((c) => {
+  if (c.req.path === "/api" || c.req.path.startsWith("/api/")) {
+    errorTracker.recordError({
+      category: "HTTP",
+      action: `${c.req.method} ${c.req.path}`,
+      message: `Route not found: ${c.req.method} ${c.req.path}`,
+      statusCode: 404,
+      endpoint: c.req.url,
+      method: c.req.method,
+    });
+  }
+  return c.json({ error: "Not Found" }, 404);
+});
+
+

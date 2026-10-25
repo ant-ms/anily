@@ -1,0 +1,1 @@
+- sidebar and episode list seems to not always ender loading state / update on navigation to a not-in-db-yet show

@@ -1,6 +1,5 @@
 import { getAnimeDetails } from "./getAnimeDetails";
 import { getAnimeDetailsFromApiAndUpsert } from "$lib/anilistApi/getAnimeDetailsFromApiAndUpsert";
-import { getNumberOfAnimeGroupings } from "../apiGrouping/updateAnimeGroupingIfNeeded";
 import { prisma } from "$src/prisma";
 import { fillAnimeGroupingDetails } from "../apiGrouping/buildAnimeGroupings";
 import { collectGroupingMemberIds } from "../apiGrouping/collectGroupingMemberIds";
@@ -9,6 +8,91 @@ import { app } from "$src/app";
 import { logger } from "$src/logger";
 
 const log = logger.child({ route: "apiDetails" });
+
+class AsyncKeyedMutex {
+  private activeLocks = new Map<number, Promise<void>>();
+
+  async runExclusive<T>(key: number, fn: () => Promise<T>): Promise<T> {
+    while (this.activeLocks.has(key)) {
+      try {
+        await this.activeLocks.get(key);
+      } catch {
+        // Ignore errors from previous holder
+      }
+    }
+
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => {
+      resolve = r;
+    });
+    this.activeLocks.set(key, promise);
+
+    try {
+      return await fn();
+    } finally {
+      this.activeLocks.delete(key);
+      resolve();
+    }
+  }
+}
+
+const groupingMutex = new AsyncKeyedMutex();
+
+export const findGroupingsForMembers = async (
+  memberIds: number[],
+  displayId: number,
+) => {
+  const ids = Array.from(new Set([...memberIds, displayId]));
+  return await prisma.animeGrouping.findMany({
+    where: {
+      OR: [
+        { items: { some: { anilistId: { in: ids } } } },
+        { displayAnimeId: { in: ids } },
+      ],
+    },
+    include: {
+      items: {
+        select: { anilistId: true },
+      },
+    },
+    orderBy: { id: "asc" },
+  });
+};
+
+export const consolidateGroupings = async (
+  groupings: Array<{ id: number; items?: { anilistId: number }[] }>,
+  targetDisplayAnimeId: number,
+  memberIds: number[],
+) => {
+  if (groupings.length === 0) return null;
+
+  const [primary, ...duplicates] = groupings;
+  const allItemIds = new Set<number>(memberIds);
+  allItemIds.add(targetDisplayAnimeId);
+  for (const g of groupings) {
+    for (const item of g.items ?? []) {
+      allItemIds.add(item.anilistId);
+    }
+  }
+
+  await prisma.animeGrouping.update({
+    where: { id: primary.id },
+    data: {
+      displayAnimeId: targetDisplayAnimeId,
+      items: {
+        set: Array.from(allItemIds).map((id) => ({ anilistId: id })),
+      },
+    },
+  });
+
+  if (duplicates.length > 0) {
+    await prisma.animeGrouping.deleteMany({
+      where: { id: { in: duplicates.map((d) => d.id) } },
+    });
+  }
+
+  return primary;
+};
 
 import { getAuthenticatedUser } from "$src/auth";
 
@@ -108,38 +192,62 @@ export const apiDetailsAnilistIdGroupingPostRoute = app.post(
           update: {},
         });
 
-      const numberOfAnimeGroupings = await getNumberOfAnimeGroupings(
-        params.anilistId,
-      );
-
-      // If the anime is already grouped, update the display anime to this one
-      if (numberOfAnimeGroupings.length > 0) {
-        await prisma.animeGrouping.updateMany({
-          where: { items: { some: { anilistId: params.anilistId } } },
-          data: { displayAnimeId: params.anilistId },
-        });
-        await bookmark();
-        return c.body(null, 204);
-      }
-
-      // Make sure all members have details
       const groupingMemberIds = await collectGroupingMemberIds(params.anilistId);
-      await fillAnimeGroupingDetails(groupingMemberIds);
+      const franchiseKey =
+        groupingMemberIds.length > 0 ? Math.min(...groupingMemberIds) : params.anilistId;
 
-      await prisma.animeGrouping.create({
-        data: {
-          items: {
-            connect: groupingMemberIds.map((id) => ({ anilistId: id })),
-          },
-          displayAnime: {
-            connect: {
-              anilistId: params.anilistId,
+      await groupingMutex.runExclusive(franchiseKey, async () => {
+        const existingGroupings = await findGroupingsForMembers(
+          groupingMemberIds,
+          params.anilistId,
+        );
+
+        // If the anime or any member is already grouped, update display anime / consolidate
+        if (existingGroupings.length > 0) {
+          await consolidateGroupings(
+            existingGroupings,
+            params.anilistId,
+            groupingMemberIds,
+          );
+          await bookmark();
+          return;
+        }
+
+        // Make sure all members have details
+        await fillAnimeGroupingDetails(groupingMemberIds);
+
+        // Re-check if a grouping was already created while fillAnimeGroupingDetails was running!
+        const recheckedGroupings = await findGroupingsForMembers(
+          groupingMemberIds,
+          params.anilistId,
+        );
+
+        if (recheckedGroupings.length > 0) {
+          await consolidateGroupings(
+            recheckedGroupings,
+            params.anilistId,
+            groupingMemberIds,
+          );
+          await bookmark();
+          return;
+        }
+
+        await prisma.animeGrouping.create({
+          data: {
+            items: {
+              connect: groupingMemberIds.map((id) => ({ anilistId: id })),
+            },
+            displayAnime: {
+              connect: {
+                anilistId: params.anilistId,
+              },
             },
           },
-        },
+        });
+
+        await bookmark();
       });
 
-      await bookmark();
       return c.body(null, 204);
     } catch (error) {
       log.error({ anilistId: params.anilistId, error }, "Failed to bookmark anime");
