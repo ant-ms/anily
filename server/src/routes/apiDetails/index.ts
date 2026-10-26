@@ -1,5 +1,5 @@
 import { getAnimeDetails } from "./getAnimeDetails";
-import { getAnimeDetailsFromApiAndUpsert } from "$lib/anilistApi/getAnimeDetailsFromApiAndUpsert";
+import { syncAnimePipeline } from "$src/services/syncAnimePipeline";
 import { prisma } from "$src/prisma";
 import { fillAnimeGroupingDetails } from "../apiGrouping/buildAnimeGroupings";
 import { collectGroupingMemberIds } from "../apiGrouping/collectGroupingMemberIds";
@@ -159,7 +159,7 @@ export const apiDetailsAnilistIdRefreshPostRoute = app.post(
 
     try {
       // Force a fresh fetch from AniList and upsert into the database.
-      await getAnimeDetailsFromApiAndUpsert(params.anilistId);
+      await syncAnimePipeline(params.anilistId);
       return c.body(null, 204);
     } catch (error) {
       return c.json(

@@ -1,4 +1,4 @@
-import { getAnimeDetailsFromApiAndUpsert } from "$lib/anilistApi/getAnimeDetailsFromApiAndUpsert";
+import { syncAnimePipeline } from "$src/services/syncAnimePipeline";
 import { prisma } from "../../prisma";
 
 const getAnimeDetailsFromDb = async (anilistId: number) =>
@@ -17,4 +17,4 @@ const getAnimeDetailsFromDb = async (anilistId: number) =>
 
 export const getAnimeDetails = async (anilistId: number) =>
   (await getAnimeDetailsFromDb(anilistId)) ??
-  (await getAnimeDetailsFromApiAndUpsert(anilistId));
+  (await syncAnimePipeline(anilistId));

@@ -1,6 +1,7 @@
 import { prisma } from "$src/prisma";
 import { resolveTvdbMapping, getSeriesEpisodes } from "@medialy/thetvdb";
 import { getAnimeScheduleDates } from "../animeschedule/getAnimeScheduleDates";
+import { getAnimeDetailsFromAPI } from "$lib/anilistApi/animeDetails/getAnimeDetails";
 
 const LANGUAGE_ENGLISH = "eng";
 const LANGUAGE_JAPANESE = "jpn";
@@ -108,7 +109,6 @@ export const upsertEpisodesForAnime = async (
   let effectiveEpisodeCount = expectedEpisodeCount;
   if (effectiveEpisodeCount === undefined) {
     try {
-      const { getAnimeDetailsFromAPI } = await import("$lib/anilistApi/animeDetails/getAnimeDetails");
       const apiDetails = await getAnimeDetailsFromAPI(anilistId);
       if (apiDetails) {
         effectiveEpisodeCount = apiDetails.episodes;
