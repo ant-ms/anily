@@ -20,6 +20,11 @@ import {
   getCachedSubtitle,
   setCachedSubtitle,
 } from "$src/services/furigana";
+import {
+  fetchReferenceSubtitleText,
+  normalizeRefSubForCache,
+  synchronizeSubtitle,
+} from "$src/services/subtitleSync";
 
 const log = logger.child({ module: "apiStream" });
 
@@ -200,12 +205,13 @@ export const apiStreamSubtitleTrackRoute = app.get(
       url: z.string(),
       furigana: z.string().optional(),
       ep: z.coerce.number().optional(),
+      refSub: z.string().optional(),
       expires: z.coerce.number().optional(),
       sig: z.string().optional(),
     }),
   ),
   async (c) => {
-    const { url: targetUrl, furigana, ep, expires, sig } = c.req.valid("query");
+    const { url: targetUrl, furigana, ep, refSub, expires, sig } = c.req.valid("query");
 
     if (!sig || !expires || !verifyStreamSignature(targetUrl, expires, sig)) {
       return c.text("Invalid or expired stream signature", 403);
@@ -216,7 +222,8 @@ export const apiStreamSubtitleTrackRoute = app.get(
     }
 
     const wantFurigana = furigana === "1" || furigana === "true";
-    const cacheKey = `${targetUrl}:${ep ?? 0}:${wantFurigana ? 1 : 0}`;
+    const canonicalRef = normalizeRefSubForCache(refSub);
+    const cacheKey = `${targetUrl}:${ep ?? 0}:${wantFurigana ? 1 : 0}:${canonicalRef}`;
     const cached = getCachedSubtitle(cacheKey);
     if (cached) {
       return c.text(cached, 200, {
@@ -226,21 +233,16 @@ export const apiStreamSubtitleTrackRoute = app.get(
       });
     }
 
-    const downloaded = await downloadJimakuSubtitleText(targetUrl, ep);
+    const [downloaded, refText] = await Promise.all([
+      downloadJimakuSubtitleText(targetUrl, ep),
+      refSub ? fetchReferenceSubtitleText(refSub) : Promise.resolve(null),
+    ]);
+
     if (!downloaded) {
       return c.text("Failed to retrieve subtitle track", 502);
     }
 
-    let vtt: string;
-    if (downloaded.format === "ass") {
-      vtt = convertAssToVtt(downloaded.text);
-    } else if (downloaded.format === "srt") {
-      vtt = convertSrtToVtt(downloaded.text);
-    } else {
-      vtt = downloaded.text.trimStart().startsWith("WEBVTT")
-        ? downloaded.text
-        : `WEBVTT\n\n${downloaded.text}`;
-    }
+    let vtt = synchronizeSubtitle(downloaded, refText, targetUrl);
 
     if (wantFurigana) {
       vtt = await addFuriganaToVtt(vtt);

@@ -1,1 +1,2 @@
 - sidebar and episode list seems to not always ender loading state / update on navigation to a not-in-db-yet show
+- Subtitle synchronization: Audio Voice Activity Alignment (VAD / `ffsubsync` style) - align subtitle cue intervals against voice activity in the audio stream if cross-track subtitle correlation is insufficient (e.g., when reference English subtitles are missing or severely out of sync)

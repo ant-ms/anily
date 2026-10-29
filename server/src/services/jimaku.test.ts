@@ -5,11 +5,15 @@ import {
   fetchJimakuFiles,
   downloadJimakuSubtitleText,
   getJimakuSubtitlesForEpisode,
+  scoreJimakuFile,
+  extractReleaseTag,
+  clearEntryCache,
 } from "./jimaku";
 
 describe("Jimaku Service", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    clearEntryCache();
   });
 
   it("searches Jimaku entry by anilist_id and falls back to title", async () => {
@@ -99,5 +103,45 @@ describe("Jimaku Service", () => {
     expect(plainTrack.label).toBe("Japanese (Jimaku)");
     expect(plainTrack.default).toBe(false);
     expect(plainTrack.url).not.toContain("furigana=1");
+  });
+
+  it("prioritizes SubsPlease/Web-DL over TV broadcast files and creates multiple release tracks", async () => {
+    process.env.JIMAKU_API_KEY = "test-token";
+
+    expect(scoreJimakuFile("[SubsPlease] Ep 01.ass")).toBeGreaterThan(scoreJimakuFile("[Ohys-Raws] Ep 01 (TV).ass"));
+    expect(extractReleaseTag("[SubsPlease] Ep 01.ass")).toBe("SubsPlease");
+    expect(extractReleaseTag("Show - Ep 01 (Netflix).vtt")).toBe("Netflix");
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ id: 54321 }]), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            { name: "[Ohys-Raws] Ep 01 (TV).ass", url: "https://jimaku.cc/files/tv.ass", size: 500 },
+            { name: "[SubsPlease] Ep 01.ass", url: "https://jimaku.cc/files/subsplease.ass", size: 600 },
+            { name: "[Netflix] Ep 01.vtt", url: "https://jimaku.cc/files/netflix.vtt", size: 400 },
+          ]),
+          { status: 200 },
+        ),
+      );
+
+    const tracks = await getJimakuSubtitlesForEpisode(154587, 1, ["Frieren"], {
+      origin: "http://localhost:3000",
+      expires: 1800000000,
+      isNativeDefault: true,
+      refSubUrl: "http://localhost:3000/api/stream/proxy/sub_en.vtt?url=https%3A%2F%2Fexample.com%2Fen.vtt",
+    });
+
+    // 2 candidates: SubsPlease (highest) and Netflix (2nd distinct), each with Furigana and Plain = 4 tracks
+    expect(tracks.length).toBe(4);
+    expect(tracks[0].label).toBe("Japanese [Furigana] (Jimaku - SubsPlease)");
+    expect(tracks[0].default).toBe(true);
+    expect(tracks[0].url).toContain("refSub=");
+    expect(tracks[1].label).toBe("Japanese (Jimaku - SubsPlease)");
+    expect(tracks[2].label).toBe("Japanese [Furigana] (Jimaku - Netflix)");
+    expect(tracks[2].default).toBe(false);
+    expect(tracks[3].label).toBe("Japanese (Jimaku - Netflix)");
   });
 });

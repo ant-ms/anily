@@ -25,6 +25,10 @@ const ENTRY_CACHE_NEGATIVE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_ENTRY_CACHE_SIZE = 1000;
 const entryCache = new Map<number, { value: number | null; expiresAt: number }>();
 
+export function clearEntryCache(): void {
+  entryCache.clear();
+}
+
 function getCachedEntryId(anilistId: number): number | null | undefined {
   const entry = entryCache.get(anilistId);
   if (!entry) return undefined;
@@ -56,6 +60,68 @@ export function isJimakuHost(rawUrl: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Extracts a recognizable release group or platform tag from a subtitle filename.
+ */
+export function extractReleaseTag(filename: string): string {
+  const bracketMatch = filename.match(/^\[([^\]]+)\]/);
+  if (bracketMatch) {
+    const candidate = bracketMatch[1].trim();
+    if (!/^\d{3,4}p$/i.test(candidate) && !/subtitle/i.test(candidate)) {
+      return candidate;
+    }
+  }
+
+  const lower = filename.toLowerCase();
+  if (lower.includes("subsplease")) return "SubsPlease";
+  if (lower.includes("erai-raws") || lower.includes("erai")) return "Erai-raws";
+  if (lower.includes("crunchyroll") || /\bcr\b/i.test(filename)) return "Crunchyroll";
+  if (lower.includes("horriblesubs") || lower.includes("horrible")) return "HorribleSubs";
+  if (lower.includes("netflix") || /\bnf\b/i.test(filename)) return "Netflix";
+  if (lower.includes("amazon") || lower.includes("amzn") || lower.includes("prime")) return "Amazon";
+  if (lower.includes("b-global") || lower.includes("bilibili")) return "Bilibili";
+  if (lower.includes("hidive")) return "HIDIVE";
+  if (lower.includes("tokyo mx") || lower.includes("tokyomx")) return "Tokyo MX";
+  if (lower.includes("bs11")) return "BS11";
+  if (lower.includes("ohys-raws") || lower.includes("ohys")) return "Ohys-Raws";
+
+  return "Jimaku";
+}
+
+/**
+ * Scores a subtitle file by release type and format.
+ * High scores prioritize Crunchyroll/Web-DL sources which match streaming video providers.
+ */
+export function scoreJimakuFile(filename: string): number {
+  let score = 0;
+  const lower = filename.toLowerCase();
+
+  // Prefer direct subtitle files over zip archives
+  if (
+    lower.endsWith(".ass") ||
+    lower.endsWith(".ssa") ||
+    lower.endsWith(".srt") ||
+    lower.endsWith(".vtt")
+  ) {
+    score += 20;
+  }
+
+  // Release match priorities: Crunchyroll web-dl rips match streaming providers (MegaPlay, HiAnime, etc.)
+  if (lower.includes("subsplease")) score += 100;
+  else if (lower.includes("erai-raws") || lower.includes("erai")) score += 95;
+  else if (lower.includes("crunchyroll") || /\bcr\b/i.test(filename)) score += 90;
+  else if (lower.includes("web-dl") || lower.includes("webrip") || lower.includes("web")) score += 50;
+  else if (lower.includes("horriblesubs") || lower.includes("horrible")) score += 40;
+  else if (lower.includes("netflix") || /\bnf\b/i.test(filename)) score += 30;
+  else if (lower.includes("amazon") || lower.includes("amzn") || lower.includes("prime")) score += 30;
+  else if (lower.includes("b-global") || lower.includes("bilibili")) score += 25;
+  else if (lower.includes("hidive")) score += 25;
+  else if (lower.includes("tokyo mx") || lower.includes("bs11") || lower.includes("at-x") || /\btv\b/i.test(filename)) score += 10;
+  else if (lower.includes("ohys") || lower.includes("leopard")) score += 10;
+
+  return score;
 }
 
 export function getJimakuApiKey(): string | null {
@@ -215,9 +281,10 @@ export async function downloadJimakuSubtitleText(
         const epStr = String(episodeNumber);
         const epPadded = epStr.padStart(2, "0");
         const match = subEntries.find((e) => {
-          const name = e.entryName;
+          // Strip season indicators (e.g. "Season 3", "S02") to prevent false positive matches
+          const cleanName = e.entryName.replace(/\b(?:season|s)\s*\d+\b/gi, "");
           const re = new RegExp(`(?:ep|episode|e|[^0-9])(?:${epStr}|${epPadded})(?:[^0-9]|$)`, "i");
-          return re.test(name);
+          return re.test(cleanName);
         });
         if (match) chosen = match;
       }
@@ -249,6 +316,7 @@ export async function getJimakuSubtitlesForEpisode(
     origin: string;
     expires: number;
     isNativeDefault?: boolean;
+    refSubUrl?: string;
   },
 ): Promise<SubtitleTrackDto[]> {
   const apiKey = getJimakuApiKey();
@@ -271,40 +339,61 @@ export async function getJimakuSubtitlesForEpisode(
     return [];
   }
 
-  // Sort files: prefer direct subtitle files (.vtt, .ass, .srt) over zips
-  files.sort((a, b) => {
-    const isZipA = a.name.toLowerCase().endsWith(".zip");
-    const isZipB = b.name.toLowerCase().endsWith(".zip");
-    if (isZipA && !isZipB) return 1;
-    if (!isZipA && isZipB) return -1;
-    return 0;
-  });
+  // Score and sort files: prioritize Web-DL/Crunchyroll releases over TV/unknown
+  files.sort((a, b) => scoreJimakuFile(b.name) - scoreJimakuFile(a.name));
 
-  const bestFile = files[0];
-  const { origin, expires, isNativeDefault = false } = options;
+  // Select up to 2 distinct release candidates to provide fallback options without cluttering
+  const candidates: Array<{ file: JimakuSubtitleFile; tag: string }> = [];
+  const seenTags = new Set<string>();
 
-  const plainSig = generateStreamSignature(bestFile.url, expires);
-  const plainUrl = `${origin}/api/stream/subtitles/track?url=${encodeURIComponent(
-    bestFile.url,
-  )}&ep=${episodeNumber}&expires=${expires}&sig=${plainSig}`;
+  for (const f of files) {
+    const tag = extractReleaseTag(f.name);
+    if (!seenTags.has(tag)) {
+      seenTags.add(tag);
+      candidates.push({ file: f, tag });
+      if (candidates.length >= 2) break;
+    }
+  }
 
-  const furiSig = generateStreamSignature(bestFile.url, expires);
-  const furiUrl = `${origin}/api/stream/subtitles/track?url=${encodeURIComponent(
-    bestFile.url,
-  )}&ep=${episodeNumber}&furigana=1&expires=${expires}&sig=${furiSig}`;
+  if (candidates.length === 0) {
+    candidates.push({ file: files[0], tag: extractReleaseTag(files[0].name) });
+  }
 
-  return [
-    {
-      label: "Japanese [Furigana] (Jimaku)",
-      language: "ja",
-      url: furiUrl,
-      default: isNativeDefault,
-    },
-    {
-      label: "Japanese (Jimaku)",
-      language: "ja",
-      url: plainUrl,
-      default: false,
-    },
-  ];
+  const { origin, expires, isNativeDefault = false, refSubUrl } = options;
+  const refParam = refSubUrl ? `&refSub=${encodeURIComponent(refSubUrl)}` : "";
+  const tracks: SubtitleTrackDto[] = [];
+
+  for (let idx = 0; idx < candidates.length; idx++) {
+    const { file, tag } = candidates[idx];
+    const isPrimary = idx === 0;
+    const labelSuffix = tag === "Jimaku" ? "Jimaku" : `Jimaku - ${tag}`;
+
+    const plainSig = generateStreamSignature(file.url, expires);
+    const plainUrl = `${origin}/api/stream/subtitles/track?url=${encodeURIComponent(
+      file.url,
+    )}&ep=${episodeNumber}${refParam}&expires=${expires}&sig=${plainSig}`;
+
+    const furiSig = generateStreamSignature(file.url, expires);
+    const furiUrl = `${origin}/api/stream/subtitles/track?url=${encodeURIComponent(
+      file.url,
+    )}&ep=${episodeNumber}&furigana=1${refParam}&expires=${expires}&sig=${furiSig}`;
+
+    tracks.push(
+      {
+        label: `Japanese [Furigana] (${labelSuffix})`,
+        language: "ja",
+        url: furiUrl,
+        default: isPrimary ? isNativeDefault : false,
+      },
+      {
+        label: `Japanese (${labelSuffix})`,
+        language: "ja",
+        url: plainUrl,
+        default: false,
+      },
+    );
+  }
+
+  return tracks;
 }
+

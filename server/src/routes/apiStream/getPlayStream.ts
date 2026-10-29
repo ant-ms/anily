@@ -84,7 +84,9 @@ export async function resolvePlayStream(
     };
   });
 
-  // Query Jimaku for Japanese subtitles
+  const refSub =
+    providerSubtitles.find((s) => s.default || s.language === "en") || providerSubtitles[0];
+
   let jimakuSubtitles: Array<{
     label: string;
     language: string;
@@ -109,6 +111,7 @@ export async function resolvePlayStream(
           origin,
           expires: streamExpires,
           isNativeDefault: isNative,
+          refSubUrl: refSub?.url,
         },
       );
     } catch {}

@@ -111,7 +111,9 @@ export async function resolveEpisodeSubtitles(
     };
   });
 
-  // Query Jimaku for Japanese subtitles
+  const refSub =
+    providerSubtitles.find((s) => s.default || s.language === "en") || providerSubtitles[0];
+
   const baseAnime = episode.animeDetails.baseAnime;
   const titles = [
     baseAnime.titleEnglish,
@@ -129,6 +131,7 @@ export async function resolveEpisodeSubtitles(
         origin,
         expires: streamExpires,
         isNativeDefault: isNative,
+        refSubUrl: refSub?.url,
       },
     );
   } catch {}
