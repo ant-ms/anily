@@ -2,6 +2,9 @@ import { prisma } from "$src/prisma";
 import { logger } from "$src/logger";
 import {
   SkipTimesCache,
+  normalizeSkipEntries,
+  DEFAULT_SKIP_CACHE_POSITIVE_TTL_MS,
+  DEFAULT_SKIP_CACHE_NEGATIVE_TTL_MS,
   type SkipType,
   type SkipInterval,
   type SkipTimeEntry,
@@ -31,8 +34,8 @@ export const skipTimesCache = new SkipTimesCache(2000);
 
 const ANISKIP_BASE_URL = "https://api.aniskip.com/v2/skip-times";
 const DEFAULT_TIMEOUT_MS = 5000;
-const POSITIVE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours for successful skip times
-const NEGATIVE_TTL_MS = 60 * 60 * 1000; // 1 hour for episodes without skip times
+const POSITIVE_TTL_MS = DEFAULT_SKIP_CACHE_POSITIVE_TTL_MS;
+const NEGATIVE_TTL_MS = DEFAULT_SKIP_CACHE_NEGATIVE_TTL_MS;
 
 const VALID_SKIP_TYPES: SkipType[] = ["op", "ed", "recap", "mixed-op", "mixed-ed"];
 
@@ -115,42 +118,7 @@ function normalizeSkipTimes(
     }
   }
 
-  if (entries.length === 0) {
-    return { found: false, results: [] };
-  }
-
-  // Find best match for each skip type.
-  // If multiple entries exist for the same type, choose the one closest to the video duration.
-  const findBestForType = (type: SkipType): SkipInterval | undefined => {
-    const matching = entries.filter((e) => e.type === type);
-    if (matching.length === 0) return undefined;
-    if (matching.length === 1 || !duration || duration <= 0) {
-      return matching[0].interval;
-    }
-
-    let best = matching[0];
-    let minDiff = Math.abs((best.episodeLength ?? 0) - duration);
-
-    for (let i = 1; i < matching.length; i++) {
-      const diff = Math.abs((matching[i].episodeLength ?? 0) - duration);
-      if (diff < minDiff) {
-        minDiff = diff;
-        best = matching[i];
-      }
-    }
-
-    return best.interval;
-  };
-
-  return {
-    found: true,
-    results: entries,
-    op: findBestForType("op"),
-    ed: findBestForType("ed"),
-    recap: findBestForType("recap"),
-    mixedOp: findBestForType("mixed-op"),
-    mixedEd: findBestForType("mixed-ed"),
-  };
+  return normalizeSkipEntries(entries, duration);
 }
 
 /**

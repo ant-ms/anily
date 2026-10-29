@@ -107,6 +107,12 @@ describe("apiDetails bookmark and grouping endpoints", () => {
       },
     });
     expect(bookmark).toBeNull();
+
+    // Verify GET /api/details reflects unbookmarked groupingId (null)
+    const getRes = await app.request(`/api/details/${FRIEREN_ID}`);
+    expect(getRes.status).toBe(200);
+    const details = await getRes.json();
+    expect(details.groupingId).toBeNull();
   });
 
   it("rejects invalid anilistId param with 400", async () => {

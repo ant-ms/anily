@@ -1,5 +1,6 @@
 import KuroshiroModule from "kuroshiro";
 import KuromojiAnalyzerModule from "kuroshiro-analyzer-kuromoji";
+import { convertSrtToVtt as coreConvertSrtToVtt } from "@medialy/stream-core";
 import { logger } from "$src/logger";
 
 const log = logger.child({ module: "furigana" });
@@ -116,11 +117,7 @@ export function convertAssToVtt(assContent: string): string {
  * Converts SubRip (SRT) format to WebVTT format.
  */
 export function convertSrtToVtt(srt: string): string {
-  if (srt.trimStart().startsWith("WEBVTT")) {
-    return srt;
-  }
-  const vttTimes = srt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
-  return `WEBVTT\n\n${vttTimes.trim()}\n`;
+  return coreConvertSrtToVtt(srt);
 }
 
 /**
@@ -130,11 +127,18 @@ export const subtitleCache = new Map<string, string>();
 const MAX_CACHE_SIZE = 150;
 
 export function getCachedSubtitle(key: string): string | undefined {
-  return subtitleCache.get(key);
+  const val = subtitleCache.get(key);
+  if (val !== undefined) {
+    subtitleCache.delete(key);
+    subtitleCache.set(key, val);
+  }
+  return val;
 }
 
 export function setCachedSubtitle(key: string, value: string): void {
-  if (subtitleCache.size >= MAX_CACHE_SIZE) {
+  if (subtitleCache.has(key)) {
+    subtitleCache.delete(key);
+  } else if (subtitleCache.size >= MAX_CACHE_SIZE) {
     const firstKey = subtitleCache.keys().next().value;
     if (firstKey) subtitleCache.delete(firstKey);
   }

@@ -39,7 +39,7 @@ export const buildChains = <T extends ChainableAnime>(
       const prequels = relatedInPool(head, AnimeRelationType.PREQUEL).filter(
         (anime) => !seen.has(anime.anilistId),
       );
-      if (prequels.length !== 1) return head;
+      if (prequels.length === 0) return head;
       head = prequels[0];
       seen.add(head.anilistId);
     }
@@ -47,11 +47,17 @@ export const buildChains = <T extends ChainableAnime>(
 
   const buildNode = (anime: T): ChainNode<T> => {
     pool.delete(anime.anilistId);
+    const children: ChainNode<T>[] = [];
+    // A sibling branch may have already consumed a re-converging sequel, so
+    // check that each candidate is still in `pool` before recursing.
+    for (const sequel of relatedInPool(anime, AnimeRelationType.SEQUEL)) {
+      if (pool.has(sequel.anilistId)) {
+        children.push(buildNode(sequel));
+      }
+    }
     return {
       anime,
-      // A sibling branch may have already consumed a re-converging sequel, so
-      // resolve children from the pool after removing this node.
-      children: relatedInPool(anime, AnimeRelationType.SEQUEL).map(buildNode),
+      children,
     };
   };
 

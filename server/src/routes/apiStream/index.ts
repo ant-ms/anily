@@ -207,11 +207,8 @@ export const apiStreamSubtitleTrackRoute = app.get(
   async (c) => {
     const { url: targetUrl, furigana, ep, expires, sig } = c.req.valid("query");
 
-    if (sig && expires) {
-      const isValid = verifyStreamSignature(targetUrl, expires, sig);
-      if (!isValid) {
-        return c.text("Invalid or expired stream signature", 403);
-      }
+    if (!sig || !expires || !verifyStreamSignature(targetUrl, expires, sig)) {
+      return c.text("Invalid or expired stream signature", 403);
     }
 
     if (!isSafeStreamUrl(targetUrl)) {

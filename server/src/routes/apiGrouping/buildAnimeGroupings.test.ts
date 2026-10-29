@@ -114,4 +114,48 @@ describe("buildAnimeGroupings - buildChains", () => {
     expect(result.notInChain.length).toBe(1);
     expect(result.notInChain[0].anilistId).toBe(300);
   });
+
+  it("does not duplicate re-converging sequels in a diamond graph (S1 -> S2A & S2B -> S3)", () => {
+    const s1 = {
+      anilistId: 1001,
+      relationsOut: [
+        { relationType: AnimeRelationType.SEQUEL, toAnimeId: 1002 },
+        { relationType: AnimeRelationType.SEQUEL, toAnimeId: 1003 },
+      ],
+    };
+    const s2a = {
+      anilistId: 1002,
+      relationsOut: [
+        { relationType: AnimeRelationType.PREQUEL, toAnimeId: 1001 },
+        { relationType: AnimeRelationType.SEQUEL, toAnimeId: 1004 },
+      ],
+    };
+    const s2b = {
+      anilistId: 1003,
+      relationsOut: [
+        { relationType: AnimeRelationType.PREQUEL, toAnimeId: 1001 },
+        { relationType: AnimeRelationType.SEQUEL, toAnimeId: 1004 },
+      ],
+    };
+    const s3 = {
+      anilistId: 1004,
+      relationsOut: [
+        { relationType: AnimeRelationType.PREQUEL, toAnimeId: 1002 },
+        { relationType: AnimeRelationType.PREQUEL, toAnimeId: 1003 },
+      ],
+    };
+
+    const result = buildChains([s3, s2b, s1, s2a]);
+    expect(result.chains.length).toBe(1);
+    expect(result.notInChain.length).toBe(0);
+
+    // Flatten all anilistIds in the chain tree and ensure 1004 appears only once
+    const collectIds = (node: any): number[] => [
+      node.anime.anilistId,
+      ...node.children.flatMap(collectIds),
+    ];
+    const allIds = collectIds(result.chains[0]);
+    expect(allIds.filter((id) => id === 1004).length).toBe(1);
+    expect(allIds.sort()).toEqual([1001, 1002, 1003, 1004]);
+  });
 });

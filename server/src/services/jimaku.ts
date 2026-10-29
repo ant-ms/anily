@@ -19,8 +19,44 @@ export interface SubtitleTrackDto {
   default?: boolean;
 }
 
-// In-memory cache for anilistId -> entryId
-const entryCache = new Map<number, number | null>();
+// In-memory TTL cache for anilistId -> entryId
+const ENTRY_CACHE_POSITIVE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const ENTRY_CACHE_NEGATIVE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_ENTRY_CACHE_SIZE = 1000;
+const entryCache = new Map<number, { value: number | null; expiresAt: number }>();
+
+function getCachedEntryId(anilistId: number): number | null | undefined {
+  const entry = entryCache.get(anilistId);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    entryCache.delete(anilistId);
+    return undefined;
+  }
+  entryCache.delete(anilistId);
+  entryCache.set(anilistId, entry);
+  return entry.value;
+}
+
+function setCachedEntryId(anilistId: number, value: number | null): void {
+  if (entryCache.has(anilistId)) {
+    entryCache.delete(anilistId);
+  } else if (entryCache.size >= MAX_ENTRY_CACHE_SIZE) {
+    const oldestKey = entryCache.keys().next().value;
+    if (oldestKey !== undefined) entryCache.delete(oldestKey);
+  }
+  const ttl = value !== null ? ENTRY_CACHE_POSITIVE_TTL_MS : ENTRY_CACHE_NEGATIVE_TTL_MS;
+  entryCache.set(anilistId, { value, expiresAt: Date.now() + ttl });
+}
+
+export function isJimakuHost(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    return host === "jimaku.cc" || host.endsWith(".jimaku.cc");
+  } catch {
+    return false;
+  }
+}
 
 export function getJimakuApiKey(): string | null {
   const key = process.env.JIMAKU_API_KEY || process.env.JIMAKU_TOKEN || null;
@@ -142,7 +178,7 @@ export async function downloadJimakuSubtitleText(
   const headers: Record<string, string> = {
     "User-Agent": "Anily/1.0",
   };
-  if (apiKey && fileUrl.includes("jimaku.cc")) {
+  if (apiKey && isJimakuHost(fileUrl)) {
     headers["Authorization"] = apiKey;
   }
 
@@ -220,10 +256,10 @@ export async function getJimakuSubtitlesForEpisode(
     return [];
   }
 
-  let entryId = entryCache.get(anilistId);
+  let entryId = getCachedEntryId(anilistId);
   if (entryId === undefined) {
     entryId = await searchJimakuEntry(anilistId, titles, apiKey);
-    entryCache.set(anilistId, entryId);
+    setCachedEntryId(anilistId, entryId);
   }
 
   if (!entryId) {

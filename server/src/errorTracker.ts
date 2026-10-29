@@ -25,6 +25,32 @@ export interface ErrorTraceEntry {
   trace: TraceStep[];
 }
 
+export function sanitizeTraceData(data: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+    if (
+      lowerKey.includes("token") ||
+      lowerKey.includes("cookie") ||
+      lowerKey.includes("auth") ||
+      lowerKey.includes("password") ||
+      lowerKey.includes("secret") ||
+      lowerKey.includes("key")
+    ) {
+      sanitized[key] = "[REDACTED]";
+    } else if (typeof val === "object" && val !== null) {
+      try {
+        sanitized[key] = JSON.parse(JSON.stringify(val));
+      } catch {
+        sanitized[key] = String(val);
+      }
+    } else {
+      sanitized[key] = val;
+    }
+  }
+  return sanitized;
+}
+
 export class ActiveTrace {
   private startTime = Date.now();
   private steps: TraceStep[] = [];
@@ -106,28 +132,7 @@ export class ActiveTrace {
   }
 
   private sanitize(data: Record<string, unknown>): Record<string, unknown> {
-    const sanitized: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(data)) {
-      const lowerKey = key.toLowerCase();
-      if (
-        lowerKey.includes("token") ||
-        lowerKey.includes("cookie") ||
-        lowerKey.includes("auth") ||
-        lowerKey.includes("password") ||
-        lowerKey.includes("secret")
-      ) {
-        sanitized[key] = "[REDACTED]";
-      } else if (typeof val === "object" && val !== null) {
-        try {
-          sanitized[key] = JSON.parse(JSON.stringify(val));
-        } catch {
-          sanitized[key] = String(val);
-        }
-      } else {
-        sanitized[key] = val;
-      }
-    }
-    return sanitized;
+    return sanitizeTraceData(data);
   }
 }
 
@@ -210,7 +215,7 @@ export class ErrorTracker {
       statusCode: options.statusCode ?? 500,
       endpoint: options.endpoint,
       method: options.method,
-      params: options.params,
+      params: options.params ? sanitizeTraceData(options.params) : undefined,
       stack: errObj?.stack,
       trace: traceSteps,
     };

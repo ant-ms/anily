@@ -1,5 +1,3 @@
-import { spawn } from 'node:child_process';
-import { Readable } from 'node:stream';
 import type { Context } from 'hono';
 import { prisma } from '$src/prisma';
 import {
@@ -13,15 +11,13 @@ import {
   markServerRateLimited as coreMarkServerRateLimited,
   isServerRateLimited,
   clearRateLimitedServers,
-  checkStderrForFatalErrors,
+  startFfmpegStream,
+  type StartedFfmpeg,
 } from "@medialy/stream-core";
 import { logger } from '$src/logger';
 import { errorTracker } from '$src/errorTracker';
 
 const log = logger.child({ module: "downloadStream" });
-
-const DEFAULT_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 export { getRateLimitServerKey, isServerRateLimited, clearRateLimitedServers };
 
@@ -34,250 +30,6 @@ export function markServerRateLimited(
   const key = getRateLimitServerKey({ providerId, serverId, serverName });
   coreMarkServerRateLimited(providerId, serverId, serverName, cooldownMs);
   log.warn({ key, cooldownMs }, "Marked server as rate-limited for downloads");
-}
-
-interface StartedFfmpeg {
-  process: ReturnType<typeof spawn>;
-  webStream: ReadableStream<Uint8Array>;
-}
-
-interface StartFfmpegOptions {
-  signal?: AbortSignal;
-  trace?: ReturnType<typeof errorTracker.startTrace>;
-  providerName?: string;
-  serverName?: string;
-  onRateLimited?: () => void;
-}
-
-function startFfmpegStream(
-  streamSource: {
-    url: string;
-    container?: string;
-    headers?: Record<string, string>;
-    subtitles?: SubtitleTrack[];
-  },
-  options?: StartFfmpegOptions,
-): Promise<StartedFfmpeg> {
-  return new Promise((resolve, reject) => {
-    const isHls = streamSource.container === "hls" || streamSource.url.includes(".m3u8");
-
-    const args = [
-      "-loglevel",
-      "warning",
-      "-hide_banner",
-    ];
-
-    if (isHls) {
-      args.push("-extension_picky", "0");
-      // Throttle HLS chunk requests to prevent triggering CDN burst rate limits (e.g. HTTP 429)
-      args.push("-readrate", "12");
-      args.push("-seg_max_retry", "5");
-    }
-
-    args.push(
-      "-reconnect",
-      "1",
-      "-reconnect_streamed",
-      "1",
-      "-reconnect_on_http_error",
-      "4xx,5xx",
-      "-reconnect_delay_max",
-      "5",
-    );
-
-    let headerStr = `User-Agent: ${DEFAULT_USER_AGENT}\r\n`;
-    if (streamSource.headers?.Referer) {
-      headerStr += `Referer: ${streamSource.headers.Referer}\r\n`;
-      try {
-        headerStr += `Origin: ${new URL(streamSource.headers.Referer).origin}\r\n`;
-      } catch {}
-    }
-    args.push("-headers", headerStr);
-    args.push("-i", streamSource.url);
-
-    const bestSub = streamSource.subtitles?.find((s) => s.default) ||
-      streamSource.subtitles?.find((s) => s.language === "en" || s.language === "eng") ||
-      streamSource.subtitles?.[0];
-
-    if (bestSub?.url) {
-      args.push("-headers", headerStr);
-      args.push("-i", bestSub.url);
-      args.push("-map", "0:v:0");
-      args.push("-map", "0:a:0?");
-      args.push("-map", "1:s:0?");
-      args.push("-c:v", "copy");
-      args.push("-c:a", "copy");
-      args.push("-c:s", "mov_text");
-      args.push("-metadata:s:s:0", `language=${bestSub.language || "eng"}`);
-      args.push("-metadata:s:s:0", `title=${bestSub.label || "English"}`);
-    } else {
-      args.push("-c", "copy");
-    }
-
-    args.push(
-      "-bsf:a",
-      "aac_adtstoasc",
-      "-movflags",
-      "frag_keyframe+empty_moov+default_base_moof",
-      "-f",
-      "mp4",
-      "pipe:1",
-    );
-
-    const ffmpeg = spawn("ffmpeg", args);
-    let stderr = "";
-    let started = false;
-    let streamClosed = false;
-    let stdoutEnded = false;
-    let processClosed = false;
-    let exitCode: number | null = null;
-    let hasFatalError = false;
-    let fatalErrorMessage = "";
-    let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
-
-    const killFfmpeg = () => {
-      try {
-        ffmpeg.kill("SIGKILL");
-      } catch {}
-    };
-
-    if (options?.signal) {
-      options.signal.addEventListener("abort", killFfmpeg, { once: true });
-    }
-
-    const finish = () => {
-      if (streamClosed) return;
-      streamClosed = true;
-      killFfmpeg();
-
-      if (hasFatalError || (exitCode !== null && exitCode !== 0)) {
-        const errorDetail = fatalErrorMessage || (stderr.trim() ? stderr.trim().slice(-300) : `ffmpeg exited with code ${exitCode}`);
-        const err = new Error(errorDetail);
-        log.error(
-          { error: err, exitCode, provider: options?.providerName, server: options?.serverName },
-          "Download stream terminated with error",
-        );
-        options?.trace?.fail(err, { message: errorDetail, statusCode: 502 });
-        if (streamController) {
-          try {
-            streamController.error(err);
-          } catch {}
-        }
-      } else {
-        options?.trace?.step("FFmpeg stream completed successfully");
-        if (streamController) {
-          try {
-            streamController.close();
-          } catch {}
-        }
-      }
-    };
-
-    ffmpeg.stderr.on("data", (data) => {
-      const text = data.toString();
-      stderr += text;
-      const errorCheck = checkStderrForFatalErrors(text);
-      if (errorCheck.isFatal && !hasFatalError) {
-        hasFatalError = true;
-        fatalErrorMessage = errorCheck.message;
-        if (errorCheck.isRateLimit) {
-          options?.onRateLimited?.();
-        }
-        if (started && streamController && !streamClosed) {
-          finish();
-        }
-      }
-    });
-
-    const cleanup = () => {
-      clearTimeout(timer);
-      ffmpeg.stdout.removeListener("data", onData);
-      ffmpeg.removeListener("error", onError);
-      ffmpeg.removeListener("close", onClose);
-    };
-
-    const timer = setTimeout(() => {
-      if (!started) {
-        cleanup();
-        killFfmpeg();
-        const errDetail = stderr.trim() ? `: ${stderr.trim().slice(-300)}` : "";
-        reject(new Error(`ffmpeg startup timed out${errDetail}`));
-      }
-    }, 25000);
-
-    const onError = (err: Error) => {
-      if (!started) {
-        cleanup();
-        reject(err);
-      } else {
-        hasFatalError = true;
-        fatalErrorMessage = err.message;
-        finish();
-      }
-    };
-
-    const onClose = (code: number | null) => {
-      if (!started) {
-        cleanup();
-        reject(new Error(stderr.trim() || `ffmpeg exited with code ${code}`));
-      }
-    };
-
-    ffmpeg.on("close", (code) => {
-      processClosed = true;
-      exitCode = code;
-      if (started) {
-        finish();
-      }
-    });
-
-    const onData = (firstChunk: Buffer) => {
-      started = true;
-      cleanup();
-
-      ffmpeg.stdout.pause();
-
-      const webStream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          streamController = controller;
-          controller.enqueue(new Uint8Array(firstChunk));
-
-          ffmpeg.stdout.on("data", (chunk: Buffer) => {
-            if (!streamClosed) {
-              try {
-                controller.enqueue(new Uint8Array(chunk));
-              } catch {}
-            }
-          });
-
-          ffmpeg.stdout.on("end", () => {
-            stdoutEnded = true;
-            if (processClosed || hasFatalError) {
-              finish();
-            }
-          });
-
-          ffmpeg.stdout.on("error", (err) => {
-            hasFatalError = true;
-            fatalErrorMessage = err.message;
-            finish();
-          });
-
-          ffmpeg.stdout.resume();
-        },
-        cancel() {
-          streamClosed = true;
-          killFfmpeg();
-        },
-      });
-
-      resolve({ process: ffmpeg, webStream });
-    };
-
-    ffmpeg.stdout.once("data", onData);
-    ffmpeg.once("error", onError);
-    ffmpeg.once("close", onClose);
-  });
 }
 
 export async function handleStreamDownload(
@@ -510,6 +262,7 @@ export async function handleStreamDownload(
       "Content-Type": "video/mp4",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-cache",
+      "Accept-Ranges": "none",
     },
   });
 }

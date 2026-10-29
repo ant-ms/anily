@@ -7,6 +7,7 @@ import {
 } from "@hono/oidc-auth";
 import { cors } from "hono/cors";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { prisma } from "./prisma";
 
 export const DEFAULT_SESSION_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 1 week (604,800 seconds)
 
@@ -210,13 +211,17 @@ export const setupAuthHandlers = (app: Hono) => {
     return c.redirect("/");
   });
   app.get("/api/me", async (c) => {
-    const auth = await getAuth(c);
+    let auth: any = null;
+    try {
+      auth = await getAuth(c);
+    } catch {}
     if (!auth) {
       return c.json({ error: "Unauthorized" }, 401);
     }
     const user = await getAuthenticatedUser(c);
     return c.json({
       ...auth,
+      ...(user.name ? { name: user.name } : {}),
       userId: user.id,
     });
   });
@@ -232,8 +237,6 @@ export type AuthUser = {
 export const getAuthenticatedUser = async (c: any): Promise<AuthUser> => {
   const existing = c.get("user" as any) as AuthUser | undefined;
   if (existing) return existing;
-
-  const { prisma } = await import("./prisma");
 
   let email: string | undefined;
   let name: string | undefined;
@@ -258,7 +261,17 @@ export const getAuthenticatedUser = async (c: any): Promise<AuthUser> => {
       },
     });
 
-    if (!user && email) {
+    if (user) {
+      if ((name && user.name !== name) || (sub && !user.sub)) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            ...(name ? { name } : {}),
+            ...(sub ? { sub } : {}),
+          },
+        });
+      }
+    } else if (email) {
       user = await prisma.user.upsert({
         where: { email },
         create: {
@@ -288,11 +301,13 @@ export const getAuthenticatedUser = async (c: any): Promise<AuthUser> => {
     }
     if (!user) {
       const defaultEmail = fallbackEmail || "owner@anily.local";
-      user = await prisma.user.create({
-        data: {
+      user = await prisma.user.upsert({
+        where: { email: defaultEmail },
+        create: {
           email: defaultEmail,
           name: "Owner",
         },
+        update: {},
       });
     }
   }

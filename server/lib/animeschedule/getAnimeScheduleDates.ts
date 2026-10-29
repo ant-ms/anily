@@ -49,7 +49,8 @@ const findMatchingAnime = (
   data: AnimeScheduleSearchResult,
   anilistId: number
 ): AnimeScheduleAnime | undefined => {
-  return data.anime?.find((a) => a.websites?.aniList?.includes(`/${anilistId}`));
+  const idPattern = new RegExp(`/${anilistId}(?:[/?#]|$)`);
+  return data.anime?.find((a) => idPattern.test(a.websites?.aniList ?? ""));
 };
 
 const isValidDate = (dateString?: string): boolean => {

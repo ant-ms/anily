@@ -125,7 +125,7 @@ export const apiDetailsAnilistIdGetRoute = app.get(
         }),
       ]);
 
-      const isBookmarked = Boolean(userBookmark || (details.baseAnime.groupings && details.baseAnime.groupings.length > 0));
+      const isBookmarked = Boolean(userBookmark);
 
       const filteredDetails = {
         anilistId: details.baseAnime.anilistId,

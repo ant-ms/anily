@@ -2,8 +2,12 @@ import { logger } from "$src/logger";
 import { prisma } from "$src/prisma";
 import { collectGroupingMemberIds } from "./collectGroupingMemberIds";
 
-export const getNumberOfAnimeGroupings = async (anilistId: number) => {
-  const groupingMemberIds = await collectGroupingMemberIds(anilistId);
+export const getNumberOfAnimeGroupings = async (
+  anilistId: number,
+  precomputedMemberIds?: number[],
+) => {
+  const groupingMemberIds =
+    precomputedMemberIds ?? (await collectGroupingMemberIds(anilistId));
   return await prisma.animeGrouping.findMany({
     where: {
       items: {
@@ -18,7 +22,11 @@ export const getNumberOfAnimeGroupings = async (anilistId: number) => {
 };
 
 export const updateAnimeGroupingIfNeeded = async (anilistId: number) => {
-  const numberOfAnimeGroupings = await getNumberOfAnimeGroupings(anilistId);
+  const groupingMemberIds = await collectGroupingMemberIds(anilistId);
+  const numberOfAnimeGroupings = await getNumberOfAnimeGroupings(
+    anilistId,
+    groupingMemberIds,
+  );
 
   // If no anime grouping is found, nothing to update
   if (numberOfAnimeGroupings.length === 0) return;
@@ -33,7 +41,6 @@ export const updateAnimeGroupingIfNeeded = async (anilistId: number) => {
   }
 
   // If a single anime grouping is found, update it to include all the grouping members
-  const groupingMemberIds = await collectGroupingMemberIds(anilistId);
   const animeGrouping = numberOfAnimeGroupings[0];
   await prisma.animeGrouping.update({
     where: { id: animeGrouping.id },

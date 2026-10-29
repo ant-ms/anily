@@ -51,6 +51,14 @@ export async function fetchGraphQL<TResult, TVariables>(
   document: TypedDocumentNode<TResult, TVariables>,
   ...[variables]: TVariables extends Record<string, never> ? [] : [TVariables]
 ): Promise<TResult> {
+  return executeFetchGraphQL(document, variables as TVariables | undefined, 0);
+}
+
+async function executeFetchGraphQL<TResult, TVariables>(
+  document: TypedDocumentNode<TResult, TVariables>,
+  variables: TVariables | undefined,
+  retryCount: number,
+): Promise<TResult> {
   const query = document.loc?.source.body ?? print(document);
 
   await throttle();
@@ -67,7 +75,7 @@ export async function fetchGraphQL<TResult, TVariables>(
   // Always sync our local state with whatever the server reports.
   updateRateLimitState(response.headers);
 
-  if (response.status === 429) {
+  if (response.status === 429 && retryCount < 2) {
     const retryAfter = response.headers.get("Retry-After");
     const resetHeader = response.headers.get("X-RateLimit-Reset");
 
@@ -82,17 +90,17 @@ export async function fetchGraphQL<TResult, TVariables>(
 
     blockedUntilMs = Date.now() + waitMs;
 
-    // Retry once after the cooldown.
-    return fetchGraphQL(
-      document,
-      ...(variables === undefined ? ([] as any) : [variables]),
-    );
+    // Retry after the cooldown (bounded to 2 retries).
+    return executeFetchGraphQL(document, variables, retryCount + 1);
   }
 
   if (!response.ok) {
-    throw new Error(
-      `API error: ${response.statusText}\n\t${JSON.stringify(await response.json(), null, 2)}`,
-    );
+    const rawBody = await response.text().catch(() => "");
+    let detail = rawBody;
+    try {
+      detail = JSON.stringify(JSON.parse(rawBody), null, 2);
+    } catch {}
+    throw new Error(`API error: ${response.statusText}\n\t${detail}`);
   }
 
   const result = (await response.json()) as GraphQLResponse<TResult>;

@@ -21,7 +21,7 @@ const gatherAnimeUntil = async (
   const animeToKeep = [];
 
   for (const anime of media) {
-    if (anime.updatedAt != null && BigInt(anime.updatedAt) < lastUpdatedInDb) {
+    if (anime.updatedAt != null && BigInt(anime.updatedAt) <= lastUpdatedInDb) {
       return animeToKeep;
     }
     animeToKeep.push(anime);
@@ -60,17 +60,18 @@ export const updateAnimeDetailsIfNeeded = async (anilistId: number): Promise<boo
   return true;
 };
 
+let isAnilistSyncRunning = false;
+
 export const keepAnilistDataUpdated = async (trigger: SyncJobTrigger = SyncJobTrigger.SCHEDULED) => {
   const log = logger.child({ task: "keepAnilistDataUpdated" });
 
-  const job = await prisma.syncJob.create({
-    data: {
-      type: SyncJobType.ANILIST_SYNC,
-      trigger,
-      status: "RUNNING",
-    },
-  });
+  if (isAnilistSyncRunning) {
+    log.info("AniList data sync is already running, skipping this run.");
+    return;
+  }
+  isAnilistSyncRunning = true;
 
+  let job: { id: number } | null = null;
   let animeWithUpdates: RecentlyUpdatedAnime = [];
   let detailsUpdatedCount = 0;
   let episodesUpdatedCount = 0;
@@ -78,6 +79,14 @@ export const keepAnilistDataUpdated = async (trigger: SyncJobTrigger = SyncJobTr
   const warnings: Array<{ anilistId: number; title: string; message: string }> = [];
 
   try {
+    job = await prisma.syncJob.create({
+      data: {
+        type: SyncJobType.ANILIST_SYNC,
+        trigger,
+        status: "RUNNING",
+      },
+    });
+
     animeWithUpdates = await getAllAnimeWithUpdates(log);
     log.info(`found ${animeWithUpdates.length} anime with updates`);
 
@@ -89,23 +98,25 @@ export const keepAnilistDataUpdated = async (trigger: SyncJobTrigger = SyncJobTr
 
       // Then update the details (thumbnail and description)
       const updatedDetails = await updateAnimeDetailsIfNeeded(anime.id);
-      if (updatedDetails) detailsUpdatedCount++;
+      if (updatedDetails) {
+        detailsUpdatedCount++;
 
-      const startDate = anime.startDate?.year && anime.startDate?.month && anime.startDate?.day
-        ? new Date(anime.startDate.year, anime.startDate.month - 1, anime.startDate.day)
-        : null;
+        const startDate = anime.startDate?.year && anime.startDate?.month && anime.startDate?.day
+          ? new Date(anime.startDate.year, anime.startDate.month - 1, anime.startDate.day)
+          : null;
 
-      try {
-        await upsertEpisodesForAnime(anime.id, anime.episodes, startDate);
-        episodesUpdatedCount++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        log.warn({ anilistId: anime.id, error }, "failed to update episodes");
-        warnings.push({
-          anilistId: anime.id,
-          title,
-          message: `Episode sync: ${msg}`,
-        });
+        try {
+          await upsertEpisodesForAnime(anime.id, anime.episodes, startDate);
+          episodesUpdatedCount++;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          log.warn({ anilistId: anime.id, error }, "failed to update episodes");
+          warnings.push({
+            anilistId: anime.id,
+            title,
+            message: `Episode sync: ${msg}`,
+          });
+        }
       }
 
       // If the anime is part of a grouping, update the grouping to include it
@@ -144,17 +155,23 @@ export const keepAnilistDataUpdated = async (trigger: SyncJobTrigger = SyncJobTr
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error }, "sync failed");
-    await prisma.syncJob.update({
-      where: { id: job.id },
-      data: {
-        status: "FAILED",
-        completedAt: new Date(),
-        error: errorMessage,
-        details: {
-          animeChecked: animeWithUpdates.length,
-          warnings: warnings.slice(0, 50),
-        },
-      },
-    });
+    if (job?.id) {
+      await prisma.syncJob
+        .update({
+          where: { id: job.id },
+          data: {
+            status: "FAILED",
+            completedAt: new Date(),
+            error: errorMessage,
+            details: {
+              animeChecked: animeWithUpdates.length,
+              warnings: warnings.slice(0, 50),
+            },
+          },
+        })
+        .catch(() => {});
+    }
+  } finally {
+    isAnilistSyncRunning = false;
   }
 };

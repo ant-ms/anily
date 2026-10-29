@@ -7,6 +7,56 @@ import { getAnimeDetails } from "../apiDetails/getAnimeDetails";
 import { getAuthenticatedUser } from "$src/auth";
 
 export const ratingEnumSchema = z.enum(["LIKE", "NEUTRAL", "DISLIKE"]);
+const ratingBodyValidator = zValidator(
+  "json",
+  z.object({
+    rating: ratingEnumSchema,
+  }),
+);
+
+async function handleUpsertRating(
+  c: any,
+  anilistId: number,
+  rating: "LIKE" | "NEUTRAL" | "DISLIKE",
+) {
+  try {
+    const user = await getAuthenticatedUser(c);
+    const existingBase = await prisma.baseAnime.findUnique({
+      where: { anilistId },
+      select: { anilistId: true },
+    });
+    if (!existingBase) {
+      await getAnimeDetails(anilistId);
+    }
+
+    const updated = await prisma.userAnimeRating.upsert({
+      where: {
+        userId_anilistId: {
+          userId: user.id,
+          anilistId,
+        },
+      },
+      create: {
+        userId: user.id,
+        anilistId,
+        rating,
+      },
+      update: {
+        rating,
+      },
+    });
+
+    return c.json({ rating: updated.rating });
+  } catch (error) {
+    return c.json(
+      {
+        error: "Failed to update rating",
+        reason: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
+  }
+}
 
 export const apiRateAnilistIdGetRoute = app.get(
   "/api/rate/:anilistId",
@@ -29,8 +79,11 @@ export const apiRateAnilistIdGetRoute = app.get(
         return c.json({ rating: userRating.rating });
       }
 
-      const details = await getAnimeDetails(params.anilistId);
-      return c.json({ rating: details.rating ?? "NEUTRAL" });
+      const details = await prisma.animeDetails.findUnique({
+        where: { baseAnimeAnilistId: params.anilistId },
+        select: { rating: true },
+      });
+      return c.json({ rating: details?.rating ?? "NEUTRAL" });
     } catch (error) {
       return c.json(
         {
@@ -46,47 +99,11 @@ export const apiRateAnilistIdGetRoute = app.get(
 export const apiRateAnilistIdPutRoute = app.put(
   "/api/rate/:anilistId",
   anilistParamValidator,
-  zValidator(
-    "json",
-    z.object({
-      rating: ratingEnumSchema,
-    }),
-  ),
+  ratingBodyValidator,
   async (c) => {
     const params = c.req.valid("param");
     const body = c.req.valid("json");
-
-    try {
-      const user = await getAuthenticatedUser(c);
-      await getAnimeDetails(params.anilistId);
-
-      const updated = await prisma.userAnimeRating.upsert({
-        where: {
-          userId_anilistId: {
-            userId: user.id,
-            anilistId: params.anilistId,
-          },
-        },
-        create: {
-          userId: user.id,
-          anilistId: params.anilistId,
-          rating: body.rating,
-        },
-        update: {
-          rating: body.rating,
-        },
-      });
-
-      return c.json({ rating: updated.rating });
-    } catch (error) {
-      return c.json(
-        {
-          error: "Failed to update rating",
-          reason: error instanceof Error ? error.message : String(error),
-        },
-        500,
-      );
-    }
+    return handleUpsertRating(c, params.anilistId, body.rating);
   },
 );
 
@@ -94,46 +111,10 @@ export const apiRateAnilistIdPutRoute = app.put(
 export const apiDetailsRatingPostRoute = app.post(
   "/api/details/:anilistId/rating",
   anilistParamValidator,
-  zValidator(
-    "json",
-    z.object({
-      rating: ratingEnumSchema,
-    }),
-  ),
+  ratingBodyValidator,
   async (c) => {
     const params = c.req.valid("param");
     const body = c.req.valid("json");
-
-    try {
-      const user = await getAuthenticatedUser(c);
-      await getAnimeDetails(params.anilistId);
-
-      const updated = await prisma.userAnimeRating.upsert({
-        where: {
-          userId_anilistId: {
-            userId: user.id,
-            anilistId: params.anilistId,
-          },
-        },
-        create: {
-          userId: user.id,
-          anilistId: params.anilistId,
-          rating: body.rating,
-        },
-        update: {
-          rating: body.rating,
-        },
-      });
-
-      return c.json({ rating: updated.rating });
-    } catch (error) {
-      return c.json(
-        {
-          error: "Failed to update rating",
-          reason: error instanceof Error ? error.message : String(error),
-        },
-        500,
-      );
-    }
+    return handleUpsertRating(c, params.anilistId, body.rating);
   },
 );

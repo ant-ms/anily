@@ -1,6 +1,6 @@
 import { getAnimeDetailsFromAPI } from "$lib/anilistApi/animeDetails/getAnimeDetails";
+import { upsertAnimeDetailsFromApiData } from "$lib/anilistApi/getAnimeDetailsFromApiAndUpsert";
 import { upsertEpisodesForAnime } from "$lib/thetvdb/upsertEpisodesForAnime";
-import { prisma } from "$src/prisma";
 
 export const syncAnimePipeline = async (anilistId: number) => {
   const animeDetails = await getAnimeDetailsFromAPI(anilistId);
@@ -9,32 +9,7 @@ export const syncAnimePipeline = async (anilistId: number) => {
     throw new Error("Failed to fetch anime details");
   }
 
-  const thumbnailUrl =
-    animeDetails.coverImage?.extraLarge ||
-    animeDetails.coverImage?.large ||
-    animeDetails.coverImage?.medium;
-
-  const upserted = await prisma.animeDetails.upsert({
-    where: {
-      baseAnimeAnilistId: anilistId,
-    },
-    update: {
-      description: animeDetails.description,
-      thumbnailUrl,
-    },
-    create: {
-      baseAnimeAnilistId: anilistId,
-      description: animeDetails.description,
-      thumbnailUrl,
-    },
-    include: {
-      baseAnime: {
-        include: {
-          groupings: true,
-        },
-      },
-    },
-  });
+  const upserted = await upsertAnimeDetailsFromApiData(anilistId, animeDetails);
 
   let startDate: Date | null = null;
   if (

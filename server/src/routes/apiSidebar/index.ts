@@ -43,49 +43,74 @@ function getEpisodeStats(items: GroupingItem[], now: Date) {
 import { getAuthenticatedUser } from "$src/auth";
 
 export const getSidebarAnimesFromDB = async (tab: string, userId: string): Promise<SidebarCardData[]> => {
-  const [animeGroupings, userProgress, userBookmarks] = await Promise.all([
-    prisma.animeGrouping.findMany({
-      include: {
-        items: {
-          select: {
-            anilistId: true,
-            relationsOut: {
-              select: {
-                relationType: true,
-                toAnimeId: true,
-              },
+  const userBookmarks = await prisma.userBookmark.findMany({
+    where: { userId },
+    select: { anilistId: true },
+  });
+
+  if (userBookmarks.length === 0) {
+    return [];
+  }
+
+  const bookmarkedIds = userBookmarks.map((b) => b.anilistId);
+  const bookmarkedSet = new Set(bookmarkedIds);
+
+  const animeGroupings = await prisma.animeGrouping.findMany({
+    where: {
+      items: {
+        some: {
+          anilistId: { in: bookmarkedIds },
+        },
+      },
+    },
+    include: {
+      items: {
+        select: {
+          anilistId: true,
+          relationsOut: {
+            select: {
+              relationType: true,
+              toAnimeId: true,
             },
-            animeDetails: {
-              select: {
-                episodes: {
-                  select: {
-                    id: true,
-                    airingAt: true,
-                  },
+          },
+          animeDetails: {
+            select: {
+              episodes: {
+                select: {
+                  id: true,
+                  airingAt: true,
                 },
               },
             },
           },
         },
-        displayAnime: {
-          include: {
-            animeDetails: true,
-          },
+      },
+      displayAnime: {
+        include: {
+          animeDetails: true,
         },
       },
-    }),
-    prisma.userEpisodeProgress.findMany({
-      where: { userId },
-      select: { episodeId: true, watched: true },
-    }),
-    prisma.userBookmark.findMany({
-      where: { userId },
-      select: { anilistId: true },
-    }),
-  ]);
+    },
+  });
+
+  const relevantEpisodeIds: number[] = [];
+  for (const grouping of animeGroupings) {
+    for (const item of grouping.items) {
+      for (const ep of item.animeDetails?.episodes ?? []) {
+        relevantEpisodeIds.push(ep.id);
+      }
+    }
+  }
+
+  const userProgress = await prisma.userEpisodeProgress.findMany({
+    where: {
+      userId,
+      episodeId: { in: relevantEpisodeIds },
+    },
+    select: { episodeId: true, watched: true },
+  });
 
   const watchedMap = new Map(userProgress.map((p) => [p.episodeId, p.watched]));
-  const bookmarkedSet = new Set(userBookmarks.map((b) => b.anilistId));
 
   // Map each episode's watched status to this user
   const userScopedGroupings = animeGroupings
@@ -173,6 +198,17 @@ export const getSidebarAnimesFromDB = async (tab: string, userId: string): Promi
       allProgressChains.push(notInChainProgressFlat);
     }
 
+    let earliestFutureDate: Date | null = null;
+    for (const item of grouping.items) {
+      for (const ep of item.animeDetails?.episodes ?? []) {
+        if (ep.airingAt && ep.airingAt > now) {
+          if (!earliestFutureDate || ep.airingAt < earliestFutureDate) {
+            earliestFutureDate = ep.airingAt;
+          }
+        }
+      }
+    }
+
     cards.push({
       displayAnilistId: grouping.displayAnime.anilistId,
       allAnilistIds: grouping.items.map((item) => item.anilistId),
@@ -181,21 +217,11 @@ export const getSidebarAnimesFromDB = async (tab: string, userId: string): Promi
       titleRomanji: grouping.displayAnime.titleRomanji,
       titleNative: grouping.displayAnime.titleNative,
       thumbnailUrl: grouping.displayAnime.animeDetails?.thumbnailUrl ?? null,
-      nextEpisodeDate: new Date(),
+      nextEpisodeDate: earliestFutureDate ?? now,
     });
   }
 
-  // Deduplicate returned list by displayAnilistId as defense-in-depth
-  const finalCards: SidebarCardData[] = [];
-  const finalSeenIds = new Set<number>();
-  for (const card of cards) {
-    if (!finalSeenIds.has(card.displayAnilistId)) {
-      finalSeenIds.add(card.displayAnilistId);
-      finalCards.push(card);
-    }
-  }
-
-  return finalCards;
+  return cards;
 };
 
 export const apiSidebarGetRoute = app.get(

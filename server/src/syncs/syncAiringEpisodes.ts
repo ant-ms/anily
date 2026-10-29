@@ -17,19 +17,19 @@ export const syncAiringEpisodes = async (
 
   isAiringSyncRunning = true;
 
-  const job = await prisma.syncJob.create({
-    data: {
-      type: SyncJobType.EPISODE_METADATA,
-      trigger,
-      status: "RUNNING",
-    },
-  });
-
+  let job: { id: number } | null = null;
   const now = new Date();
   const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
   try {
+    job = await prisma.syncJob.create({
+      data: {
+        type: SyncJobType.EPISODE_METADATA,
+        trigger,
+        status: "RUNNING",
+      },
+    });
     // Find anime in user's library that have episodes airing around now,
     // or are from the current / recent season.
     const candidates = await prisma.animeDetails.findMany({
@@ -109,14 +109,18 @@ export const syncAiringEpisodes = async (
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error }, "Airing episode sync failed");
-    await prisma.syncJob.update({
-      where: { id: job.id },
-      data: {
-        status: "FAILED",
-        completedAt: new Date(),
-        error: errorMessage,
-      },
-    });
+    if (job?.id) {
+      await prisma.syncJob
+        .update({
+          where: { id: job.id },
+          data: {
+            status: "FAILED",
+            completedAt: new Date(),
+            error: errorMessage,
+          },
+        })
+        .catch(() => {});
+    }
   } finally {
     isAiringSyncRunning = false;
   }

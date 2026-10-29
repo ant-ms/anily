@@ -39,9 +39,17 @@ serve(
     logger.info(`Server is running on http://localhost:${info.port}`);
 
     if (process.env.ANILY_DISABLE_SCHEDULES !== "true") {
-      setInterval(keepAnilistDataUpdated, 5 * 60 * 1000);
+      setInterval(() => {
+        keepAnilistDataUpdated().catch((err) => {
+          logger.error({ error: err }, "Unhandled error in keepAnilistDataUpdated");
+        });
+      }, 5 * 60 * 1000);
       // Sync airing anime episodes from TheTVDB and AnimeSchedule every 60 minutes
-      setInterval(syncAiringEpisodes, 60 * 60 * 1000);
+      setInterval(() => {
+        syncAiringEpisodes().catch((err) => {
+          logger.error({ error: err }, "Unhandled error in syncAiringEpisodes");
+        });
+      }, 60 * 60 * 1000);
     }
   },
 );
